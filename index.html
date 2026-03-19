@@ -370,24 +370,10 @@
                 <!-- Token display -->
                 <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">הטוקן שלך</p>
-                    <div class="flex items-center justify-between gap-2">
-                        <span id="settingsTokenDisplay" class="font-mono font-black text-xl tracking-widest text-slate-800">------</span>
-                        <button onclick="window.copyTokenFromSettings()" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1">
-                            <i class="fa-solid fa-copy"></i>העתק
-                        </button>
-                    </div>
-                    <p class="text-[9px] text-slate-400 mt-1">גישה דרך URL: <span id="settingsTokenUrl" class="font-mono text-blue-500"></span></p>
+                    <span id="settingsTokenDisplay" class="font-mono font-black text-2xl tracking-widest text-slate-800">------</span>
                 </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2">Supabase URL</label>
-                    <input type="text" id="supabaseUrlInput" placeholder="https://xxxx.supabase.co" class="input-field w-full px-4 py-3 rounded-xl font-mono text-xs">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2">Supabase Anon Key</label>
-                    <input type="text" id="supabaseKeyInput" placeholder="eyJ..." class="input-field w-full px-4 py-3 rounded-xl font-mono text-xs">
-                </div>
-                <div class="pt-4 border-t border-slate-100">
-                    <div class="flex justify-between items-center mb-4">
+                <div class="pt-2 border-t border-slate-100">
+                    <div class="flex justify-between items-center">
                         <span class="font-bold text-slate-700 text-sm">מצב Privacy</span>
                         <label class="toggle-switch">
                             <input type="checkbox" id="privacyToggle" onchange="window.togglePrivacyMode()">
@@ -398,7 +384,6 @@
                 <button onclick="window.openImportModal()" class="w-full bg-amber-50 border border-amber-200 text-amber-700 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
                     <i class="fa-brands fa-google text-sm"></i>ייבוא היסטוריה מ-Google Sheets
                 </button>
-                <button id="saveSettingsBtn" onclick="window.saveSettings()" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl text-xs mt-2">שמור הגדרות</button>
                 <button onclick="window.logout()" class="w-full bg-red-50 border border-red-100 text-red-500 font-bold py-3 rounded-xl text-xs">התנתק</button>
             </div>
         </div>
@@ -437,24 +422,12 @@
     <!-- Import from Apps Script Modal -->
     <div id="importOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-            <h3 class="text-lg font-bold text-slate-900 mb-2 text-center">ייבוא מ-Google Sheets</h3>
-            <p class="text-xs text-slate-500 mb-5 text-center leading-relaxed">הייבוא משתמש ב-Apps Script הקיים כדי לשלוף תנועות ותקציב וייצא אותם ל-Supabase</p>
+            <h3 class="text-lg font-bold text-slate-900 mb-5 text-center">ייבוא מ-Google Sheets</h3>
             <div class="space-y-4">
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">מפתח Apps Script</label>
                     <input type="text" id="importGasKeyInput" placeholder="Mck-LpZ123..." class="input-field w-full px-4 py-3 rounded-xl font-mono text-xs">
                     <p class="text-[9px] text-slate-400 mt-1 mr-1">אותו מפתח סנכרון שהיה בהגדרות האפליקציה המקורית</p>
-                </div>
-                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                    <p class="text-[10px] font-bold text-slate-500 mb-2">מה יתוייבא:</p>
-                    <div class="space-y-1">
-                        <label class="flex items-center gap-2 text-xs text-slate-600">
-                            <input type="checkbox" id="importTxCheck" checked class="rounded text-blue-600"> תנועות (הוצאות שוטפות ומתוכננות)
-                        </label>
-                        <label class="flex items-center gap-2 text-xs text-slate-600">
-                            <input type="checkbox" id="importBudgetCheck" checked class="rounded text-blue-600"> הגדרות תקציב (הכנסות, קבועות, מתוכננות)
-                        </label>
-                    </div>
                 </div>
                 <div id="importProgress" class="hidden">
                     <p id="importStatusText" class="text-xs text-slate-600 font-semibold mb-1"></p>
@@ -1058,9 +1031,8 @@
         const rawKey = document.getElementById('importGasKeyInput').value.trim();
         if (!rawKey) { window.showToast('נא להזין מפתח Apps Script', 'circle-xmark'); return; }
         const gasKey = sanitizeScriptId(rawKey);
-        const doTx = document.getElementById('importTxCheck').checked;
-        const doBudget = document.getElementById('importBudgetCheck').checked;
-        if (!doTx && !doBudget) { window.showToast('יש לבחור לפחות אפשרות אחת', 'circle-xmark'); return; }
+        const doTx = true;
+        const doBudget = true;
 
         const progDiv = document.getElementById('importProgress');
         const statusText = document.getElementById('importStatusText');
@@ -1594,14 +1566,9 @@
         const o = document.getElementById('settingsOverlay');
         if (!o) return;
         if (o.classList.contains('hidden')) {
-            document.getElementById('supabaseUrlInput').value = localStorage.getItem('supabase_url') || SUPABASE_URL;
-            document.getElementById('supabaseKeyInput').value = localStorage.getItem('supabase_anon_key') || SUPABASE_ANON_KEY;
             const pt = document.getElementById('privacyToggle'); if (pt) pt.checked = state.isPrivacyMode;
-            // Show current token
             const td = document.getElementById('settingsTokenDisplay');
             if (td) td.textContent = USER_TOKEN || '------';
-            const tu = document.getElementById('settingsTokenUrl');
-            if (tu) tu.textContent = USER_TOKEN ? `?token=${USER_TOKEN}` : '';
             o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10);
         } else {
             o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300);
@@ -2363,6 +2330,54 @@
         const urlParams = new URLSearchParams(window.location.search);
         const urlToken = (urlParams.get('token') || '').toUpperCase().trim();
         const storedToken = localStorage.getItem('user_token') || '';
+
+        // ── Quick-add via URL: ?token=XXXX&add=50&name=קפה ──────────────────
+        // Used by iPhone Shortcuts — opens Safari briefly, adds expense, shows result
+        const quickAmount   = parseFloat(urlParams.get('add') || '');
+        const quickName     = urlParams.get('name') || '';
+        const quickCategory = urlParams.get('category') || 'שוטף';
+
+        if (quickAmount > 0 && quickName) {
+            const tokenForQuick = urlToken.length === TOKEN_LEN ? urlToken : storedToken;
+            if (tokenForQuick.length === TOKEN_LEN && sbClient) {
+                // Show minimal "adding..." UI
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('appRoot').innerHTML = `
+                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:1rem;padding:2rem;text-align:center">
+                        <div style="font-size:2rem">⏳</div>
+                        <p style="font-weight:700;color:#1e293b;font-size:1.1rem">רושם הוצאה...</p>
+                        <p style="color:#64748b;font-size:0.9rem">${quickName} — ₪${quickAmount}</p>
+                    </div>`;
+                sbClient.from('transactions').insert({
+                    amount: quickAmount,
+                    name: quickName,
+                    category: quickCategory,
+                    user_token: tokenForQuick,
+                    created_at: new Date().toISOString()
+                }).then(async ({ error }) => {
+                    const balance = error ? null : await fetchBalance().catch(() => null);
+                    const balanceText = balance !== null
+                        ? `<p style="color:#64748b;font-size:0.85rem;margin-top:0.5rem">מאזן: ₪${Math.round(balance).toLocaleString()}</p>`
+                        : '';
+                    document.getElementById('appRoot').innerHTML = error
+                        ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:1rem;padding:2rem;text-align:center">
+                               <div style="font-size:2rem">❌</div>
+                               <p style="font-weight:700;color:#ef4444">שגיאה: ${error.message}</p>
+                           </div>`
+                        : `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:1rem;padding:2rem;text-align:center">
+                               <div style="font-size:3rem">✅</div>
+                               <p style="font-weight:700;color:#1e293b;font-size:1.1rem">נרשם בהצלחה!</p>
+                               <p style="color:#64748b;font-size:0.95rem">${quickName} — ₪${quickAmount}</p>
+                               ${balanceText}
+                               <a href="${window.location.pathname}?token=${tokenForQuick}" style="margin-top:1.5rem;background:#2563eb;color:white;padding:0.75rem 2rem;border-radius:9999px;font-weight:700;font-size:0.875rem;text-decoration:none">פתח את האפליקציה</a>
+                           </div>`;
+                    // Clean URL
+                    window.history.replaceState({}, '', `${window.location.pathname}?token=${tokenForQuick}`);
+                });
+                return; // don't continue with normal init
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         if (urlToken.length === TOKEN_LEN) {
             // Token in URL — validate and use
