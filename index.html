@@ -94,9 +94,60 @@
         .conn-dot.connected { background: #10b981; box-shadow: 0 0 0 2px #d1fae5; }
         .conn-dot.disconnected { background: #ef4444; box-shadow: 0 0 0 2px #fee2e2; }
         .conn-dot.connecting { background: #f59e0b; box-shadow: 0 0 0 2px #fef3c7; animation: pulse-ai 1s infinite; }
+
+        /* Login screen */
+        #loginScreen { position: fixed; inset: 0; background: #f3f4f6; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
+        #loginScreen.hidden { display: none; }
+        .token-display { font-family: 'Courier New', monospace; font-size: 2.2rem; font-weight: 900; letter-spacing: 0.5em; color: #1e293b; background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 1rem; padding: 1rem 2rem; text-align: center; user-select: all; cursor: copy; }
+        .token-input { font-family: 'Courier New', monospace; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.35em; text-align: center; text-transform: uppercase; }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
+        .shake { animation: shake 0.4s ease; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center p-4 large-text">
+
+    <!-- ===================== LOGIN SCREEN ===================== -->
+    <div id="loginScreen">
+        <div class="w-full max-w-xs flex flex-col items-center">
+            <div class="mb-8 text-center">
+                <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-3 mx-auto shadow-lg shadow-blue-200">
+                    <i class="fa-solid fa-wallet text-white text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-black text-slate-900">MoneyBoss</h1>
+                <p class="text-xs text-slate-400 font-semibold mt-1">ניהול תקציב משפחתי</p>
+            </div>
+            <div class="w-full bg-slate-100 rounded-2xl p-1 flex mb-6">
+                <button id="tabNew" onclick="window.switchLoginTab('new')" class="flex-1 py-2 rounded-xl text-xs font-bold transition-all bg-white text-slate-800 shadow-sm">חשבון חדש</button>
+                <button id="tabExist" onclick="window.switchLoginTab('exist')" class="flex-1 py-2 rounded-xl text-xs font-bold transition-all text-slate-500">יש לי טוקן</button>
+            </div>
+            <div id="panelNew" class="w-full">
+                <p class="text-xs text-slate-500 text-center mb-5 leading-relaxed">לחץ על הכפתור ליצירת חשבון חדש.<br>תקבל טוקן אישי — שמור אותו!</p>
+                <button onclick="window.createNewAccount()" id="createAccountBtn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-sm shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus-circle"></i>צור חשבון חדש
+                </button>
+                <div id="newTokenResult" class="hidden mt-5">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center mb-2">הטוקן שלך — לחץ להעתקה</p>
+                    <div id="newTokenDisplay" class="token-display mb-3" onclick="window.copyToken()">------</div>
+                    <p class="text-[9px] text-red-500 font-bold text-center mb-4">⚠️ שמור את הטוקן — אין אפשרות לשחזר!</p>
+                    <button onclick="window.enterWithToken()" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-2xl text-sm">כניסה לחשבון</button>
+                </div>
+            </div>
+            <div id="panelExist" class="w-full hidden">
+                <p class="text-xs text-slate-500 text-center mb-5">הזן את הטוקן שקיבלת בעת יצירת החשבון</p>
+                <input type="text" id="existingTokenInput" maxlength="6"
+                    class="token-input input-field w-full px-4 py-4 rounded-2xl mb-3"
+                    placeholder="AB1C2D"
+                    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)"
+                    onkeydown="if(event.key==='Enter') window.loginWithToken()">
+                <button onclick="window.loginWithToken()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-sm shadow-lg shadow-blue-200">
+                    כניסה
+                </button>
+                <p id="loginError" class="text-xs text-red-500 font-bold text-center mt-3 hidden">טוקן לא נמצא. בדוק שוב.</p>
+            </div>
+        </div>
+    </div>
+    <!-- ====================================================== -->
+
     <div class="w-full max-w-md bg-transparent flex flex-col min-h-screen pb-32" id="appRoot">
         <div class="flex justify-between items-center mb-4 px-1">
             <div class="flex items-center gap-2">
@@ -316,6 +367,17 @@
                 <button onclick="window.toggleSettings()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="space-y-5">
+                <!-- Token display -->
+                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">הטוקן שלך</p>
+                    <div class="flex items-center justify-between gap-2">
+                        <span id="settingsTokenDisplay" class="font-mono font-black text-xl tracking-widest text-slate-800">------</span>
+                        <button onclick="window.copyTokenFromSettings()" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg flex items-center gap-1">
+                            <i class="fa-solid fa-copy"></i>העתק
+                        </button>
+                    </div>
+                    <p class="text-[9px] text-slate-400 mt-1">גישה דרך URL: <span id="settingsTokenUrl" class="font-mono text-blue-500"></span></p>
+                </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2">Supabase URL</label>
                     <input type="text" id="supabaseUrlInput" placeholder="https://xxxx.supabase.co" class="input-field w-full px-4 py-3 rounded-xl font-mono text-xs">
@@ -337,6 +399,7 @@
                     <i class="fa-brands fa-google text-sm"></i>ייבוא היסטוריה מ-Google Sheets
                 </button>
                 <button id="saveSettingsBtn" onclick="window.saveSettings()" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl text-xs mt-2">שמור הגדרות</button>
+                <button onclick="window.logout()" class="w-full bg-red-50 border border-red-100 text-red-500 font-bold py-3 rounded-xl text-xs">התנתק</button>
             </div>
         </div>
     </div>
@@ -371,20 +434,27 @@
         </div>
     </div>
 
-    <!-- Import from Sheets Modal -->
+    <!-- Import from Apps Script Modal -->
     <div id="importOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
             <h3 class="text-lg font-bold text-slate-900 mb-2 text-center">ייבוא מ-Google Sheets</h3>
-            <p class="text-xs text-slate-500 mb-5 text-center">יש לוודא שהגיליון משותף לקריאה ציבורית</p>
+            <p class="text-xs text-slate-500 mb-5 text-center leading-relaxed">הייבוא משתמש ב-Apps Script הקיים כדי לשלוף תנועות ותקציב וייצא אותם ל-Supabase</p>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">Spreadsheet ID</label>
-                    <input type="text" id="importSheetIdInput" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" class="input-field w-full px-4 py-3 rounded-xl font-mono text-xs">
-                    <p class="text-[9px] text-slate-400 mt-1 mr-1">מתוך הכתובת: docs.google.com/spreadsheets/d/<b>ID</b>/edit</p>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">מפתח Apps Script</label>
+                    <input type="text" id="importGasKeyInput" placeholder="Mck-LpZ123..." class="input-field w-full px-4 py-3 rounded-xl font-mono text-xs">
+                    <p class="text-[9px] text-slate-400 mt-1 mr-1">אותו מפתח סנכרון שהיה בהגדרות האפליקציה המקורית</p>
                 </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">שם הגיליון (Sheet Name)</label>
-                    <input type="text" id="importSheetNameInput" placeholder="Sheet1 / גיליון1" value="Sheet1" class="input-field w-full px-4 py-3 rounded-xl text-sm">
+                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <p class="text-[10px] font-bold text-slate-500 mb-2">מה יתוייבא:</p>
+                    <div class="space-y-1">
+                        <label class="flex items-center gap-2 text-xs text-slate-600">
+                            <input type="checkbox" id="importTxCheck" checked class="rounded text-blue-600"> תנועות (הוצאות שוטפות ומתוכננות)
+                        </label>
+                        <label class="flex items-center gap-2 text-xs text-slate-600">
+                            <input type="checkbox" id="importBudgetCheck" checked class="rounded text-blue-600"> הגדרות תקציב (הכנסות, קבועות, מתוכננות)
+                        </label>
+                    </div>
                 </div>
                 <div id="importProgress" class="hidden">
                     <p id="importStatusText" class="text-xs text-slate-600 font-semibold mb-1"></p>
@@ -556,24 +626,37 @@
     <script>
     // =====================================================
     // SUPABASE SETUP
-    // NOTE: We use `sbClient` to avoid collision with the
-    // `sbClient` global exported by @sbClient/sbClient-js
+    // We use `sbClient` to avoid collision with window.supabase
+    // which is the namespace exported by the CDN build.
     // =====================================================
+    // ── Hardcoded Supabase credentials ──────────────────────
+    var SUPABASE_URL = 'https://pyesfzaeccommpwokpaq.supabase.co';
+    var SUPABASE_ANON_KEY = 'sb_publishable_ebHVqMPJkDUi5fpfXPnpDQ_ZQXWhmeF';
     var sbClient = null;
 
+    // Active user token (6-char alphanumeric, uppercase)
+    var USER_TOKEN = null;
+
+    // Token length constant
+    var TOKEN_LEN = 6;
+
+    // Generate a random token
+    function generateToken() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
+        let t = '';
+        for (let i = 0; i < TOKEN_LEN; i++) t += chars[Math.floor(Math.random() * chars.length)];
+        return t;
+    }
+
     function initSupabase(url, key) {
-        if (!url || !key) {
-            updateConnIndicator('disconnected');
-            return null;
-        }
+        url = url || SUPABASE_URL;
+        key = key || SUPABASE_ANON_KEY;
+        if (!url || !key) { updateConnIndicator('disconnected'); return null; }
         try {
-            // The CDN build exposes window.supabase.createClient
             sbClient = window.supabase.createClient(url, key);
             updateConnIndicator('connecting');
             sbClient.from('transactions').select('id', { count: 'exact', head: true })
-                .then(function(res) {
-                    updateConnIndicator(res.error ? 'disconnected' : 'connected');
-                });
+                .then(res => updateConnIndicator(res.error ? 'disconnected' : 'connected'));
             return sbClient;
         } catch (e) {
             console.error('Supabase init error:', e);
@@ -589,6 +672,124 @@
         const labels = { connected: 'מחובר', disconnected: 'לא מחובר', connecting: 'מתחבר...' };
         dot.title = labels[status] || status;
     }
+
+    // =====================================================
+    // LOGIN / TOKEN MANAGEMENT
+    // =====================================================
+    window.switchLoginTab = function(tab) {
+        const isNew = tab === 'new';
+        document.getElementById('panelNew').classList.toggle('hidden', !isNew);
+        document.getElementById('panelExist').classList.toggle('hidden', isNew);
+        document.getElementById('tabNew').className = `flex-1 py-2 rounded-xl text-xs font-bold transition-all ${isNew ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`;
+        document.getElementById('tabExist').className = `flex-1 py-2 rounded-xl text-xs font-bold transition-all ${!isNew ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`;
+    };
+
+    window.createNewAccount = async function() {
+        if (!sbClient) { sbClient = initSupabase(SUPABASE_URL, SUPABASE_ANON_KEY); }
+        const btn = document.getElementById('createAccountBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> יוצר...';
+        try {
+            // Generate unique token — retry if collision
+            let token, attempts = 0;
+            do {
+                token = generateToken();
+                const { data } = await sbClient.from('user_tokens').select('token').eq('token', token).maybeSingle();
+                if (!data) break; // unique
+                attempts++;
+            } while (attempts < 10);
+
+            const { error } = await sbClient.from('user_tokens').insert({ token });
+            if (error) throw error;
+
+            document.getElementById('newTokenDisplay').textContent = token;
+            document.getElementById('newTokenResult').classList.remove('hidden');
+            btn.classList.add('hidden');
+            // Store pending token
+            window._pendingToken = token;
+        } catch (e) {
+            console.error(e);
+            alert('שגיאה ביצירת חשבון: ' + e.message);
+        } finally {
+            btn.disabled = false;
+        }
+    };
+
+    window.copyToken = function() {
+        const tok = document.getElementById('newTokenDisplay').textContent;
+        navigator.clipboard.writeText(tok).then(() => window.showToast('הטוקן הועתק!', 'check')).catch(() => {});
+    };
+
+    window.copyTokenFromSettings = function() {
+        if (USER_TOKEN) navigator.clipboard.writeText(USER_TOKEN).then(() => window.showToast('הטוקן הועתק!', 'check')).catch(() => {});
+    };
+
+    window.enterWithToken = function() {
+        const token = window._pendingToken;
+        if (token) activateSession(token);
+    };
+
+    window.loginWithToken = async function() {
+        if (!sbClient) { alert('יש להגדיר Supabase תחילה'); return; }
+        const input = document.getElementById('existingTokenInput');
+        const errEl = document.getElementById('loginError');
+        const token = (input.value || '').trim().toUpperCase();
+        if (token.length !== TOKEN_LEN) { input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 400); return; }
+        errEl.classList.add('hidden');
+        try {
+            const { data, error } = await sbClient.from('user_tokens').select('token').eq('token', token).maybeSingle();
+            if (error) throw error;
+            if (!data) {
+                errEl.classList.remove('hidden');
+                input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 400);
+                return;
+            }
+            activateSession(token);
+        } catch (e) {
+            console.error(e); errEl.classList.remove('hidden');
+        }
+    };
+
+    function activateSession(token) {
+        USER_TOKEN = token;
+        localStorage.setItem('user_token', token);
+        // Update URL without reload
+        const url = new URL(window.location.href);
+        url.searchParams.set('token', token);
+        window.history.replaceState({}, '', url.toString());
+        // Show settings token
+        const disp = document.getElementById('settingsTokenDisplay');
+        if (disp) disp.textContent = token;
+        const urlEl = document.getElementById('settingsTokenUrl');
+        if (urlEl) urlEl.textContent = `?token=${token}`;
+        // Hide login screen
+        document.getElementById('loginScreen').classList.add('hidden');
+        // Load data (fetchTransactionsOnly will call get_balance from DB)
+        window.fetchData();
+    }
+
+    window.logout = function() {
+        USER_TOKEN = null;
+        localStorage.removeItem('user_token');
+        localStorage.removeItem('expense_history');
+        localStorage.removeItem('cached_balance');
+        localStorage.removeItem('cached_g4');
+        localStorage.removeItem('cached_start_date');
+        const url = new URL(window.location.href);
+        url.searchParams.delete('token');
+        window.history.replaceState({}, '', url.toString());
+        // Reset state
+        state.transactions = [];
+        state.balance = 0;
+        state.budget = { incomes: [], fixed: [], annual: [], g4: 0, startDate: '' };
+        window.toggleSettings(); // close settings
+        document.getElementById('loginScreen').classList.remove('hidden');
+        // Reset new account panel
+        document.getElementById('newTokenResult').classList.add('hidden');
+        const btn = document.getElementById('createAccountBtn');
+        btn.classList.remove('hidden'); btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-plus-circle"></i>צור חשבון חדש';
+    };
 
     // =====================================================
     // HELPERS
@@ -680,26 +881,30 @@
     // SUPABASE DATA FETCHING
     // =====================================================
 
-    async function calculateBalance() {
-        if (!sbClient) return 0;
-        const { data, error } = await sbClient
-            .from('transactions')
-            .select('amount');
-        if (error || !data) return 0;
-        return data.reduce((sum, t) => sum + safeParseFloat(t.amount), 0);
+    // Fetch balance from DB (computed server-side by get_balance RPC)
+    async function fetchBalance() {
+        if (!sbClient || !USER_TOKEN) return 0;
+        const { data, error } = await sbClient.rpc('get_balance', { p_user_token: USER_TOKEN });
+        if (error) { console.error('get_balance error', error); return state.balance; }
+        return safeParseFloat(data);
     }
 
     window.fetchTransactionsOnly = async function() {
-        if (!sbClient) return window.toggleSettings();
+        if (!sbClient || !USER_TOKEN) return;
         setLoading(true);
         try {
-            const { data, error } = await sbClient
-                .from('transactions')
-                .select('*')
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-            state.transactions = (data || []).map(mapSupabaseTx);
-            state.balance = state.transactions.reduce((s, t) => s + safeParseFloat(t.amount), 0);
+            // Fetch transactions list and balance in parallel
+            const [txRes, balance] = await Promise.all([
+                sbClient
+                    .from('transactions')
+                    .select('*')
+                    .eq('user_token', USER_TOKEN)
+                    .order('created_at', { ascending: false }),
+                fetchBalance()
+            ]);
+            if (txRes.error) throw txRes.error;
+            state.transactions = (txRes.data || []).map(mapSupabaseTx);
+            state.balance = balance;
             localStorage.setItem('expense_history', JSON.stringify(state.transactions));
             localStorage.setItem('cached_balance', state.balance.toString());
             render();
@@ -726,13 +931,14 @@
     }
 
     window.fetchBudgetData = async function(isManual = false) {
-        if (!sbClient) return;
+        if (!sbClient || !USER_TOKEN) return;
         const icon = document.getElementById('budgetRefreshIcon');
         if (isManual && icon) icon.classList.add('animate-spin');
         try {
             const { data, error } = await sbClient
                 .from('budget_settings')
                 .select('*')
+                .eq('user_token', USER_TOKEN)
                 .order('category_name');
             if (error) throw error;
 
@@ -751,6 +957,20 @@
             localStorage.setItem('cached_g4', state.budget.g4.toString());
             localStorage.setItem('cached_start_date', state.budget.startDate);
 
+            // Keep user_tokens.daily_budget in sync so get_balance is accurate
+            if (state.budget.g4 > 0) {
+                const startParts = state.budget.startDate ? state.budget.startDate.split('/') : [];
+                const startDateISO = startParts.length === 3
+                    ? `${startParts[2]}-${startParts[1].padStart(2,'0')}-${startParts[0].padStart(2,'0')}`
+                    : null;
+                // Fire-and-forget — don't block render
+                sbClient.rpc('update_daily_budget', {
+                    p_user_token:   USER_TOKEN,
+                    p_daily_budget: state.budget.g4 / 30,
+                    p_start_date:   startDateISO
+                }).then(({ error }) => { if (error) console.warn('update_daily_budget sync:', error); });
+            }
+
             renderBudget();
             if (isManual) window.showToast('תקציב סונכרן', 'check');
         } catch (e) {
@@ -761,7 +981,7 @@
     };
 
     window.fetchData = async function() {
-        if (!sbClient) return window.toggleSettings();
+        if (!sbClient || !USER_TOKEN) return;
         setLoading(true);
         state.displayedTransactionsCount = 30;
         try {
@@ -807,88 +1027,174 @@
         if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
     };
 
+    // Helper: call GAS endpoint (same retry logic as original app)
+    async function fetchGAS(url, options = {}, retries = 3) {
+        const backoffDelays = [500, 1200, 2500];
+        const currentRetry = 3 - retries;
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 45000);
+            const res = await fetch(url, { ...options, mode: 'cors', redirect: 'follow', cache: 'no-cache', signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+            return res;
+        } catch (e) {
+            const isRetryable = e.name === 'AbortError' || e.message.includes('Failed to fetch') || e.message.includes('NetworkError');
+            if (retries > 0 && isRetryable) {
+                await new Promise(r => setTimeout(r, backoffDelays[currentRetry] || 3000));
+                return fetchGAS(url, options, retries - 1);
+            }
+            throw e;
+        }
+    }
+
+    function sanitizeScriptId(id) {
+        const m = id.match(/\/macros\/s\/([^/]+)\/exec/);
+        return (m ? m[1] : id).trim();
+    }
+
     window.startImport = async function() {
         if (!sbClient) { window.showToast('יש להגדיר Supabase תחילה', 'circle-xmark'); return; }
-        const sheetId = document.getElementById('importSheetIdInput').value.trim();
-        const sheetName = document.getElementById('importSheetNameInput').value.trim() || 'Sheet1';
-        if (!sheetId) { window.showToast('נא להזין Spreadsheet ID', 'circle-xmark'); return; }
+        const rawKey = document.getElementById('importGasKeyInput').value.trim();
+        if (!rawKey) { window.showToast('נא להזין מפתח Apps Script', 'circle-xmark'); return; }
+        const gasKey = sanitizeScriptId(rawKey);
+        const doTx = document.getElementById('importTxCheck').checked;
+        const doBudget = document.getElementById('importBudgetCheck').checked;
+        if (!doTx && !doBudget) { window.showToast('יש לבחור לפחות אפשרות אחת', 'circle-xmark'); return; }
 
         const progDiv = document.getElementById('importProgress');
         const statusText = document.getElementById('importStatusText');
         const progFill = document.getElementById('importProgressFill');
         progDiv.classList.remove('hidden');
-        statusText.textContent = 'מוריד נתונים מ-Google Sheets...';
-        progFill.style.width = '10%';
+        progFill.style.background = '';
 
-        const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+        const setStatus = (msg, pct) => { statusText.textContent = msg; progFill.style.width = pct + '%'; };
+
         try {
-            const res = await fetch(csvUrl);
-            if (!res.ok) throw new Error('לא ניתן לגשת לגיליון. ודא שהוא ציבורי.');
-            const csvText = await res.text();
-            progFill.style.width = '30%';
-            statusText.textContent = 'מעבד שורות...';
+            const baseUrl = `https://script.google.com/macros/s/${gasKey}/exec`;
 
-            const rows = parseCSV(csvText);
-            if (rows.length < 2) throw new Error('הגיליון ריק או לא בפורמט הנכון');
+            // ── STEP 1: Import transactions (action=transactions) ──────────────────
+            if (doTx) {
+                setStatus('שולף תנועות מ-Apps Script...', 10);
 
-            const header = rows[0].map(h => h.toLowerCase().trim());
-            // Try to identify columns: date, time, amount, name/description, category/tag
-            const idxDate = header.findIndex(h => h.includes('date') || h.includes('תאריך'));
-            const idxTime = header.findIndex(h => h.includes('time') || h.includes('שעה'));
-            const idxAmount = header.findIndex(h => h.includes('amount') || h.includes('סכום'));
-            const idxName = header.findIndex(h => h.includes('name') || h.includes('שם') || h.includes('description') || h.includes('תיאור'));
-            const idxCategory = header.findIndex(h => h.includes('category') || h.includes('קטגוריה') || h.includes('tag') || h.includes('תג'));
-            const idxExtId = header.findIndex(h => h.includes('id') || h.includes('row'));
+                // Fetch regular transactions
+                const txRes = await fetchGAS(`${baseUrl}?action=transactions`);
+                const txData = await txRes.json();
+                const regularTxs = txData.transactions || [];
 
-            if (idxAmount === -1 || idxName === -1) {
-                throw new Error('לא נמצאו עמודות "amount/סכום" ו-"name/שם". ודא שהכותרות נכונות.');
+                setStatus('שולף תנועות מתוכננות...', 25);
+
+                // Fetch planned transactions (same endpoint used in original app)
+                let plannedTxs = [];
+                try {
+                    const plannedRes = await fetchGAS(`${baseUrl}?action=getPlannedTransactions`);
+                    const plannedData = await plannedRes.json();
+                    plannedTxs = Array.isArray(plannedData) ? plannedData : (plannedData.transactions || []);
+                } catch(e) { console.warn('getPlannedTransactions failed, skipping', e); }
+
+                // Merge: planned transactions may overlap with regular ones (same row numbers)
+                const txMap = new Map();
+                [...regularTxs, ...plannedTxs].forEach(tx => txMap.set(tx.row, tx));
+                const allTxs = Array.from(txMap.values());
+
+                setStatus(`ממיר ${allTxs.length} תנועות...`, 40);
+
+                // Map GAS transaction format → Supabase transactions table
+                const toUpsert = allTxs
+                    .filter(tx => tx.amount && tx.name)
+                    .map(tx => {
+                        // date is DD/MM/YYYY from GAS
+                        const parts = (tx.date || '').split('/');
+                        let created_at;
+                        if (parts.length === 3) {
+                            const timeStr = (tx.time || '00:00:00').replace(/[^\d:]/g, '');
+                            created_at = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}T${timeStr}`;
+                        } else {
+                            created_at = new Date().toISOString();
+                        }
+                        return {
+                            name: tx.name,
+                            amount: safeParseFloat(tx.amount),
+                            category: tx.tag || 'שוטף',
+                            created_at,
+                            external_id: `gas_row_${tx.row}_${USER_TOKEN}`,
+                            user_token: USER_TOKEN
+                        };
+                    });
+
+                setStatus(`שומר ${toUpsert.length} תנועות ב-Supabase...`, 55);
+
+                // מחק תנועות ייבוא קיימות של משתמש זה, ואז הכנס מחדש
+                const { error: delTxErr } = await sbClient
+                    .from('transactions')
+                    .delete()
+                    .eq('user_token', USER_TOKEN)
+                    .not('external_id', 'is', null);
+                if (delTxErr) throw delTxErr;
+
+                // Insert in chunks of 100
+                const chunkSize = 100;
+                for (let i = 0; i < toUpsert.length; i += chunkSize) {
+                    const chunk = toUpsert.slice(i, i + chunkSize);
+                    const { error } = await sbClient
+                        .from('transactions')
+                        .insert(chunk);
+                    if (error) throw error;
+                    setStatus(`שומר תנועות... (${Math.min(i + chunkSize, toUpsert.length)}/${toUpsert.length})`,
+                        55 + Math.round(((i + chunk.length) / toUpsert.length) * 20));
+                }
             }
 
-            const dataRows = rows.slice(1).filter(r => r.some(c => c.trim()));
-            const toUpsert = dataRows.map((r, i) => {
-                const rawDate = idxDate >= 0 ? r[idxDate] : '';
-                const rawTime = idxTime >= 0 ? r[idxTime] : '00:00';
-                const amount = safeParseFloat(r[idxAmount]);
-                const name = idxName >= 0 ? r[idxName].trim() : 'ייבוא';
-                const category = idxCategory >= 0 && r[idxCategory] ? r[idxCategory].trim() : 'שוטף';
-                const external_id = idxExtId >= 0 ? r[idxExtId].trim() : `import_${i}`;
+            // ── STEP 2: Import budget settings (action=getBudget) ─────────────────
+            if (doBudget) {
+                setStatus('שולף הגדרות תקציב מ-Apps Script...', 77);
 
-                // Parse date
-                let created_at;
-                if (rawDate) {
-                    const parts = rawDate.split('/');
-                    if (parts.length === 3) {
-                        created_at = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}T${rawTime || '00:00'}:00`;
-                    } else {
-                        created_at = rawDate;
-                    }
-                } else {
-                    created_at = new Date().toISOString();
+                const budgetRes = await fetchGAS(`${baseUrl}?action=getBudget`);
+                const budgetData = await budgetRes.json();
+
+                // GAS returns: { income: [...], fixedMonthly: [...], annual: [...], currentMonthlyBudget, startDate }
+                // Each item has: { name, value, cell }
+                const rows = [];
+
+                (budgetData.income || []).forEach(item => {
+                    rows.push({ category_name: item.name, budget_amount: safeParseFloat(item.value), type: 'income', parent_group: null, user_token: USER_TOKEN });
+                });
+                (budgetData.fixedMonthly || []).forEach(item => {
+                    rows.push({ category_name: item.name, budget_amount: safeParseFloat(item.value), type: 'fixed', parent_group: null, user_token: USER_TOKEN });
+                });
+                (budgetData.annual || []).forEach(item => {
+                    rows.push({ category_name: item.name, budget_amount: safeParseFloat(item.value), type: 'annual', parent_group: null, user_token: USER_TOKEN });
+                });
+
+                // Store g4 (monthly budget) and start date as special system rows
+                if (budgetData.currentMonthlyBudget !== undefined) {
+                    rows.push({ category_name: '__g4__', budget_amount: safeParseFloat(budgetData.currentMonthlyBudget), type: 'system', parent_group: null, user_token: USER_TOKEN });
+                }
+                if (budgetData.startDate) {
+                    rows.push({ category_name: '__start_date__', budget_amount: 0, type: 'system', parent_group: budgetData.startDate, user_token: USER_TOKEN });
                 }
 
-                return { name, amount, category, created_at, external_id };
-            }).filter(r => r.amount !== 0 && r.name);
+                setStatus(`שומר ${rows.length} קטגוריות תקציב...`, 88);
 
-            progFill.style.width = '60%';
-            statusText.textContent = `מייבא ${toUpsert.length} רשומות...`;
-
-            // Batch upsert in chunks of 100
-            const chunkSize = 100;
-            for (let i = 0; i < toUpsert.length; i += chunkSize) {
-                const chunk = toUpsert.slice(i, i + chunkSize);
-                const { error } = await sbClient
-                    .from('transactions')
-                    .upsert(chunk, { onConflict: 'external_id', ignoreDuplicates: false });
-                if (error) throw error;
-                progFill.style.width = `${60 + Math.round(((i + chunk.length) / toUpsert.length) * 35)}%`;
+                // Delete existing budget rows for this user, then insert fresh
+                const { error: delBudgetErr } = await sbClient
+                    .from('budget_settings')
+                    .delete()
+                    .eq('user_token', USER_TOKEN);
+                if (delBudgetErr) throw delBudgetErr;
+                const { error: budgetError } = await sbClient
+                    .from('budget_settings')
+                    .insert(rows);
+                if (budgetError) throw budgetError;
             }
 
-            progFill.style.width = '100%';
-            statusText.textContent = `✅ יובאו ${toUpsert.length} רשומות בהצלחה!`;
+            setStatus('✅ הייבוא הושלם בהצלחה!', 100);
 
-            setTimeout(() => {
+            setTimeout(async () => {
                 window.closeImportModal();
-                window.fetchTransactionsOnly();
+                await window.fetchBudgetData();
+                await window.fetchTransactionsOnly();
+                window.showToast('הייבוא הושלם', 'check');
             }, 1500);
 
         } catch (e) {
@@ -899,30 +1205,13 @@
         }
     };
 
-    function parseCSV(text) {
-        const lines = text.split('\n');
-        return lines.map(line => {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
-            for (let i = 0; i < line.length; i++) {
-                const ch = line[i];
-                if (ch === '"') { inQuotes = !inQuotes; }
-                else if (ch === ',' && !inQuotes) { result.push(current); current = ''; }
-                else { current += ch; }
-            }
-            result.push(current);
-            return result;
-        }).filter(r => r.length > 0);
-    }
-
     // =====================================================
     // TRANSACTION OPERATIONS
     // =====================================================
 
     window.handleAddExpense = async function(e) {
         e.preventDefault();
-        if (!sbClient) return window.toggleSettings();
+        if (!sbClient || !USER_TOKEN) return window.toggleSettings();
         const aInp = document.getElementById('amountInput');
         const nInp = document.getElementById('nameInput');
         const cSel = document.getElementById('categorySelect');
@@ -931,35 +1220,33 @@
         const amount = safeParseFloat(aInp.value);
         const name = nInp.value.trim();
         const category = cSel ? cSel.value : 'שוטף';
+        if (!amount || !name) return;
 
         setLoading(true, false, true);
         try {
-            // Use RPC for atomic insert + balance return
-            const { data: newBalance, error } = await sbClient.rpc('add_expense_and_get_balance', {
-                p_amount: amount,
-                p_name: name,
-                p_category: category
-            });
-            if (error) throw error;
-
-            // Optimistically add to local state immediately
+            // הוסף תנועה ישירות לטבלה
             const now = new Date();
+            const { error: insertErr } = await sbClient
+                .from('transactions')
+                .insert({ amount, name, category, user_token: USER_TOKEN, created_at: now.toISOString() });
+            if (insertErr) throw insertErr;
+
+            // קבל מאזן מעודכן מה-DB
+            const newBalance = await fetchBalance();
+
+            // עדכן state מיד (optimistic)
+            const day = String(now.getDate()).padStart(2,'0');
+            const mon = String(now.getMonth()+1).padStart(2,'0');
             const newTx = {
                 id: `temp_${Date.now()}`,
                 row: `temp_${Date.now()}`,
-                name,
-                amount,
-                date: now.toLocaleDateString('en-GB').replace(/\//g, '/'),
+                name, amount,
+                date: `${day}/${mon}/${now.getFullYear()}`,
                 time: now.toLocaleTimeString('he-IL'),
                 tag: category !== 'שוטף' ? category : null
             };
-            // Format date properly
-            const day = String(now.getDate()).padStart(2,'0');
-            const mon = String(now.getMonth()+1).padStart(2,'0');
-            newTx.date = `${day}/${mon}/${now.getFullYear()}`;
-
             state.transactions = [newTx, ...state.transactions];
-            state.balance = safeParseFloat(newBalance);
+            state.balance = newBalance;
             localStorage.setItem('cached_balance', state.balance.toString());
 
             render();
@@ -967,11 +1254,11 @@
             window.closeAddExpenseModal();
             window.showToast('הוצאה נרשמה', 'check');
 
-            // Refresh to get actual IDs
-            setTimeout(() => window.fetchTransactionsOnly(), 1000);
+            // רענן לקבלת ID אמיתי
+            setTimeout(() => window.fetchTransactionsOnly(), 800);
         } catch (e) {
             console.error(e);
-            window.showToast('שגיאה בהוספת הוצאה', 'circle-xmark');
+            window.showToast('שגיאה בהוספת הוצאה: ' + (e.message || e), 'circle-xmark');
         } finally {
             setLoading(false, false, true);
         }
@@ -987,7 +1274,8 @@
             const { error } = await sbClient
                 .from('transactions')
                 .update({ name: enInp.value, amount: safeParseFloat(eaInp.value) })
-                .eq('id', state.pendingActionRow.row);
+                .eq('id', state.pendingActionRow.row)
+                .eq('user_token', USER_TOKEN);
             if (error) throw error;
             await window.fetchTransactionsOnly();
             window.showToast('עודכן', 'check');
@@ -1007,10 +1295,12 @@
             const { error } = await sbClient
                 .from('transactions')
                 .delete()
-                .eq('id', state.pendingActionRow.row);
+                .eq('id', state.pendingActionRow.row)
+                .eq('user_token', USER_TOKEN);
             if (error) throw error;
             state.transactions = state.transactions.filter(t => t.row !== state.pendingActionRow.row);
-            state.balance = state.transactions.reduce((s, t) => s + safeParseFloat(t.amount), 0);
+            // Recalculate balance from DB after delete
+            state.balance = await fetchBalance();
             localStorage.setItem('cached_balance', state.balance.toString());
             render();
             window.showToast('נמחק', 'check');
@@ -1030,7 +1320,8 @@
             const { error } = await sbClient
                 .from('transactions')
                 .update({ category: categoryName })
-                .eq('id', state.pendingActionRow.row);
+                .eq('id', state.pendingActionRow.row)
+                .eq('user_token', USER_TOKEN);
             if (error) throw error;
             await window.fetchTransactionsOnly();
             window.showToast('שויך', 'check');
@@ -1050,7 +1341,8 @@
             const { error } = await sbClient
                 .from('transactions')
                 .update({ category: 'שוטף' })
-                .eq('id', state.pendingActionRow.row);
+                .eq('id', state.pendingActionRow.row)
+                .eq('user_token', USER_TOKEN);
             if (error) throw error;
             await window.fetchTransactionsOnly();
             window.showToast('הוסר', 'check');
@@ -1078,14 +1370,15 @@
             const { error: updateError } = await sbClient
                 .from('transactions')
                 .update({ amount: originalAmount - splitAmountActual })
-                .eq('id', state.pendingActionRow.row);
+                .eq('id', state.pendingActionRow.row)
+                .eq('user_token', USER_TOKEN);
             if (updateError) throw updateError;
             // Insert split row
             const origTx = state.transactions.find(t => t.row === state.pendingActionRow.row);
             const created_at = origTx ? `${origTx.date.split('/').reverse().join('-')}T${origTx.time}` : new Date().toISOString();
             const { error: insertError } = await sbClient
                 .from('transactions')
-                .insert({ name: splitName, amount: splitAmountActual, category: 'שוטף', created_at });
+                .insert({ name: splitName, amount: splitAmountActual, category: 'שוטף', created_at, user_token: USER_TOKEN });
             if (insertError) throw insertError;
             await window.fetchTransactionsOnly();
             window.showToast('פוצל', 'check');
@@ -1110,7 +1403,7 @@
         try {
             const { error } = await sbClient
                 .from('budget_settings')
-                .insert({ category_name: nameInp.value.trim(), budget_amount: 0, type: state.pendingAddType });
+                .insert({ category_name: nameInp.value.trim(), budget_amount: 0, type: state.pendingAddType, user_token: USER_TOKEN });
             if (error) throw error;
             nameInp.value = '';
             await window.fetchBudgetData();
@@ -1137,14 +1430,16 @@
                     const { error } = await sbClient
                         .from('budget_settings')
                         .update({ category_name: value })
-                        .eq('category_name', oldName);
+                        .eq('category_name', oldName)
+                        .eq('user_token', USER_TOKEN);
                     if (error) throw error;
                 } else {
                     const numVal = state.isPrivacyMode ? denormalizeAmount(safeParseFloat(value)) : safeParseFloat(value);
                     const { error } = await sbClient
                         .from('budget_settings')
                         .update({ budget_amount: numVal })
-                        .eq('category_name', catName);
+                        .eq('category_name', catName)
+                        .eq('user_token', USER_TOKEN);
                     if (error) throw error;
                 }
             }
@@ -1173,12 +1468,12 @@
             for (const chk of checkboxes) {
                 const catName = chk.value;
                 if (chk.checked) {
-                    await sbClient.from('budget_settings').update({ parent_group: parentName }).eq('category_name', catName);
+                    await sbClient.from('budget_settings').update({ parent_group: parentName }).eq('category_name', catName).eq('user_token', USER_TOKEN);
                 } else {
                     // Only clear if it was in this group
                     const item = [...state.budget.incomes, ...state.budget.fixed, ...state.budget.annual].find(i => i.category_name === catName);
                     if (item && item.parent_group === parentName) {
-                        await sbClient.from('budget_settings').update({ parent_group: null }).eq('category_name', catName);
+                        await sbClient.from('budget_settings').update({ parent_group: null }).eq('category_name', catName).eq('user_token', USER_TOKEN);
                     }
                 }
             }
@@ -1219,12 +1514,46 @@
         setLoading(true, true);
         try {
             const { finalG4, balancingAmount } = state.pendingG4;
-            // Upsert g4 in budget_settings
-            await sbClient.from('budget_settings').upsert({ category_name: '__g4__', budget_amount: finalG4, type: 'system' }, { onConflict: 'category_name' });
+            const dailyBudget = finalG4 / 30;
+
+            // Parse start_date for the RPC
+            const startParts = state.budget.startDate ? state.budget.startDate.split('/') : [];
+            const startDateISO = startParts.length === 3
+                ? `${startParts[2]}-${startParts[1].padStart(2,'0')}-${startParts[0].padStart(2,'0')}`
+                : null;
+
+            // Save g4 in budget_settings (for budget screen display)
+            await sbClient.from('budget_settings')
+                .delete()
+                .eq('user_token', USER_TOKEN)
+                .eq('category_name', '__g4__');
+            await sbClient.from('budget_settings')
+                .insert({ category_name: '__g4__', budget_amount: finalG4, type: 'system', user_token: USER_TOKEN });
+
+            // Update daily_budget + start_date on user_tokens via RPC
+            // This is what get_balance uses to compute the balance
+            const { data: newBalance, error: rpcErr } = await sbClient.rpc('update_daily_budget', {
+                p_user_token:   USER_TOKEN,
+                p_daily_budget: dailyBudget,
+                p_start_date:   startDateISO
+            });
+            if (rpcErr) throw rpcErr;
+
+            // In 'today' mode, add a balancing transaction (affects sum(amount))
+            // so the balance stays correct from today onwards
             if (mode === 'today' && Math.abs(balancingAmount) > 0.1) {
                 const now = new Date();
-                await sbClient.from('transactions').insert({ amount: balancingAmount, name: 'איזון שינוי תקציב', category: 'שוטף', created_at: now.toISOString() });
+                await sbClient.from('transactions').insert({
+                    amount: balancingAmount,
+                    name: 'איזון שינוי תקציב',
+                    category: 'שוטף',
+                    created_at: now.toISOString(),
+                    user_token: USER_TOKEN
+                });
             }
+
+            state.balance = safeParseFloat(await fetchBalance());
+            localStorage.setItem('cached_balance', state.balance.toString());
             state.isDirty = true;
             await window.fetchBudgetData();
             await window.fetchTransactionsOnly();
@@ -1245,8 +1574,8 @@
         try {
             const catTitle = diff > 0 ? 'השלמה לתקציב' : 'ביטול חריגה';
             const dailyTitle = diff > 0 ? `הכנסה מיתרה ב${name}` : `הוצאה עקב חריגה ב${name}`;
-            await sbClient.from('transactions').insert({ amount: diff, name: catTitle, category: name, created_at: now.toISOString() });
-            await sbClient.from('transactions').insert({ amount: diff > 0 ? -diff : Math.abs(diff), name: dailyTitle, category: 'שוטף', created_at: now.toISOString() });
+            await sbClient.from('transactions').insert({ amount: diff, name: catTitle, category: name, created_at: now.toISOString(), user_token: USER_TOKEN });
+            await sbClient.from('transactions').insert({ amount: diff > 0 ? -diff : Math.abs(diff), name: dailyTitle, category: 'שוטף', created_at: now.toISOString(), user_token: USER_TOKEN });
             await window.fetchTransactionsOnly();
             state.isDirty = true;
             window.showToast(`הקטגוריה ${name} נסגרה`, 'check');
@@ -1265,9 +1594,14 @@
         const o = document.getElementById('settingsOverlay');
         if (!o) return;
         if (o.classList.contains('hidden')) {
-            document.getElementById('supabaseUrlInput').value = localStorage.getItem('supabase_url') || '';
-            document.getElementById('supabaseKeyInput').value = localStorage.getItem('supabase_anon_key') || '';
+            document.getElementById('supabaseUrlInput').value = localStorage.getItem('supabase_url') || SUPABASE_URL;
+            document.getElementById('supabaseKeyInput').value = localStorage.getItem('supabase_anon_key') || SUPABASE_ANON_KEY;
             const pt = document.getElementById('privacyToggle'); if (pt) pt.checked = state.isPrivacyMode;
+            // Show current token
+            const td = document.getElementById('settingsTokenDisplay');
+            if (td) td.textContent = USER_TOKEN || '------';
+            const tu = document.getElementById('settingsTokenUrl');
+            if (tu) tu.textContent = USER_TOKEN ? `?token=${USER_TOKEN}` : '';
             o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10);
         } else {
             o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300);
@@ -1275,8 +1609,8 @@
     };
 
     window.saveSettings = function() {
-        const url = document.getElementById('supabaseUrlInput').value.trim();
-        const key = document.getElementById('supabaseKeyInput').value.trim();
+        const url = document.getElementById('supabaseUrlInput').value.trim() || SUPABASE_URL;
+        const key = document.getElementById('supabaseKeyInput').value.trim() || SUPABASE_ANON_KEY;
         localStorage.setItem('supabase_url', url);
         localStorage.setItem('supabase_anon_key', key);
         sbClient = initSupabase(url, key);
@@ -1540,7 +1874,6 @@
         const updateBtn = document.getElementById('batchUpdateBtn');
         if (updateBtn) updateBtn.classList.toggle('visible', Object.keys(state.dirtyBudgetItems).length > 0);
     };
-
 
     window.toggleZeroItems = function(section) {
         state.showZeroSections[section] = !state.showZeroSections[section];
@@ -2021,18 +2354,43 @@
             ).join('');
         }
 
-        // Init Supabase from stored credentials
-        const storedUrl = localStorage.getItem('supabase_url');
-        const storedKey = localStorage.getItem('supabase_anon_key');
-        if (storedUrl && storedKey) {
-            sbClient = initSupabase(storedUrl, storedKey);
-            if (sbClient) window.fetchData();
+        // Init Supabase — use stored override or fallback to hardcoded
+        const storedUrl = localStorage.getItem('supabase_url') || SUPABASE_URL;
+        const storedKey = localStorage.getItem('supabase_anon_key') || SUPABASE_ANON_KEY;
+        sbClient = initSupabase(storedUrl, storedKey);
+
+        // Resolve token: URL param → localStorage → show login
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = (urlParams.get('token') || '').toUpperCase().trim();
+        const storedToken = localStorage.getItem('user_token') || '';
+
+        if (urlToken.length === TOKEN_LEN) {
+            // Token in URL — validate and use
+            if (sbClient) {
+                sbClient.from('user_tokens').select('token').eq('token', urlToken).maybeSingle()
+                    .then(({ data }) => {
+                        if (data) {
+                            activateSession(urlToken);
+                        } else {
+                            // Token not found — show login with error
+                            document.getElementById('loginScreen').classList.remove('hidden');
+                            window.switchLoginTab('exist');
+                            document.getElementById('existingTokenInput').value = urlToken;
+                            document.getElementById('loginError').classList.remove('hidden');
+                        }
+                    });
+            } else {
+                // No Supabase yet — show settings first
+                setTimeout(() => window.toggleSettings(), 300);
+            }
+        } else if (storedToken.length === TOKEN_LEN && sbClient) {
+            // Stored token — auto-login silently
+            activateSession(storedToken);
         } else {
-            // Show settings on first launch
-            setTimeout(() => window.toggleSettings(), 500);
+            // No token — show login screen
+            document.getElementById('loginScreen').classList.remove('hidden');
         }
 
-        // Render cached data immediately
         render();
     });
     </script>
