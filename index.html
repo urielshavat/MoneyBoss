@@ -891,6 +891,14 @@
     };
 
     function mapSupabaseTx(t) {
+        const rawCategory = (t.category || '').trim();
+        // אם הקטגוריה מכילה " > " (שם מלא עם parent) — שמור רק את החלק אחרי ה->
+        // כי budget_settings מאחסן category_name ללא ה-parent אחרי הפרסור
+        let tag = null;
+        if (rawCategory && rawCategory !== 'שוטף') {
+            const sep = rawCategory.indexOf(' > ');
+            tag = sep !== -1 ? rawCategory.slice(sep + 3).trim() : rawCategory;
+        }
         return {
             row: t.id,
             id: t.id,
@@ -898,9 +906,38 @@
             amount: t.amount,
             date: formatDateFromSupabase(t.created_at),
             time: new Date(t.created_at).toLocaleTimeString('he-IL'),
-            tag: t.category && t.category !== 'שוטף' ? t.category : null,
+            tag,
             external_id: t.external_id || null
         };
+    }
+
+
+    // מוצא קטגוריה לפי tag — תומך בשם מלא "parent > child" וגם בשם קצר "child"
+    function findCatByTag(tag) {
+        if (!tag) return null;
+        const t = tag.trim();
+        // חיפוש לפי שם מלא "parent > child"
+        const bySep = t.indexOf(' > ');
+        if (bySep !== -1) {
+            const parent = t.slice(0, bySep).trim();
+            const child  = t.slice(bySep + 3).trim();
+            const found = state.budget.annual.find(a =>
+                (a.category_name||'').trim() === child &&
+                (a.parent_group||'').trim() === parent
+            );
+            if (found) return found;
+        }
+        // חיפוש לפי שם קצר בלבד
+        return state.budget.annual.find(a => (a.category_name||'').trim() === t) || null;
+    }
+
+    // מחזיר את ה-category_name המפורסר (השם הקצר) שמשמש להשוואה
+    function tagToShortName(tag) {
+        const cat = findCatByTag(tag);
+        if (cat) return (cat.category_name||'').trim();
+        // אם לא נמצא — אם יש > קח את החלק השני
+        const sep = (tag||'').indexOf(' > ');
+        return sep !== -1 ? tag.slice(sep + 3).trim() : (tag||'').trim();
     }
 
     window.fetchBudgetData = async function(isManual = false) {
@@ -1755,7 +1792,7 @@
                 <div class="flex-1 flex flex-col">
                     <div class="flex items-center">
                         <span class="font-bold text-slate-800 text-xs">${tx.name}</span>
-                        ${tx.tag && !hideTag ? `<span class="tag-badge">${(() => { const cat = state.budget.annual.find(a => a.category_name === tx.tag); return cat && cat.parent_group ? cat.parent_group + ' > ' + cat.category_name : tx.tag; })()}</span>` : ''}
+                        ${tx.tag && !hideTag ? `<span class="tag-badge">${(() => { const cat = findCatByTag(tx.tag); return cat && cat.parent_group ? cat.parent_group + ' > ' + cat.category_name : tx.tag; })()}</span>` : ''}
                     </div>
                     ${!hideDate ? `<span class="text-[8px] text-slate-400 font-bold">${tx.date}</span>` : ''}
                 </div>
@@ -1946,12 +1983,27 @@
         const annualTotal = state.budget.annual.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
         const monthlySetAside = annualTotal / 12;
         const totalAccruedBudget = monthlySetAside * monthsPassed;
-        const annualCatNames = new Set(state.budget.annual.map(a => a.category_name));
+        const annualCatNames = new Set();
+        state.budget.annual.forEach(a => {
+            const short = (a.category_name||'').trim();
+            annualCatNames.add(short);
+            if (a.parent_group) annualCatNames.add((a.parent_group + ' > ' + short).trim());
+        });
         const actualSpent = state.transactions.reduce((s, tx) => {
-            if (tx.tag && annualCatNames.has(tx.tag)) return s + safeParseFloat(tx.amount);
+            if (tx.tag && annualCatNames.has(tagToShortName(tx.tag))) return s + safeParseFloat(tx.amount);
             return s;
         }, 0);
         return { monthsPassed, annualTotal, monthlySetAside, totalAccruedBudget, actualSpent, reserve: totalAccruedBudget - actualSpent };
+    }
+
+    // פונקציית עזר: האם תנועה שייכת לקטגוריה מתוכננת?
+    // tx.tag יכול להיות "מלון יום נישואין" או "חופשות > מלון יום נישואין"
+    function tagMatchesCat(tag, cat) {
+        if (!tag || !cat) return false;
+        const t = tag.trim();
+        const short = (cat.category_name || '').trim();
+        const full = cat.parent_group ? (cat.parent_group.trim() + ' > ' + short) : short;
+        return t === short || t === full;
     }
 
     function renderAnnualView() {
@@ -2038,28 +2090,28 @@
         Object.values(groups).forEach(group => {
             let groupSpent = 0;
             group.items.forEach(item => {
-                groupSpent += state.transactions.filter(t => t.tag === item.category_name).reduce((s, t) => s + safeParseFloat(t.amount), 0);
+                groupSpent += state.transactions.filter(t => tagMatchesCat(t.tag, item)).reduce((s, t) => s + safeParseFloat(t.amount), 0);
             });
             const groupObj = createCard(group.name, group.totalValue, groupSpent, true);
             container.appendChild(groupObj.card);
             if (state.expandedAnnualCategories.has(group.name)) {
                 group.items.forEach(item => {
-                    const itemSpent = state.transactions.filter(t => t.tag === item.category_name).reduce((s, t) => s + safeParseFloat(t.amount), 0);
+                    const itemSpent = state.transactions.filter(t => tagMatchesCat(t.tag, item)).reduce((s, t) => s + safeParseFloat(t.amount), 0);
                     const childObj = createCard(item.category_name, safeParseFloat(item.budget_amount), itemSpent, false, item.category_name);
                     groupObj.details.appendChild(childObj.card);
                     if (state.expandedAnnualCategories.has(item.category_name)) {
-                        state.transactions.filter(t => t.tag === item.category_name).forEach(tx => childObj.details.appendChild(createTransactionEl(tx, false, true)));
+                        state.transactions.filter(t => tagMatchesCat(t.tag, item)).forEach(tx => childObj.details.appendChild(createTransactionEl(tx, false, true)));
                     }
                 });
             }
         });
 
         standalone.forEach(item => {
-            const spent = state.transactions.filter(t => t.tag === item.category_name).reduce((s, t) => s + safeParseFloat(t.amount), 0);
+            const spent = state.transactions.filter(t => tagMatchesCat(t.tag, item)).reduce((s, t) => s + safeParseFloat(t.amount), 0);
             const standObj = createCard(item.category_name, safeParseFloat(item.budget_amount), spent, false);
             container.appendChild(standObj.card);
             if (state.expandedAnnualCategories.has(item.category_name)) {
-                state.transactions.filter(t => t.tag === item.category_name).forEach(tx => standObj.details.appendChild(createTransactionEl(tx, false, true)));
+                state.transactions.filter(t => tagMatchesCat(t.tag, item)).forEach(tx => standObj.details.appendChild(createTransactionEl(tx, false, true)));
             }
         });
     }
@@ -2290,8 +2342,13 @@
         });
         const income = state.budget.incomes.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
         const fixed = state.budget.fixed.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
-        const annualCatNames = new Set(state.budget.annual.map(a => a.category_name));
-        const planned = filteredTxs.reduce((s, tx) => tx.tag && annualCatNames.has(tx.tag) ? s + safeParseFloat(tx.amount) : s, 0);
+        const annualCatNames = new Set();
+        state.budget.annual.forEach(a => {
+            const short = (a.category_name||'').trim();
+            annualCatNames.add(short);
+            if (a.parent_group) annualCatNames.add((a.parent_group + ' > ' + short).trim());
+        });
+        const planned = filteredTxs.reduce((s, tx) => tx.tag && annualCatNames.has(tagToShortName(tx.tag)) ? s + safeParseFloat(tx.amount) : s, 0);
         const current = filteredTxs.reduce((s, tx) => !tx.tag ? s + safeParseFloat(tx.amount) : s, 0);
         renderStatsChart(formatDisplayAmount(income), formatDisplayAmount(fixed), formatDisplayAmount(planned), formatDisplayAmount(current));
     };
