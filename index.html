@@ -916,15 +916,29 @@
             if (error) throw error;
 
             const rows = data || [];
-            state.budget.incomes = rows.filter(r => r.type === 'income');
-            state.budget.fixed = rows.filter(r => r.type === 'fixed');
-            state.budget.annual = rows.filter(r => r.type === 'annual');
+
+            // פרסר קטגוריות אב מתוך שם הקטגוריה אם parent_group ריק
+            // "אחזקת רכב > ביטוח רכב" → category_name="ביטוח רכב", parent_group="אחזקת רכב"
+            const parsedRows = rows.map(r => {
+                if (r.parent_group || !r.category_name) return r;
+                const sep = r.category_name.indexOf(' > ');
+                if (sep === -1) return r;
+                return {
+                    ...r,
+                    parent_group: r.category_name.slice(0, sep).trim(),
+                    category_name: r.category_name.slice(sep + 3).trim()
+                };
+            });
+
+            state.budget.incomes = parsedRows.filter(r => r.type === 'income');
+            state.budget.fixed   = parsedRows.filter(r => r.type === 'fixed');
+            state.budget.annual  = parsedRows.filter(r => r.type === 'annual');
 
             // g4 stored as a special budget_setting row
-            const g4Row = rows.find(r => r.category_name === '__g4__');
+            const g4Row = rows.find(r => r.category_name === '__g4__' || r.category_name.endsWith('__g4__'));
             state.budget.g4 = g4Row ? safeParseFloat(g4Row.budget_amount) : state.budget.g4;
 
-            const startRow = rows.find(r => r.category_name === '__start_date__');
+            const startRow = rows.find(r => r.category_name === '__start_date__' || r.category_name.endsWith('__start_date__'));
             state.budget.startDate = startRow ? (startRow.parent_group || '') : state.budget.startDate;
 
             localStorage.setItem('cached_g4', state.budget.g4.toString());
@@ -1128,14 +1142,30 @@
                 // Each item has: { name, value, cell }
                 const rows = [];
 
+                // פונקציה לפרסור שם קטגוריה עם קטגורית אב
+                // "אחזקת רכב > ביטוח רכב" → { category_name: "ביטוח רכב", parent_group: "אחזקת רכב" }
+                function parseImportCatName(fullName) {
+                    const sep = fullName.indexOf(' > ');
+                    if (sep !== -1) {
+                        return {
+                            category_name: fullName.slice(sep + 3).trim(),
+                            parent_group: fullName.slice(0, sep).trim()
+                        };
+                    }
+                    return { category_name: fullName.trim(), parent_group: null };
+                }
+
                 (budgetData.income || []).forEach(item => {
-                    rows.push({ category_name: item.name, budget_amount: safeParseFloat(item.value), type: 'income', parent_group: null, user_token: USER_TOKEN });
+                    const { category_name, parent_group } = parseImportCatName(item.name);
+                    rows.push({ category_name, budget_amount: safeParseFloat(item.value), type: 'income', parent_group, user_token: USER_TOKEN });
                 });
                 (budgetData.fixedMonthly || []).forEach(item => {
-                    rows.push({ category_name: item.name, budget_amount: safeParseFloat(item.value), type: 'fixed', parent_group: null, user_token: USER_TOKEN });
+                    const { category_name, parent_group } = parseImportCatName(item.name);
+                    rows.push({ category_name, budget_amount: safeParseFloat(item.value), type: 'fixed', parent_group, user_token: USER_TOKEN });
                 });
                 (budgetData.annual || []).forEach(item => {
-                    rows.push({ category_name: item.name, budget_amount: safeParseFloat(item.value), type: 'annual', parent_group: null, user_token: USER_TOKEN });
+                    const { category_name, parent_group } = parseImportCatName(item.name);
+                    rows.push({ category_name, budget_amount: safeParseFloat(item.value), type: 'annual', parent_group, user_token: USER_TOKEN });
                 });
 
                 // Store g4 (monthly budget) and start date as special system rows
@@ -1171,7 +1201,12 @@
 
         } catch (e) {
             console.error(e);
-            statusText.textContent = `❌ שגיאה: ${e.message}`;
+            const msg = e.message || String(e);
+            if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS')) {
+                statusText.textContent = `❌ שגיאת רשת — ודא שה-Apps Script פרוס ומוגדר לגישה ציבורית`;
+            } else {
+                statusText.textContent = `❌ שגיאה: ${msg}`;
+            }
             progFill.style.width = '100%';
             progFill.style.background = '#ef4444';
         }
@@ -1396,15 +1431,42 @@
             for (const [catName, value] of updates) {
                 // catName is used as unique identifier here
                 if (catName.startsWith('__name__:')) {
-                    // Rename operation
-                    const parts = catName.split(':');
-                    const oldName = parts[1];
-                    const { error } = await sbClient
+                    const oldDbName = catName.slice('__name__:'.length);
+                    const newChildName = value.trim();
+                    if (!newChildName) continue;
+
+                    const sepIdx = oldDbName.indexOf(' > ');
+                    const parentPrefix = sepIdx !== -1 ? oldDbName.slice(0, sepIdx + 3) : '';
+                    const newDbName = parentPrefix + newChildName;
+
+                    if (oldDbName === newDbName) continue;
+
+                    // שם הקטגוריה כפי שמופיע בתנועות — יכול להיות גם עם וגם בלי prefix
+                    const oldChildName = sepIdx !== -1 ? oldDbName.slice(sepIdx + 3).trim() : oldDbName;
+
+                    // 1. עדכן שם ב-budget_settings
+                    const { error: budgetErr } = await sbClient
                         .from('budget_settings')
-                        .update({ category_name: value })
-                        .eq('category_name', oldName)
+                        .update({ category_name: newDbName })
+                        .eq('category_name', oldDbName)
                         .eq('user_token', USER_TOKEN);
-                    if (error) throw error;
+                    if (budgetErr) throw budgetErr;
+
+                    // 2a. עדכן תנועות שמקוטלגות עם השם הקצר (ללא parent)
+                    await sbClient
+                        .from('transactions')
+                        .update({ category: newChildName })
+                        .eq('category', oldChildName)
+                        .eq('user_token', USER_TOKEN);
+
+                    // 2b. עדכן תנועות שמקוטלגות עם השם המלא (עם parent)
+                    if (parentPrefix) {
+                        await sbClient
+                            .from('transactions')
+                            .update({ category: newChildName })
+                            .eq('category', oldDbName)
+                            .eq('user_token', USER_TOKEN);
+                    }
                 } else {
                     const numVal = state.isPrivacyMode ? denormalizeAmount(safeParseFloat(value)) : safeParseFloat(value);
                     const { error } = await sbClient
@@ -1693,7 +1755,7 @@
                 <div class="flex-1 flex flex-col">
                     <div class="flex items-center">
                         <span class="font-bold text-slate-800 text-xs">${tx.name}</span>
-                        ${tx.tag && !hideTag ? `<span class="tag-badge">${tx.tag}</span>` : ''}
+                        ${tx.tag && !hideTag ? `<span class="tag-badge">${(() => { const cat = state.budget.annual.find(a => a.category_name === tx.tag); return cat && cat.parent_group ? cat.parent_group + ' > ' + cat.category_name : tx.tag; })()}</span>` : ''}
                     </div>
                     ${!hideDate ? `<span class="text-[8px] text-slate-400 font-bold">${tx.date}</span>` : ''}
                 </div>
@@ -1770,14 +1832,18 @@
                     const div = document.createElement('div');
                     div.className = `bg-white px-3 py-2 rounded-xl flex justify-between items-center shadow-sm gap-2 animate-fade-in ${isZero ? 'opacity-60 border-dashed border border-slate-200' : ''} ${isChild ? 'ml-4 border-r-2 border-slate-100 rounded-r-none' : ''}`;
                     const numericVal = Math.round(formatDisplayAmount(val, type));
+                    // שמור את השם המלא המקורי (כולל parent > child) לצורך עדכון ב-DB
+                    const dbName = item.parent_group
+                        ? `${item.parent_group} > ${item.category_name}`
+                        : item.category_name;
                     div.innerHTML = `
                         <input type="text" class="name-input text-xs flex-1" value="${item.category_name || ''}" 
-                            oninput="window.handleBudgetInput('__name__:${item.category_name}', this.value)">
+                            oninput="window.handleBudgetInput('__name__:${dbName}', this.value)">
                         <div class="flex items-center font-bold text-xs text-slate-600 ltr-num" style="column-gap: 1px;">
                             <span class="leading-none">₪</span>
                             <input type="text" inputmode="decimal" class="budget-input font-bold text-slate-600 ltr p-0 m-0 border-none outline-none text-left" 
                                 style="width: 70px; background: transparent;" value="${numericVal.toLocaleString()}" 
-                                oninput="window.handleBudgetInputAmount('${item.category_name}', this.value)">
+                                oninput="window.handleBudgetInputAmount('${dbName}', this.value)">
                         </div>`;
                     return div;
                 }
@@ -2060,7 +2126,7 @@
             activeAnnuals.forEach(cat => {
                 const btn = document.createElement('button');
                 btn.className = 'w-full text-right p-4 bg-slate-50 rounded-xl font-bold text-slate-700 text-sm mb-2';
-                btn.innerText = cat.category_name;
+                btn.innerText = cat.parent_group ? `${cat.parent_group} > ${cat.category_name}` : cat.category_name;
                 btn.onclick = () => window.applyTag(cat.category_name);
                 list.appendChild(btn);
             });
