@@ -128,7 +128,10 @@
                 <div id="newTokenResult" class="hidden mt-5">
                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center mb-2">הטוקן שלך — לחץ להעתקה</p>
                     <div id="newTokenDisplay" class="token-display mb-3" onclick="window.copyToken()">------</div>
-                    <p class="text-[9px] text-red-500 font-bold text-center mb-4">⚠️ שמור את הטוקן — אין אפשרות לשחזר!</p>
+                    <p class="text-[9px] text-red-500 font-bold text-center mb-3">⚠️ שמור את הטוקן — אין אפשרות לשחזר!</p>
+                    <button id="copyNewUrlBtn" onclick="window.copyTokenUrl()" class="w-full bg-blue-50 border border-blue-200 text-blue-600 font-bold py-3 rounded-2xl text-xs mb-2 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-link text-xs"></i>העתק קישור לאתר עם הטוקן
+                    </button>
                     <button onclick="window.enterWithToken()" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-2xl text-sm">כניסה לחשבון</button>
                 </div>
             </div>
@@ -137,10 +140,13 @@
                 <input type="text" id="existingTokenInput" maxlength="6"
                     class="token-input input-field w-full px-4 py-4 rounded-2xl mb-3"
                     placeholder="AB1C2D"
-                    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)"
+                    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6); window.onTokenInputChange(this.value)"
                     onkeydown="if(event.key==='Enter') window.loginWithToken()">
-                <button onclick="window.loginWithToken()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-sm shadow-lg shadow-blue-200">
+                <button id="existLoginBtn" onclick="window.loginWithToken()" disabled class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-sm shadow-lg shadow-blue-200 mb-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity">
                     כניסה
+                </button>
+                <button id="copyExistUrlBtn" onclick="window.copyExistingTokenUrl()" disabled class="w-full bg-slate-50 border border-slate-200 text-slate-600 font-bold py-3 rounded-2xl text-xs flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity">
+                    <i class="fa-solid fa-link text-xs"></i>העתק קישור לאתר עם הטוקן
                 </button>
                 <p id="loginError" class="text-xs text-red-500 font-bold text-center mt-3 hidden">טוקן לא נמצא. בדוק שוב.</p>
             </div>
@@ -693,8 +699,41 @@
         navigator.clipboard.writeText(tok).then(() => window.showToast('הטוקן הועתק!', 'check')).catch(() => {});
     };
 
-    window.copyTokenFromSettings = function() {
-        if (USER_TOKEN) navigator.clipboard.writeText(USER_TOKEN).then(() => window.showToast('הטוקן הועתק!', 'check')).catch(() => {});
+    window.copyTokenUrl = function() {
+        const tok = document.getElementById('newTokenDisplay').textContent;
+        const url = `https://urielshavat.github.io/MoneyBoss/?token=${tok}`;
+        const btn = document.getElementById('copyNewUrlBtn');
+        navigator.clipboard.writeText(url).then(() => {
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-check text-xs"></i>הקישור הועתק!';
+                btn.classList.remove('bg-blue-50','border-blue-200','text-blue-600');
+                btn.classList.add('bg-green-50','border-green-200','text-green-600');
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fa-solid fa-link text-xs"></i>העתק קישור לאתר עם הטוקן';
+                    btn.classList.remove('bg-green-50','border-green-200','text-green-600');
+                    btn.classList.add('bg-blue-50','border-blue-200','text-blue-600');
+                }, 3000);
+            }
+        }).catch(() => {});
+    };
+
+    window.copyExistingTokenUrl = function() {
+        const tok = (document.getElementById('existingTokenInput').value || '').trim().toUpperCase();
+        if (!tok) { window.showToast('הזן טוקן תחילה', 'circle-xmark'); return; }
+        const url = `https://urielshavat.github.io/MoneyBoss/?token=${tok}`;
+        const btn = document.getElementById('copyExistUrlBtn');
+        navigator.clipboard.writeText(url).then(() => {
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-check text-xs"></i>הקישור הועתק!';
+                btn.classList.remove('bg-slate-50','border-slate-200','text-slate-600');
+                btn.classList.add('bg-green-50','border-green-200','text-green-600');
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fa-solid fa-link text-xs"></i>העתק קישור לאתר עם הטוקן';
+                    btn.classList.remove('bg-green-50','border-green-200','text-green-600');
+                    btn.classList.add('bg-slate-50','border-slate-200','text-slate-600');
+                }, 3000);
+            }
+        }).catch(() => {});
     };
 
     window.enterWithToken = function() {
@@ -702,8 +741,15 @@
         if (token) activateSession(token);
     };
 
+    window.onTokenInputChange = function(val) {
+        const ready = val.length === TOKEN_LEN;
+        const loginBtn = document.getElementById('existLoginBtn');
+        const copyBtn  = document.getElementById('copyExistUrlBtn');
+        if (loginBtn) loginBtn.disabled = !ready;
+        if (copyBtn)  copyBtn.disabled  = !ready;
+    };
+
     window.loginWithToken = async function() {
-        if (!sbClient) { alert('יש להגדיר Supabase תחילה'); return; }
         const input = document.getElementById('existingTokenInput');
         const errEl = document.getElementById('loginError');
         const token = (input.value || '').trim().toUpperCase();
@@ -726,18 +772,19 @@
     function activateSession(token) {
         USER_TOKEN = token;
         localStorage.setItem('user_token', token);
-        // Update URL without reload
         const url = new URL(window.location.href);
         url.searchParams.set('token', token);
         window.history.replaceState({}, '', url.toString());
-        // Show settings token
         const disp = document.getElementById('settingsTokenDisplay');
         if (disp) disp.textContent = token;
         const urlEl = document.getElementById('settingsTokenUrl');
         if (urlEl) urlEl.textContent = `?token=${token}`;
-        // Hide login screen
         document.getElementById('loginScreen').classList.add('hidden');
-        // Load data (fetchTransactionsOnly will call get_balance from DB)
+        // Track page view (fire-and-forget)
+        if (sbClient) {
+            sbClient.from('analytics').insert({ user_token: token, event_type: 'page_view' })
+                .then(({ error }) => { if (error) console.warn('analytics:', error); });
+        }
         window.fetchData();
     }
 
@@ -1012,7 +1059,6 @@
             await Promise.all([window.fetchTransactionsOnly(), window.fetchBudgetData()]);
             state.isDirty = false;
             render();
-            window.showToast('הנתונים סונכרנו בהצלחה', 'check');
         } catch (e) {
             console.error(e);
         } finally {
@@ -1292,6 +1338,10 @@
             state.transactions = [newTx, ...state.transactions];
             state.balance = newBalance;
             localStorage.setItem('cached_balance', state.balance.toString());
+
+            // Track add_expense (fire-and-forget)
+            sbClient.from('analytics').insert({ user_token: USER_TOKEN, event_type: 'add_expense' })
+                .then(({ error }) => { if (error) console.warn('analytics:', error); });
 
             render();
             document.getElementById('expenseFormModal').reset();
@@ -1964,7 +2014,7 @@
         activeAnnuals.forEach(cat => {
             const opt = document.createElement('option');
             opt.value = cat.category_name;
-            opt.innerText = cat.category_name;
+            opt.innerText = cat.parent_group ? `${cat.parent_group} > ${cat.category_name}` : cat.category_name;
             select.appendChild(opt);
         });
     }
@@ -2503,29 +2553,22 @@
         // ─────────────────────────────────────────────────────────────────────
 
         if (urlToken.length === TOKEN_LEN) {
-            // Token in URL — validate and use
             if (sbClient) {
                 sbClient.from('user_tokens').select('token').eq('token', urlToken).maybeSingle()
                     .then(({ data }) => {
                         if (data) {
                             activateSession(urlToken);
                         } else {
-                            // Token not found — show login with error
                             document.getElementById('loginScreen').classList.remove('hidden');
                             window.switchLoginTab('exist');
                             document.getElementById('existingTokenInput').value = urlToken;
                             document.getElementById('loginError').classList.remove('hidden');
                         }
                     });
-            } else {
-                // No Supabase yet — show settings first
-                setTimeout(() => window.toggleSettings(), 300);
             }
         } else if (storedToken.length === TOKEN_LEN && sbClient) {
-            // Stored token — auto-login silently
             activateSession(storedToken);
         } else {
-            // No token — show login screen
             document.getElementById('loginScreen').classList.remove('hidden');
         }
 
