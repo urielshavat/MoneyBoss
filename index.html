@@ -452,13 +452,35 @@
     <!-- Edit Row Modal -->
     <div id="editRowOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-            <h3 class="text-lg font-bold text-slate-900 mb-6 text-center">עריכת הוצאה</h3>
-            <div class="space-y-4">
-                <input type="number" id="editRowAmount" step="any" inputmode="decimal" class="input-field w-full px-4 py-3 rounded-xl font-bold">
-                <input type="text" id="editRowName" class="input-field w-full px-4 py-3 rounded-xl">
-                <div class="flex gap-2 pt-2">
+            <h3 class="text-lg font-bold text-slate-900 mb-5 text-center">עריכת הוצאה</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סכום</label>
+                    <input type="number" id="editRowAmount" step="any" inputmode="decimal" class="input-field w-full px-4 py-3 rounded-xl font-bold text-lg">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תיאור</label>
+                    <input type="text" id="editRowName" class="input-field w-full px-4 py-3 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">קטגוריה</label>
+                    <select id="editRowCategory" class="input-field w-full px-4 py-3 rounded-xl appearance-none">
+                        <option value="שוטף">ללא (שוטף)</option>
+                    </select>
+                </div>
+                <!-- Primary actions -->
+                <div class="flex gap-2 pt-1">
                     <button id="saveEditBtn" onclick="window.saveRowEdit()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl">שמור</button>
                     <button onclick="window.closeEditRowModal()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl">ביטול</button>
+                </div>
+                <!-- Secondary actions -->
+                <div class="flex gap-2 pt-1 border-t border-slate-100">
+                    <button onclick="window.editRowSplit()" class="flex-1 bg-orange-50 border border-orange-200 text-orange-600 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-scissors text-xs"></i>פצל הוצאה
+                    </button>
+                    <button onclick="window.editRowDelete()" class="flex-1 bg-red-50 border border-red-200 text-red-500 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-trash text-xs"></i>מחק
+                    </button>
                 </div>
             </div>
         </div>
@@ -1364,10 +1386,12 @@
         window.closeEditRowModal();
         const enInp = document.getElementById('editRowName');
         const eaInp = document.getElementById('editRowAmount');
+        const eCat  = document.getElementById('editRowCategory');
         try {
+            const category = eCat ? eCat.value : 'שוטף';
             const { error } = await sbClient
                 .from('transactions')
-                .update({ name: enInp.value, amount: safeParseFloat(eaInp.value) })
+                .update({ name: enInp.value, amount: safeParseFloat(eaInp.value), category })
                 .eq('id', state.pendingActionRow.row)
                 .eq('user_token', USER_TOKEN);
             if (error) throw error;
@@ -1831,14 +1855,7 @@
         d.className = 'bg-white compact-tx rounded-xl shadow-sm animate-fade-in';
         const displayAmt = Math.round(formatDisplayAmount(safeParseFloat(tx.amount)));
         d.innerHTML = `
-            <div class="tx-actions-panel">
-                <button onclick="window.initEditRow('${tx.row}')" class="action-btn btn-edit"><i class="fa-solid fa-pen"></i></button>
-                <button onclick="window.initTagModalByRow('${tx.row}')" class="action-btn btn-tag"><i class="fa-solid fa-tag"></i></button>
-                <button onclick="window.initSplitRow('${tx.row}')" class="action-btn btn-split"><i class="fa-solid fa-scissors"></i></button>
-                <button onclick="window.handleDeleteByRow('${tx.row}')" class="action-btn btn-delete"><i class="fa-solid fa-trash"></i></button>
-                <button onclick="window.closeRowActions(event)" class="action-btn btn-close-actions"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div id="tx-content-${tx.row}" class="tx-inner">
+            <div class="tx-inner">
                 <div class="flex-1 flex flex-col">
                     <div class="flex items-center">
                         <span class="font-bold text-slate-800 text-xs">${tx.name}</span>
@@ -1848,7 +1865,7 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <div class="text-red-500 font-bold text-xs ltr-num">₪${displayAmt.toLocaleString()}</div>
-                    <button onclick="window.toggleRowActions(event)" class="action-trigger-btn p-1.5"><i class="fa-solid fa-ellipsis-vertical text-[10px] text-slate-300"></i></button>
+                    <button onclick="window.initEditRow('${tx.row}')" class="p-1.5"><i class="fa-solid fa-ellipsis-vertical text-[10px] text-slate-300"></i></button>
                 </div>
             </div>`;
         return d;
@@ -2181,9 +2198,38 @@
         state.pendingActionRow = { row: tx.row, name: tx.name, amount: tx.amount };
         const enInp = document.getElementById('editRowName');
         const eaInp = document.getElementById('editRowAmount');
+        const eCat  = document.getElementById('editRowCategory');
         if (enInp && eaInp) { enInp.value = tx.name; eaInp.value = safeParseFloat(tx.amount).toString(); }
+        // Populate category dropdown
+        if (eCat) {
+            eCat.innerHTML = '<option value="שוטף">ללא (שוטף)</option>';
+            const activeAnnuals = state.budget.annual.filter(a => safeParseFloat(a.budget_amount) > 0);
+            activeAnnuals.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.category_name;
+                opt.innerText = cat.parent_group ? `${cat.parent_group} > ${cat.category_name}` : cat.category_name;
+                if (tx.tag && tx.tag.trim() === cat.category_name.trim()) opt.selected = true;
+                eCat.appendChild(opt);
+            });
+            if (!tx.tag) eCat.value = 'שוטף';
+        }
         const o = document.getElementById('editRowOverlay');
         if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
+    };
+
+    // פיצול מתוך מודאל העריכה
+    window.editRowSplit = function() {
+        window.closeEditRowModal();
+        if (state.pendingActionRow) window.initSplitRow(state.pendingActionRow.row);
+    };
+
+    // מחיקה מתוך מודאל העריכה
+    window.editRowDelete = function() {
+        window.closeEditRowModal();
+        if (state.pendingActionRow) {
+            const o = document.getElementById('confirmOverlay');
+            if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
+        }
     };
 
     window.closeEditRowModal = () => { const o = document.getElementById('editRowOverlay'); if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); } };
