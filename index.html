@@ -184,12 +184,14 @@
                         <span id="balanceValue" class="text-4xl font-black text-slate-900 ltr-num">0</span>
                         <span class="text-lg text-slate-400 font-bold">₪</span>
                     </div>
-                    <div class="bg-slate-50 px-3 py-1 rounded-full border border-slate-100 flex items-center gap-1.5">
-                        <span class="text-[10px] text-slate-500 font-bold">תקציב יומי:</span>
-                        <span class="text-blue-600 font-bold text-[10px]">₪</span>
-                        <span id="dailyBudgetValue" class="text-blue-600 font-bold text-[10px] ltr-num">0</span>
-                        <button id="budgetAiBtn" onclick="window.showBudgetRecommendation()" class="hidden text-amber-500 hover:text-amber-600 transition-colors ai-pulse">
-                            <i class="fa-solid fa-lightbulb text-[11px]"></i>
+                    <div class="flex flex-col items-center gap-2 mb-2">
+                        <div class="bg-slate-50 px-3 py-1 rounded-full border border-slate-100 flex items-center gap-1.5">
+                            <span class="text-[10px] text-slate-500 font-bold">תקציב יומי:</span>
+                            <span class="text-blue-600 font-bold text-[10px]">₪</span>
+                            <span id="dailyBudgetValue" class="text-blue-600 font-bold text-[10px] ltr-num">0</span>
+                        </div>
+                        <button id="budgetAiBtn" onclick="window.showBudgetRecommendation()" class="hidden bg-amber-50 border border-amber-200 text-amber-600 font-bold text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all hover:bg-amber-100 ai-pulse">
+                            המלצה <i class="fa-solid fa-lightbulb text-[11px]"></i>
                         </button>
                     </div>
                 </div>
