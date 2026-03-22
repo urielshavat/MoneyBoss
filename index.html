@@ -392,7 +392,39 @@
                 <button onclick="window.openImportModal()" class="w-full bg-amber-50 border border-amber-200 text-amber-700 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
                     <i class="fa-brands fa-google text-sm"></i>ייבוא היסטוריה מ-Google Sheets
                 </button>
+                <button onclick="window.openShortcutsModal()" class="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-mobile-screen text-sm"></i>הגדרת קיצורים לאייפון
+                </button>
                 <button onclick="window.logout()" class="w-full bg-red-50 border border-red-100 text-red-500 font-bold py-3 rounded-xl text-xs">התנתק</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- iPhone Shortcuts Modal -->
+    <div id="shortcutsOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-900">קיצורים לאייפון</h2>
+                <button onclick="window.closeShortcutsModal()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <!-- Progress bar -->
+            <div class="mb-5">
+                <div class="flex justify-between items-center mb-1.5">
+                    <span id="shortcutsStepLabel" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">שלב 1 מתוך 4</span>
+                    <span id="shortcutsStepTitle" class="text-[10px] font-bold text-blue-600"></span>
+                </div>
+                <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div id="shortcutsProgressBar" class="h-full bg-blue-500 rounded-full transition-all duration-300" style="width:25%"></div>
+                </div>
+            </div>
+            <!-- Steps container -->
+            <div id="shortcutsStepContent" class="min-h-[260px]"></div>
+            <!-- Navigation -->
+            <div class="flex gap-2 mt-5">
+                <button id="shortcutsPrevBtn" onclick="window.shortcutsNav(-1)" class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-xl text-sm hidden">הקודם</button>
+                <button id="shortcutsNextBtn" onclick="window.shortcutsNav(1)" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl text-sm">המשך</button>
             </div>
         </div>
     </div>
@@ -2508,6 +2540,151 @@
     // =====================================================
     // MISC
     // =====================================================
+    window.openShortcutsModal = function() {
+        window.toggleSettings();
+        shortcutsCurrentStep = 0;
+        renderShortcutsStep();
+        const o = document.getElementById('shortcutsOverlay');
+        if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
+    };
+    window.closeShortcutsModal = function() {
+        const o = document.getElementById('shortcutsOverlay');
+        if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
+    };
+
+    let shortcutsCurrentStep = 0;
+
+    const shortcutsSteps = [
+        {
+            title: 'תצוגת מאזן',
+            content: () => `
+                <p class="text-sm text-slate-600 mb-4 leading-relaxed">קיצור שמציג את המאזן הנוכחי שלך.</p>
+                <ol class="space-y-3 text-sm text-slate-700">
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span>
+                        <span>הורידו את <a href="https://www.icloud.com/shortcuts/da56aef8643f42eda3269ee793197489" target="_blank" class="text-blue-600 font-bold underline">תצוגת מאזן</a></span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">2</span>
+                        <span>לחצו על <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הוספת קיצור</span></span>
+                    </li>
+                </ol>`
+        },
+        {
+            title: 'עדכון מאזן',
+            content: () => `
+                <p class="text-sm text-slate-600 mb-4 leading-relaxed">קיצור שמעדכן ומציג את המאזן העדכני.</p>
+                <ol class="space-y-3 text-sm text-slate-700">
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span>
+                        <span>הורידו את <a href="https://www.icloud.com/shortcuts/ec072a3b88cb4ec2b81baea13e0b74ee" target="_blank" class="text-blue-600 font-bold underline">עדכון מאזן</a></span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">2</span>
+                        <span>לחצו על <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הגדרת קיצור</span></span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">3</span>
+                        <span>הזינו בשדה המלל את הטוקן שלכם — <span class="font-mono font-black text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">${USER_TOKEN || '------'}</span> — ולחצו <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הבא</span></span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">4</span>
+                        <span>לחצו על <span class="text-[#007AFF] font-semibold">בחירה</span> ובחרו בקיצור <span class="font-bold">תצוגת מאזן</span></span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">5</span>
+                        <span>לחצו על <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הוספת קיצור</span></span>
+                    </li>
+                </ol>`
+        },
+        {
+            title: 'הוצאה',
+            content: () => `
+                <p class="text-sm text-slate-600 mb-3 leading-relaxed">קיצור לרישום הוצאה מהירה.</p>
+                <ol class="space-y-2.5 text-sm text-slate-700">
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span><span>הורידו את <a href="https://www.icloud.com/shortcuts/d045f71ca7e4447ea79220ba0366ac36" target="_blank" class="text-blue-600 font-bold underline">הוצאה</a></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">2</span><span>לחצו על <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הגדרת קיצור</span></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">3</span><span>הזינו את הטוקן — <span class="font-mono font-black text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">${USER_TOKEN || '------'}</span> — ולחצו <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הבא</span></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">4</span><span>לחצו על <span class="font-bold text-slate-700">+</span> לבחירת איש קשר שיקבל הודעה על כל הוצאה (ניתן להשאיר ריק) ולחצו <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הבא</span></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">5</span><span>לחצו על <span class="text-[#007AFF] font-semibold">בחירה</span>, בחרו <span class="font-bold">תצוגת מאזן</span> ולחצו <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הבא</span></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">6</span><span>לחצו שוב על <span class="text-[#007AFF] font-semibold">בחירה</span> ובחרו <span class="font-bold">תצוגת מאזן</span></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">7</span><span>לחצו על <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הוספת קיצור</span></span></li>
+                </ol>`
+        },
+        {
+            title: 'אתר MoneyBoss',
+            content: () => `
+                <p class="text-sm text-slate-600 mb-3 leading-relaxed">קיצור לפתיחת האתר עם הטוקן שלכם ישירות.</p>
+                <ol class="space-y-2.5 text-sm text-slate-700">
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span><span>הורידו את <a href="https://www.icloud.com/shortcuts/28d8fed8a39b49eea5bc9199284042dc" target="_blank" class="text-blue-600 font-bold underline">אתר MoneyBoss</a></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">2</span><span>לחצו על <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הגדרת קיצור</span></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">3</span><span>הזינו את הטוקן — <span class="font-mono font-black text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">${USER_TOKEN || '------'}</span> — ולחצו <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הוספת קיצור</span></span></li>
+                </ol>`
+        },
+        {
+            title: 'מסך הפקדים',
+            content: () => `
+                <p class="text-sm text-slate-600 mb-3 leading-relaxed">הוסיפו את הקיצורים למסך הפקדים המהיר (Control Center).</p>
+                <ol class="space-y-2.5 text-sm text-slate-700">
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span><span>הורידו את המסך מהפינה השמאלית עליונה (איפה שמעבירים למצב טיסה...)</span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">2</span><span>לחיצה ארוכה על אזור ריק ← מעבר למצב עריכה</span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">3</span><span>לחצו למטה על <span class="inline-flex items-center bg-[#3a3a3c] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">+ הוספת פקד</span></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">4</span><span>בחיפוש הקלידו <span class="font-bold">קיצור</span> ← בחרו <span class="font-bold">הפעלת קיצור</span></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">5</span><span>לחצו <span class="text-[#007AFF] font-semibold">בחירה</span> ← בחרו <span class="font-bold">תצוגת מאזן</span></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">6</span><span>חזרו על שלבים 3–5 עבור: <span class="font-bold">עדכון מאזן</span>, <span class="font-bold">הוצאה</span>, <span class="font-bold">אתר MoneyBoss</span></span></li>
+                </ol>`
+        },
+        {
+            title: 'בדיקה',
+            content: () => `
+                <p class="text-sm text-slate-600 mb-3 leading-relaxed">כעת בואו נבדוק שהכל עובד:</p>
+                <div class="space-y-3">
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                        <p class="text-xs font-bold text-blue-800 mb-1">1. לחצו על <span class="font-black">עדכון מאזן</span></p>
+                        <p class="text-xs text-blue-700">הקיצור של תצוגת מאזן אמור לשנות שמו ולהציג את המאזן היומי</p>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                        <p class="text-xs font-bold text-blue-800 mb-1">2. לחצו על <span class="font-black">הוצאה</span> — הזינו כמות <span class="font-black">(10)</span> ושם <span class="font-black">(בדיקה)</span></p>
+                        <ul class="text-xs text-blue-700 mr-3 space-y-0.5 mt-1" style="list-style:disc">
+                            <li>ההוצאה תירשם באתר</li>
+                            <li>קיצור תצוגת המאזן יעודכן למאזן החדש</li>
+                            <li>הודעה עם פרטי ההוצאה תישלח לאיש הקשר שהגדרתם</li>
+                        </ul>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                        <p class="text-xs font-bold text-blue-800 mb-1">3. לחצו על <span class="font-black">אתר MoneyBoss</span></p>
+                        <p class="text-xs text-blue-700">האתר שלכם אמור להיפתח</p>
+                        <p class="text-xs text-blue-700 mt-1">לאחר שנפתח — לחצו על <span class="font-black">⋮</span> בהוצאה שהוספתם לצורך הבדיקה ← לחצו <span class="font-black">מחק</span></p>
+                    </div>
+                </div>`
+        }
+    ];
+
+    function renderShortcutsStep() {
+        const step = shortcutsSteps[shortcutsCurrentStep];
+        const total = shortcutsSteps.length;
+        const pct = Math.round(((shortcutsCurrentStep + 1) / total) * 100);
+
+        document.getElementById('shortcutsStepLabel').textContent = `שלב ${shortcutsCurrentStep + 1} מתוך ${total}`;
+        document.getElementById('shortcutsStepTitle').textContent = step.title;
+        document.getElementById('shortcutsProgressBar').style.width = pct + '%';
+        document.getElementById('shortcutsStepContent').innerHTML = step.content();
+
+        const prevBtn = document.getElementById('shortcutsPrevBtn');
+        const nextBtn = document.getElementById('shortcutsNextBtn');
+        prevBtn.classList.toggle('hidden', shortcutsCurrentStep === 0);
+        nextBtn.textContent = shortcutsCurrentStep === total - 1 ? 'סיום' : 'המשך';
+    }
+
+    window.shortcutsNav = function(dir) {
+        const total = shortcutsSteps.length;
+        if (dir === 1 && shortcutsCurrentStep === total - 1) {
+            window.closeShortcutsModal();
+            return;
+        }
+        shortcutsCurrentStep = Math.max(0, Math.min(total - 1, shortcutsCurrentStep + dir));
+        renderShortcutsStep();
+    };
     window.openAddExpenseModal = () => { const o = document.getElementById('addExpenseOverlay'); if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); } };
     window.closeAddExpenseModal = () => { const o = document.getElementById('addExpenseOverlay'); if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); } };
     window.toggleUsefulInfo = function(id) {
