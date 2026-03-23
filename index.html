@@ -171,7 +171,7 @@
                 <button onclick="window.toggleSettings()" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
                     <i class="fa-solid fa-cog text-lg"></i>
                 </button>
-                <button id="mainSyncBtn" onclick="window.fetchTransactionsOnly()" class="btn-sync">
+                <button id="mainSyncBtn" onclick="window.fetchTransactionsOnly(true)" class="btn-sync">
                     <i id="refreshIcon" class="fa-solid fa-arrows-rotate"></i>סנכרן
                 </button>
                 <button id="budgetSyncBtn" onclick="window.fetchBudgetData(true)" class="btn-sync hidden">
@@ -972,7 +972,7 @@
                     <span class="text-xl mt-0.5">🚀</span>
                     <div>
                         <p class="text-sm font-bold text-slate-800">שלבי ההתחלה</p>
-                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed"> הגדירו הכנסות והוצאות קבועות בעמוד <span class="font-bold">תקציב</span> ← התחילו לתעד הוצאות יומיות.</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">① הגדירו הכנסות והוצאות קבועות בעמוד <span class="font-bold">תקציב</span> ← ② ייבאו היסטוריה מגוגל שיט (אם יש) מהגדרות ← ③ התחילו לתעד הוצאות יומיות.</p>
                     </div>
                 </div>
             </div>
@@ -1067,6 +1067,14 @@
 
             const { error } = await sbClient.from('user_tokens').insert({ token });
             if (error) throw error;
+
+            // אתחל daily_budget=0 ו-start_date=היום — כדי שהמאזן יתחיל מ-0
+            const todayISO = new Date().toISOString().split('T')[0];
+            await sbClient.rpc('update_daily_budget', {
+                p_user_token:   token,
+                p_daily_budget: 0,
+                p_start_date:   todayISO
+            });
 
             document.getElementById('newTokenDisplay').textContent = token;
             document.getElementById('newTokenResult').classList.remove('hidden');
@@ -1300,7 +1308,7 @@
         return safeParseFloat(data);
     }
 
-    window.fetchTransactionsOnly = async function() {
+    window.fetchTransactionsOnly = async function(isManual = false) {
         if (!sbClient || !USER_TOKEN) return;
         setLoading(true);
         try {
@@ -1319,31 +1327,36 @@
             localStorage.setItem('expense_history', JSON.stringify(state.transactions));
             localStorage.setItem('cached_balance', state.balance.toString());
 
-            // סנכרן start_date לפי התנועה הראשונה (רק אם יש תקציב יומי)
-            if (state.budget.g4 > 0 && state.transactions.length > 0) {
+            // סנכרן start_date תמיד — לפי התנועה הראשונה אם קיימת, אחרת השאר כפי שהוא
+            if (state.transactions.length > 0) {
                 const sorted = [...state.transactions].sort((a, b) =>
                     new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
                 );
                 const fp = sorted[0].date.split('/');
                 if (fp.length === 3) {
                     const startDateISO = `${fp[2]}-${fp[1].padStart(2,'0')}-${fp[0].padStart(2,'0')}`;
-                    sbClient.rpc('update_daily_budget', {
-                        p_user_token:   USER_TOKEN,
-                        p_daily_budget: state.budget.g4 / 30,
-                        p_start_date:   startDateISO
-                    }).then(async ({ error }) => {
-                        if (!error) {
-                            // רענן מאזן אחרי עדכון
-                            state.balance = await fetchBalance();
-                            localStorage.setItem('cached_balance', state.balance.toString());
-                            render();
-                        }
-                    });
+                    // עדכן רק אם start_date השתנה
+                    const currentStart = state.budget.startDate
+                        ? state.budget.startDate.split('/').reverse().join('-')
+                        : null;
+                    if (startDateISO !== currentStart) {
+                        sbClient.rpc('update_daily_budget', {
+                            p_user_token:   USER_TOKEN,
+                            p_daily_budget: state.budget.g4 / 30,
+                            p_start_date:   startDateISO
+                        }).then(async ({ error }) => {
+                            if (!error) {
+                                state.balance = await fetchBalance();
+                                localStorage.setItem('cached_balance', state.balance.toString());
+                                render();
+                            }
+                        });
+                    }
                 }
             }
 
             render();
-            window.showToast('עודכן בהצלחה', 'check');
+            if (isManual) window.showToast('עודכן בהצלחה', 'check');
         } catch (e) {
             console.error(e);
             window.showToast('שגיאה בטעינת נתונים', 'circle-xmark');
@@ -1496,7 +1509,7 @@
         if (icon) icon.classList.add('animate-spin');
         try {
             if (force) await window.fetchBudgetData();
-            await window.fetchTransactionsOnly();
+            await window.fetchTransactionsOnly(force); // isManual=true רק בלחיצה ידנית
             renderAnnualView();
         } catch (e) {
             console.error(e);
@@ -2138,8 +2151,6 @@
         const requestedMonthlyDisplay = safeParseFloat(document.getElementById('g4Input').value.replace(/,/g, ''));
         const actualRequested = denormalizeAmount(requestedMonthlyDisplay);
         const oldMonthly = safeParseFloat(state.budget.g4);
-        const diff = actualRequested - oldMonthly;
-        const dailyDiff = diff / 30;
 
         // חשב תאריך התחלה מהתנועה הראשונה
         let startDate = null;
@@ -2159,27 +2170,29 @@
         const now = new Date();
         const monthsElapsed = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
 
-        // הצג/הסתר אפשרות "החל מחודש"
-        const fromMonthOpt = document.getElementById('fromMonthOption');
-        if (monthsElapsed >= 1) {
-            fromMonthOpt.classList.remove('hidden');
-            // בנה רשימת חודשים מתאריך ההתחלה עד עכשיו
-            const sel = document.getElementById('fromMonthSelect');
-            sel.innerHTML = '';
-            const monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-            for (let m = 0; m <= monthsElapsed; m++) {
-                const d = new Date(startDate.getFullYear(), startDate.getMonth() + m, 1);
-                const opt = document.createElement('option');
-                opt.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
-                opt.textContent = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-                if (m === monthsElapsed) opt.selected = true; // ברירת מחדל: חודש נוכחי
-                sel.appendChild(opt);
-            }
-        } else {
-            fromMonthOpt.classList.add('hidden');
+        state.pendingG4 = { finalG4: actualRequested, startDate, monthsElapsed };
+
+        // אם עדיין לא עבר חודש — אין בחירה, מבצעים ישירות
+        if (monthsElapsed < 1) {
+            window.updateG4Budget('retro');
+            return;
         }
 
-        state.pendingG4 = { finalG4: actualRequested, startDate, monthsElapsed };
+        // בנה רשימת חודשים מתאריך ההתחלה עד עכשיו
+        const fromMonthOpt = document.getElementById('fromMonthOption');
+        fromMonthOpt.classList.remove('hidden');
+        const sel = document.getElementById('fromMonthSelect');
+        sel.innerHTML = '';
+        const monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+        for (let m = 0; m <= monthsElapsed; m++) {
+            const d = new Date(startDate.getFullYear(), startDate.getMonth() + m, 1);
+            const opt = document.createElement('option');
+            opt.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+            opt.textContent = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+            if (m === monthsElapsed) opt.selected = true;
+            sel.appendChild(opt);
+        }
+
         const o = document.getElementById('retroUpdateOverlay');
         o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10);
     };
@@ -2264,7 +2277,7 @@
             localStorage.setItem('cached_balance', state.balance.toString());
             state.isDirty = true;
             await window.fetchBudgetData();
-            await window.fetchTransactionsOnly();
+            await window.fetchTransactionsOnly(false);
             // השבת כפתור העדכון עד שיוקלד ערך חדש
             const g4Btn = document.getElementById('g4UpdateBtn');
             if (g4Btn) g4Btn.disabled = true;
