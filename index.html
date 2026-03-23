@@ -165,6 +165,7 @@
                 <button id="budgetHelpBtn" onclick="window.openBudgetHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="איך למלא את התקציב">?</button>
                 <button id="mainHelpBtn" onclick="window.openMainHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="הסבר על הוצאות שוטפות">?</button>
                 <button id="annualHelpBtn" onclick="window.openAnnualHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="הסבר על הוצאות מתוכננות">?</button>
+                <button id="onboardingBtn" onclick="window.openOnboarding()" class="hidden bg-blue-50 border border-blue-200 text-blue-600 text-[10px] font-bold px-2.5 py-1 rounded-full hover:bg-blue-100 transition-colors whitespace-nowrap" title="איך מתחילים?">איך מתחילים?</button>
             </div>
             <div class="flex items-center gap-2">
                 <button onclick="window.toggleSettings()" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
@@ -400,6 +401,9 @@
                 </button>
                 <button onclick="window.openShortcutsModal()" class="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
                     <i class="fa-solid fa-mobile-screen text-sm"></i>הגדרת קיצורים לאייפון
+                </button>
+                <button onclick="window.toggleSettings(); window.openOnboarding();" class="w-full bg-blue-50 border border-blue-200 text-blue-600 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-circle-info text-sm"></i>איך מתחילים?
                 </button>
                 <button onclick="window.logout()" class="w-full bg-red-50 border border-red-100 text-red-500 font-bold py-3 rounded-xl text-xs">התנתק</button>
             </div>
@@ -894,6 +898,91 @@
         </div>
     </div>
 
+    <!-- Main View Help Modal -->
+    <div id="mainHelpOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
+        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col max-h-[85vh]">
+            <div class="flex justify-between items-center p-6 pb-4 border-b border-slate-100">
+                <h3 class="text-lg font-bold text-slate-900">הוצאות שוטפות</h3>
+                <button onclick="window.closeMainHelp()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="overflow-y-auto p-6 space-y-4 text-sm text-slate-600 leading-relaxed">
+                <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
+                    <p>לאחר שמילאתם את עמוד התקציב וקבעתם תקציב חודשי לשוטף, הסכום מחולק ב-30 לקבלת <strong>תקציב יומי</strong> — וסכום זה מתווסף למאזן שלכם כל יום.</p>
+                    <p class="mt-2">לדוגמא: תקציב חודשי של ₪3,000 = תקציב יומי של ₪100. בכל יום המאזן גדל ב-₪100.</p>
+                </div>
+                <div>
+                    <p class="font-bold text-slate-800 mb-1.5">📋 תיעוד הוצאות</p>
+                    <p>כאן ירשמו ההוצאות שתתעדו. יש לתעד את <strong>כל</strong> ההוצאות שלא ציינתם תחת "הוצאות קבועות" בעמוד התקציב.</p>
+                </div>
+                <div>
+                    <p class="font-bold text-slate-800 mb-1.5">➕ כיצד לתעד הוצאה</p>
+                    <p>לחצו על הכפתור <strong>+</strong> הכחול למטה, ציינו שם וסכום. ניתן לתעד בקלות ישירות מהנייד — לחצו על הגדרות לקבלת הסבר.</p>
+                </div>
+                <div>
+                    <p class="font-bold text-slate-800 mb-1.5">📅 הוצאה מתוכננת</p>
+                    <p>אם ההוצאה שייכת לקטגוריה שתכננתם תחת "הוצאות מתוכננות" — סמנו את הקטגוריה המתאימה. הוצאה זו <strong>לא תרד מהמאזן</strong> אלא מהתקציב שהגדרתם לאותה קטגוריה.</p>
+                    <p class="mt-2 text-xs text-slate-500">הוצאות מתוכננות מוסתרות ברשימה. לחצו על <strong>"הצג הוצאות מתוכננות"</strong> כדי להציג אותן.</p>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-100">
+                <button onclick="window.closeMainHelp()" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-sm">הבנתי, תודה</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onboarding Modal -->
+    <div id="onboardingOverlay" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[150] flex items-end justify-center p-0 hidden opacity-0 transition-opacity">
+        <div class="bg-white w-full max-w-md rounded-t-3xl p-6 shadow-2xl pb-10">
+            <div class="flex justify-center mb-4">
+                <div class="w-10 h-1.5 bg-slate-200 rounded-full"></div>
+            </div>
+            <div class="flex items-center gap-3 mb-5">
+                <div class="w-11 h-11 bg-blue-600 rounded-2xl flex items-center justify-center shadow-md shadow-blue-200 flex-shrink-0">
+                    <i class="fa-solid fa-wallet text-white text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-black text-slate-900">ברוכים הבאים ל-MoneyBoss</h2>
+                    <p class="text-[11px] text-slate-400 font-semibold">קצת על השיטה לפני שמתחילים</p>
+                </div>
+            </div>
+
+            <div class="space-y-3 mb-6">
+                <div class="flex gap-3 items-start bg-blue-50 rounded-2xl p-3 border border-blue-100">
+                    <span class="text-xl mt-0.5">📊</span>
+                    <div>
+                        <p class="text-sm font-bold text-slate-800">תקציב יומי = הכנסות פחות הוצאות</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">מגדירים הכנסות והוצאות קבועות — המערכת מחשבת כמה אפשר להוציא ביום.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start bg-slate-50 rounded-2xl p-3 border border-slate-100">
+                    <span class="text-xl mt-0.5">💰</span>
+                    <div>
+                        <p class="text-sm font-bold text-slate-800">המאזן גדל כל יום</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">כל יום שלא הוצאתם כלום — המאזן עולה. כל הוצאה מורידה אותו. המטרה: לשמור אותו חיובי.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start bg-slate-50 rounded-2xl p-3 border border-slate-100">
+                    <span class="text-xl mt-0.5">📅</span>
+                    <div>
+                        <p class="text-sm font-bold text-slate-800">הוצאות מתוכננות בנפרד</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">חופשות, ביגוד, רכב — מנוהלות בעמוד "מתוכנן" ולא מפריעות למאזן השוטף.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start bg-amber-50 rounded-2xl p-3 border border-amber-100">
+                    <span class="text-xl mt-0.5">🚀</span>
+                    <div>
+                        <p class="text-sm font-bold text-slate-800">שלבי ההתחלה</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed"> הגדירו הכנסות והוצאות קבועות בעמוד <span class="font-bold">תקציב</span> ← התחילו לתעד הוצאות יומיות.</p>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="window.closeOnboarding()" class="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl text-sm">
+                הבנתי — נתחיל!
+            </button>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div id="toast" class="fixed bottom-32 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-2.5 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-2.5 opacity-0 pointer-events-none transition-all duration-300 z-[100] w-[85%] max-w-xs">
         <i id="toastIcon" class="fa-solid fa-circle-info"></i>
@@ -1036,7 +1125,7 @@
 
     window.enterWithToken = function() {
         const token = window._pendingToken;
-        if (token) activateSession(token);
+        if (token) activateSession(token, true);
     };
 
     window.onTokenInputChange = function(val) {
@@ -1067,7 +1156,7 @@
         }
     };
 
-    function activateSession(token) {
+    function activateSession(token, isNew = false) {
         USER_TOKEN = token;
         localStorage.setItem('user_token', token);
         const url = new URL(window.location.href);
@@ -1082,6 +1171,10 @@
         if (sbClient) {
             sbClient.from('analytics').insert({ user_token: token, event_type: 'page_view' })
                 .then(({ error }) => { if (error) console.warn('analytics:', error); });
+        }
+        // הצג onboarding רק בחשבון חדש לגמרי
+        if (isNew) {
+            setTimeout(() => window.openOnboarding(), 600);
         }
         window.fetchData();
     }
@@ -2260,6 +2353,12 @@
         if (mainHelpBtn) mainHelpBtn.classList.toggle('hidden', state.currentView !== 'main');
         const annualHelpBtn = document.getElementById('annualHelpBtn');
         if (annualHelpBtn) annualHelpBtn.classList.toggle('hidden', state.currentView !== 'annual');
+        // כפתור "איך מתחילים?" — מוצג בכל עמוד כל עוד לא הוגדר תקציב חודשי
+        const onboardingBtn = document.getElementById('onboardingBtn');
+        if (onboardingBtn) {
+            const hasG4 = safeParseFloat(state.budget.g4) > 0;
+            onboardingBtn.classList.toggle('hidden', hasG4);
+        }
         ['main','budget','annual'].forEach(v => {
             const btn = document.getElementById(v === 'main' ? 'mainSyncBtn' : (v + 'SyncBtn' + (v === 'annual' ? 'Top' : '')));
             if (btn) btn.classList.toggle('hidden', state.currentView !== v);
@@ -2285,6 +2384,7 @@
     // RENDER MAIN
     // =====================================================
     function render() {
+        updateNavigationUI();
         if (state.currentView === 'annual') return renderAnnualView();
         if (state.currentView === 'budget') return;
         if (state.currentView !== 'main') return;
@@ -3216,6 +3316,15 @@
     window.closeAnnualHelp = function() {
         const o = document.getElementById('annualHelpOverlay');
         if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
+    };
+    window.openOnboarding = function() {
+        const o = document.getElementById('onboardingOverlay');
+        if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
+    };
+    window.closeOnboarding = function() {
+        const o = document.getElementById('onboardingOverlay');
+        if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
+        localStorage.setItem('onboarding_seen', '1');
     };
     window.openMainHelp = function() {
         const o = document.getElementById('mainHelpOverlay');
