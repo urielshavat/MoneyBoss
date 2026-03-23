@@ -857,18 +857,40 @@
 
     <!-- Retro Update Modal -->
     <div id="retroUpdateOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
-        <div class="bg-white w-full max-sm rounded-3xl p-6 shadow-2xl">
-            <h3 class="text-lg font-bold text-slate-900 mb-3 text-center">עדכון תקציב חודשי</h3>
-            <p class="text-xs text-slate-500 mb-4 text-center">בחר כיצד להחיל את השינוי:</p>
-            <div id="todayExplanation" class="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6 text-xs text-blue-800 leading-relaxed">
-                <p class="font-bold mb-1">איזון "מהיום":</p>
-                <div id="explNumbers"></div>
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-slate-900 mb-2 text-center">עדכון תקציב חודשי</h3>
+            <p class="text-xs text-slate-400 mb-4 text-center">מאיזה מועד להחיל את השינוי?</p>
+
+            <!-- Option 1: from start -->
+            <div class="border border-slate-200 rounded-2xl p-4 mb-3">
+                <div class="flex items-start gap-3 mb-3">
+                    <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-calendar-days text-blue-600 text-xs"></i>
+                    </div>
+                    <div>
+                        <p class="font-bold text-slate-800 text-sm">החל מתאריך ההתחלה</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">מתאים כשמצאתם טעות — שכחתם הוצאה, טעיתם בסכום של הוצאה או הכנסה</p>
+                    </div>
+                </div>
+                <button onclick="window.updateG4Budget('retro')" class="w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl text-sm">עדכן מתאריך ההתחלה</button>
             </div>
-            <div class="space-y-3">
-                <button onclick="window.updateG4Budget('retro')" class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl text-sm shadow-lg shadow-blue-200">עדכן רטרואקטיבית מתאריך ההתחלה</button>
-                <button onclick="window.updateG4Budget('today')" class="w-full bg-slate-100 text-slate-700 font-bold py-3.5 rounded-xl text-sm">עדכן מהיום (הוספת הוצאת איזון)</button>
-                <button onclick="window.closeRetroUpdateModal()" class="w-full text-slate-400 text-xs py-2">ביטול</button>
+
+            <!-- Option 2: from month (shown only if > 1 month elapsed) -->
+            <div id="fromMonthOption" class="border border-slate-200 rounded-2xl p-4 mb-3">
+                <div class="flex items-start gap-3 mb-3">
+                    <div class="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-rotate text-orange-500 text-xs"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-bold text-slate-800 text-sm">החל מחודש</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">מתאים כשמשהו השתנה — הוצאה גדלה/קטנה, קיבלתם העלאה במשכורת</p>
+                        <select id="fromMonthSelect" class="mt-2 w-full input-field px-3 py-2 rounded-lg text-xs font-bold appearance-none"></select>
+                    </div>
+                </div>
+                <button onclick="window.updateG4Budget('month')" class="w-full bg-orange-500 text-white font-bold py-2.5 rounded-xl text-sm">עדכן מהחודש שנבחר</button>
             </div>
+
+            <button onclick="window.closeRetroUpdateModal()" class="w-full text-slate-400 text-xs py-2">ביטול</button>
         </div>
     </div>
 
@@ -1239,8 +1261,7 @@
 
     function mapSupabaseTx(t) {
         const rawCategory = (t.category || '').trim();
-        // אם הקטגוריה מכילה " > " (שם מלא עם parent) — שמור רק את החלק אחרי ה->
-        // כי budget_settings מאחסן category_name ללא ה-parent אחרי הפרסור
+        const isAdjustment = rawCategory === 'איזון עדכון תקציב';
         let tag = null;
         if (rawCategory && rawCategory !== 'שוטף') {
             const sep = rawCategory.indexOf(' > ');
@@ -1254,6 +1275,7 @@
             date: formatDateFromSupabase(t.created_at),
             time: new Date(t.created_at).toLocaleTimeString('he-IL'),
             tag,
+            isAdjustment,
             external_id: t.external_id || null
         };
     }
@@ -1502,12 +1524,11 @@
 
                 setStatus(`שומר ${toUpsert.length} תנועות ב-Supabase...`, 55);
 
-                // מחק תנועות ייבוא קיימות של משתמש זה, ואז הכנס מחדש
+                // מחק את כל התנועות של המשתמש לפני ייבוא מחדש
                 const { error: delTxErr } = await sbClient
                     .from('transactions')
                     .delete()
-                    .eq('user_token', USER_TOKEN)
-                    .not('external_id', 'is', null);
+                    .eq('user_token', USER_TOKEN);
                 if (delTxErr) throw delTxErr;
 
                 // Insert in chunks of 100
@@ -2026,70 +2047,134 @@
         const oldMonthly = safeParseFloat(state.budget.g4);
         const diff = actualRequested - oldMonthly;
         const dailyDiff = diff / 30;
-        const startParts = state.budget.startDate ? state.budget.startDate.split('/') : [];
-        let daysElapsed = 0;
-        if (startParts.length === 3) {
-            const startDate = new Date(startParts[2], startParts[1]-1, startParts[0]);
-            const today = new Date(); today.setHours(0,0,0,0);
-            daysElapsed = Math.max(0, Math.floor((today - startDate) / (1000*3600*24)));
+
+        // חשב תאריך התחלה מהתנועה הראשונה
+        let startDate = null;
+        if (state.transactions.length > 0) {
+            const sorted = [...state.transactions].sort((a, b) =>
+                new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
+            );
+            const fp = sorted[0].date.split('/');
+            if (fp.length === 3) startDate = new Date(parseInt(fp[2]), parseInt(fp[1]) - 1, 1);
         }
-        const balancingAmount = dailyDiff * daysElapsed;
-        const explNums = document.getElementById('explNumbers');
-        explNums.innerHTML = `התקציב ישתנה ב-₪${Math.round(formatDisplayAmount(diff)).toLocaleString()}. זהו שינוי של <b>₪${formatDisplayAmount(dailyDiff).toFixed(1)}</b> ליום. מכיוון שעברו <b>${daysElapsed} ימים</b>, תיווצר הוצאת איזון בסך <b>₪${Math.round(formatDisplayAmount(balancingAmount)).toLocaleString()}</b>.`;
+        if (!startDate && state.budget.startDate) {
+            const sp = state.budget.startDate.split('/');
+            if (sp.length === 3) startDate = new Date(parseInt(sp[2]), parseInt(sp[1]) - 1, 1);
+        }
+        if (!startDate) startDate = new Date();
+
+        const now = new Date();
+        const monthsElapsed = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
+
+        // הצג/הסתר אפשרות "החל מחודש"
+        const fromMonthOpt = document.getElementById('fromMonthOption');
+        if (monthsElapsed >= 1) {
+            fromMonthOpt.classList.remove('hidden');
+            // בנה רשימת חודשים מתאריך ההתחלה עד עכשיו
+            const sel = document.getElementById('fromMonthSelect');
+            sel.innerHTML = '';
+            const monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+            for (let m = 0; m <= monthsElapsed; m++) {
+                const d = new Date(startDate.getFullYear(), startDate.getMonth() + m, 1);
+                const opt = document.createElement('option');
+                opt.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+                opt.textContent = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+                if (m === monthsElapsed) opt.selected = true; // ברירת מחדל: חודש נוכחי
+                sel.appendChild(opt);
+            }
+        } else {
+            fromMonthOpt.classList.add('hidden');
+        }
+
+        state.pendingG4 = { finalG4: actualRequested, startDate, monthsElapsed };
         const o = document.getElementById('retroUpdateOverlay');
         o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10);
-        state.pendingG4 = { finalG4: actualRequested, balancingAmount };
     };
 
     window.updateG4Budget = async function(mode) {
         if (!sbClient) return;
+
+        // קרא ערכים לפני סגירת המודאל
+        const selVal = mode === 'month' ? (document.getElementById('fromMonthSelect')?.value || '') : '';
         window.closeRetroUpdateModal();
         setLoading(true, true);
+
         try {
-            const { finalG4, balancingAmount } = state.pendingG4;
+            const { finalG4, startDate } = state.pendingG4;
+            const oldG4 = safeParseFloat(state.budget.g4);
             const dailyBudget = finalG4 / 30;
+            const oldDailyBudget = oldG4 / 30;
+            let startDateISO = null;
 
-            // Parse start_date for the RPC
-            const startParts = state.budget.startDate ? state.budget.startDate.split('/') : [];
-            const startDateISO = startParts.length === 3
-                ? `${startParts[2]}-${startParts[1].padStart(2,'0')}-${startParts[0].padStart(2,'0')}`
-                : null;
+            if (mode === 'retro') {
+                const effectiveStart = startDate || new Date();
+                startDateISO = `${effectiveStart.getFullYear()}-${String(effectiveStart.getMonth()+1).padStart(2,'0')}-01`;
 
-            // Save g4 in budget_settings (for budget screen display)
-            await sbClient.from('budget_settings')
-                .delete()
-                .eq('user_token', USER_TOKEN)
-                .eq('category_name', '__g4__');
-            await sbClient.from('budget_settings')
-                .insert({ category_name: '__g4__', budget_amount: finalG4, type: 'system', user_token: USER_TOKEN });
+            } else if (mode === 'month') {
+                const fromDate = selVal ? new Date(selVal) : new Date();
+                fromDate.setHours(0,0,0,0);
 
-            // Update daily_budget + start_date on user_tokens via RPC
-            // This is what get_balance uses to compute the balance
-            const { data: newBalance, error: rpcErr } = await sbClient.rpc('update_daily_budget', {
+                // תאריך התחלה המקורי (ה-start_date הנוכחי בDB)
+                const originalStart = startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), 1) : new Date();
+                originalStart.setHours(0,0,0,0);
+
+                // ימים מה-start_date המקורי עד לתאריך הנבחר (לא עד היום!)
+                // כי get_balance מחשב: (ימים_מ_start_עד_היום × תקציב_יומי_חדש) - sum(amount)
+                // אחרי העדכון, הימים לפני fromDate יקבלו תקציב_יומי_חדש במקום תקציב_יומי_ישן
+                // לכן נוסיף הוצאת איזון = הפרש_יומי × ימים_מ_start_עד_fromDate
+                const daysBeforeSelected = Math.max(0, Math.floor((fromDate - originalStart) / (1000*3600*24)));
+
+                // get_balance = (ימים × תקציב_יומי_חדש) - sum(amount)
+                // כדי שהמאזן ישתנה רק מהחודש הנבחר ולא רטרואקטיבית —
+                // נוסיף הוצאה = הפרש_יומי × ימים_שעברו_מה_start_עד_החודש_הנבחר
+                // אם התקציב עלה (dailyDiff > 0) — נוסיף הוצאה חיובית (מנטרל את העלייה הרטרואקטיבית)
+                // אם התקציב ירד (dailyDiff < 0) — נוסיף הוצאה שלילית (מנטרל את הירידה הרטרואקטיבית)
+                const dailyDiff = dailyBudget - oldDailyBudget;
+                const balancingAmount = dailyDiff * daysBeforeSelected;
+                console.log('📊 Budget update:', { finalG4, oldG4, dailyBudget, oldDailyBudget, dailyDiff, originalStart, fromDate, daysBeforeSelected, balancingAmount });
+
+                if (Math.abs(balancingAmount) > 0.1) {
+                    const adjPayload = {
+                        amount: balancingAmount,
+                        name: 'איזון עדכון תקציב',
+                        category: 'איזון עדכון תקציב',
+                        created_at: fromDate.toISOString(),
+                        user_token: USER_TOKEN
+                    };
+                    console.log('💰 Inserting adjustment:', adjPayload);
+                    const { error: adjErr } = await sbClient.from('transactions').insert(adjPayload);
+                    if (adjErr) console.error('❌ adjustment insert error:', adjErr);
+                    else console.log('✅ adjustment inserted OK');
+                } else {
+                    console.log('⚠️ balancingAmount too small to insert:', balancingAmount, 'dailyDiff:', dailyDiff, 'days:', daysFromSelectedMonth);
+                }
+
+                // start_date נשאר כפי שהוא ב-DB
+                startDateISO = startDate
+                    ? `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-01`
+                    : null;
+            }
+
+            // שמור g4 ב-budget_settings
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__g4__');
+            await sbClient.from('budget_settings').insert({ category_name: '__g4__', budget_amount: finalG4, type: 'system', user_token: USER_TOKEN });
+
+            // עדכן daily_budget + start_date ב-user_tokens
+            const { error: rpcErr } = await sbClient.rpc('update_daily_budget', {
                 p_user_token:   USER_TOKEN,
                 p_daily_budget: dailyBudget,
                 p_start_date:   startDateISO
             });
             if (rpcErr) throw rpcErr;
 
-            // In 'today' mode, add a balancing transaction (affects sum(amount))
-            // so the balance stays correct from today onwards
-            if (mode === 'today' && Math.abs(balancingAmount) > 0.1) {
-                const now = new Date();
-                await sbClient.from('transactions').insert({
-                    amount: balancingAmount,
-                    name: 'איזון שינוי תקציב',
-                    category: 'שוטף',
-                    created_at: now.toISOString(),
-                    user_token: USER_TOKEN
-                });
-            }
-
             state.balance = safeParseFloat(await fetchBalance());
             localStorage.setItem('cached_balance', state.balance.toString());
             state.isDirty = true;
             await window.fetchBudgetData();
             await window.fetchTransactionsOnly();
+            // השבת כפתור העדכון עד שיוקלד ערך חדש
+            const g4Btn = document.getElementById('g4UpdateBtn');
+            if (g4Btn) g4Btn.disabled = true;
             window.showToast('עודכן בהצלחה', 'check');
         } catch (e) {
             console.error(e);
@@ -2220,7 +2305,16 @@
             aiBtn.classList.toggle('hidden', !(daysPassed >= 30 && Math.abs(state.balance) > threshold));
         } else if (aiBtn) aiBtn.classList.add('hidden');
 
-        const filteredTxs = state.transactions.filter(tx => state.showAnnualInMain || !tx.tag);
+        const filteredTxs = state.transactions.filter(tx => {
+            if (tx.isAdjustment) return state.showAnnualInMain;
+            return state.showAnnualInMain || !tx.tag;
+        });
+        if (state.showAnnualInMain) {
+            const adj = state.transactions.filter(t => t.isAdjustment);
+            console.log('🔍 adjustment txs in state:', adj.length, adj.map(t => ({ name: t.name, amount: t.amount, tag: t.tag, isAdj: t.isAdjustment })));
+            const adjInFiltered = filteredTxs.filter(t => t.isAdjustment);
+            console.log('🔍 adjustment in filteredTxs:', adjInFiltered.length, 'total filtered:', filteredTxs.length, 'paginated:', state.displayedTransactionsCount);
+        }
         const paginatedTxs = filteredTxs.slice(0, state.displayedTransactionsCount);
         const grouped = {};
         paginatedTxs.forEach(tx => {
