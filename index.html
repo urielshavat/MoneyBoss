@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MoneyBoss</title>
+    <link rel="icon" type="image/png" href="favicon-32x32.png" sizes="32x32">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -160,25 +162,24 @@
     <div class="w-full max-w-md bg-transparent flex flex-col min-h-screen pb-32" id="appRoot">
         <div class="flex justify-between items-center mb-4 px-1">
             <div class="flex items-center gap-2">
+                <button onclick="window.toggleHamburgerMenu()" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                    <i class="fa-solid fa-bars text-lg"></i>
+                </button>
                 <h1 id="pageTitle" class="text-xl font-bold text-slate-800 tracking-tight">הוצאות שוטפות</h1>
-                <span id="connIndicator" class="conn-dot disconnected" title="לא מחובר"></span>
                 <button id="budgetHelpBtn" onclick="window.openBudgetHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="איך למלא את התקציב">?</button>
                 <button id="mainHelpBtn" onclick="window.openMainHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="הסבר על הוצאות שוטפות">?</button>
                 <button id="annualHelpBtn" onclick="window.openAnnualHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="הסבר על הוצאות מתוכננות">?</button>
                 <button id="onboardingBtn" onclick="window.openOnboarding()" class="hidden bg-blue-50 border border-blue-200 text-blue-600 text-[10px] font-bold px-2.5 py-1 rounded-full hover:bg-blue-100 transition-colors whitespace-nowrap" title="איך מתחילים?">איך מתחילים?</button>
             </div>
             <div class="flex items-center gap-2">
-                <button onclick="window.toggleSettings()" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-                    <i class="fa-solid fa-cog text-lg"></i>
-                </button>
                 <button id="mainSyncBtn" onclick="window.fetchTransactionsOnly(true)" class="btn-sync">
-                    <i id="refreshIcon" class="fa-solid fa-arrows-rotate"></i>סנכרן
+                    <i id="refreshIcon" class="fa-solid fa-arrows-rotate"></i>
                 </button>
                 <button id="budgetSyncBtn" onclick="window.fetchBudgetData(true)" class="btn-sync hidden">
-                    <i id="budgetRefreshIcon" class="fa-solid fa-arrows-rotate"></i>סנכרן
+                    <i id="budgetRefreshIcon" class="fa-solid fa-arrows-rotate"></i>
                 </button>
                 <button id="annualSyncBtnTop" onclick="window.fetchAnnualData(true)" class="btn-sync hidden">
-                    <i id="annualRefreshIcon" class="fa-solid fa-arrows-rotate"></i>סנכרן
+                    <i id="annualRefreshIcon" class="fa-solid fa-arrows-rotate"></i>
                 </button>
             </div>
         </div>
@@ -338,7 +339,17 @@
                     </button>
                     <div id="calcInfoContent" class="hidden bg-slate-50 p-4 text-xs text-slate-600 border-t border-slate-100 leading-relaxed">
                         בעזרת המחשבון הזה תוכלו לחשב כמה צריך להפקיד לחסכון בכל חודש כדי שיהיה מספיק לאירועים שלכם בעתיד
-                        <a href="https://moneyboss.netlify.app/family-savings" target="_blank" class="text-blue-600 underline font-bold">Family Savings</a>
+                        <a href="family-savings.html" target="_blank" class="text-blue-600 underline font-bold">Family Savings</a>
+                    </div>
+               </div>
+             <div class="card overflow-hidden mt-3">
+                    <button onclick="window.toggleUsefulInfo('carCostInfo')" class="w-full flex justify-between items-center p-4 bg-white text-right active:bg-slate-50 transition-colors">
+                        <span class="text-xs font-bold text-slate-800">כמה עולה לי הרכב בחודש?</span>
+                        <i id="carCostInfoIcon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200"></i>
+                    </button>
+                    <div id="carCostInfoContent" class="hidden bg-slate-50 p-4 text-xs text-slate-600 border-t border-slate-100 leading-relaxed">
+                        בעזרת המחשבון הזה תוכלו לחשב כמה אתם באמת מוציאים על הרכב שלכם בחודש
+                        <a href="car-cost.html" target="_blank" class="text-blue-600 underline font-bold">Car Cost</a>
                     </div>
                 </div>
             </div>
@@ -372,6 +383,56 @@
         <button id="batchUpdateBtn" onclick="window.saveAllBudgetChanges()" class="batch-update-btn">עדכן תקציב</button>
     </div>
 
+    <!-- ===================== HAMBURGER DROPDOWN ===================== -->
+    <div id="hamburgerBackdrop" class="fixed inset-0 z-[105] hidden" onclick="window.closeHamburgerMenu()"></div>
+    <div id="hamburgerMenu" class="fixed top-14 right-2 z-[110] hidden" style="min-width:220px">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-fade-in">
+
+            <!-- Main actions -->
+            <button onclick="window.closeHamburgerMenu(); window.toggleSettings();" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-cog text-slate-400 w-4 text-center flex-shrink-0"></i>
+                <span>הגדרות</span>
+            </button>
+            <div class="border-t border-slate-100 mx-3"></div>
+            <button onclick="window.closeHamburgerMenu(); window.openOnboarding();" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-circle-info text-blue-400 w-4 text-center flex-shrink-0"></i>
+                <span>איך מתחילים?</span>
+            </button>
+            <div class="border-t border-slate-100 mx-3"></div>
+            <button onclick="window.closeHamburgerMenu(); window.copyExpensesList();" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-copy text-purple-400 w-4 text-center flex-shrink-0"></i>
+                <span>העתק רשימת הוצאות</span>
+            </button>
+            <div class="border-t border-slate-100 mx-3"></div>
+            <button onclick="window.closeHamburgerMenu(); window.shareApp();" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-share-nodes text-green-500 w-4 text-center flex-shrink-0"></i>
+                <span>שיתוף</span>
+            </button>
+            <div class="border-t border-slate-100 mx-3"></div>
+            <a href="https://chat.whatsapp.com/E2Ra8MzSWIzEmIvHtgG5ZB" target="_blank" onclick="window.closeHamburgerMenu();" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i class="fa-brands fa-whatsapp w-4 text-center flex-shrink-0 text-green-500"></i>
+                <span>קהילת MoneyBoss</span>
+            </a>
+
+            <!-- Financial tools section -->
+            <div class="border-t border-slate-200 mt-1"></div>
+            <div class="px-4 pt-3 pb-1">
+                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">כלים פיננסיים</p>
+            </div>
+            <a href="car-cost.html" target="_blank" onclick="window.closeHamburgerMenu();" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-car text-blue-400 w-4 text-center flex-shrink-0"></i>
+                <span>החזקת רכב</span>
+            </a>
+            <div class="border-t border-slate-100 mx-3"></div>
+            <a href="family-savings.html" target="_blank" onclick="window.closeHamburgerMenu();" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-piggy-bank text-pink-400 w-4 text-center flex-shrink-0"></i>
+                <span>חסכון לילדים</span>
+            </a>
+
+        </div>
+    </div>
+    <!-- ====================================================== -->
+
     <!-- ===================== MODALS ===================== -->
 
     <!-- Settings Modal -->
@@ -401,9 +462,6 @@
                 </button>
                 <button onclick="window.openShortcutsModal()" class="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
                     <i class="fa-solid fa-mobile-screen text-sm"></i>הגדרת קיצורים לאייפון
-                </button>
-                <button onclick="window.toggleSettings(); window.openOnboarding();" class="w-full bg-blue-50 border border-blue-200 text-blue-600 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-circle-info text-sm"></i>איך מתחילים?
                 </button>
                 <button onclick="window.logout()" class="w-full bg-red-50 border border-red-100 text-red-500 font-bold py-3 rounded-xl text-xs">התנתק</button>
             </div>
@@ -563,6 +621,21 @@
             <div class="flex gap-2">
                 <button id="deleteConfirmBtn" onclick="window.confirmDeleteAction()" class="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl">מחק</button>
                 <button onclick="window.closeConfirm()" class="flex-1 bg-slate-100 py-3 rounded-xl">ביטול</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overspend Alert Modal -->
+    <div id="overspendOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
+        <div class="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl text-center">
+            <div class="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <i class="fa-solid fa-triangle-exclamation text-red-500 text-xl"></i>
+            </div>
+            <h3 class="text-md font-bold mb-2 text-slate-900">חריגה מהתקציב!</h3>
+            <p id="overspendMessage" class="text-sm text-slate-500 mb-6 leading-relaxed"></p>
+            <div class="flex flex-col gap-2">
+                <button id="overspendConfirmBtn" class="w-full bg-red-500 text-white font-bold py-3 rounded-xl text-sm">פצה על החריגה (הורד מהמאזן)</button>
+                <button onclick="window.closeOverspendModal()" class="w-full bg-slate-100 text-slate-600 font-bold py-3 rounded-xl text-sm">התעלם</button>
             </div>
         </div>
     </div>
@@ -1784,8 +1857,13 @@
             window.closeAddExpenseModal();
             window.showToast('הוצאה נרשמה', 'check');
 
-            // רענן לקבלת ID אמיתי
-            setTimeout(() => window.fetchTransactionsOnly(), 800);
+            // רענן לקבלת ID אמיתי, ואז בדוק חריגה בקטגוריה מתוכננת
+            setTimeout(async () => {
+                await window.fetchTransactionsOnly();
+                if (category !== 'שוטף') {
+                    window.checkAnnualOverspend(category);
+                }
+            }, 800);
         } catch (e) {
             console.error(e);
             window.showToast('שגיאה בהוספת הוצאה: ' + (e.message || e), 'circle-xmark');
@@ -2309,6 +2387,90 @@
         } finally {
             setLoading(false, true);
         }
+    };
+
+    // בדיקת חריגה בקטגוריה מתוכננת לאחר הוספת הוצאה
+    window.checkAnnualOverspend = function(categoryName) {
+        // מצא את הקטגוריה
+        const cat = state.budget.annual.find(a => (a.category_name||'').trim() === categoryName.trim());
+        if (!cat) return;
+        const budget = safeParseFloat(cat.budget_amount);
+        if (budget <= 0) return;
+
+        // חשב כמה הוצא עד עכשיו
+        const spent = state.transactions
+            .filter(t => tagMatchesCat(t.tag, cat))
+            .reduce((s, t) => s + safeParseFloat(t.amount), 0);
+
+        if (spent <= budget) return; // אין חריגה
+
+        const overAmount = spent - budget;
+        const displayOver = Math.round(formatDisplayAmount(overAmount)).toLocaleString();
+        const displayCat = cat.parent_group ? `${cat.parent_group} > ${cat.category_name}` : cat.category_name;
+
+        const msgEl = document.getElementById('overspendMessage');
+        const confirmBtn = document.getElementById('overspendConfirmBtn');
+        if (msgEl) msgEl.textContent = `חרגת מהתקציב של "${displayCat}" ב-${displayOver} ש"ח. האם לפצות על החריגה ולהוריד את הסכום מהמאזן?`;
+        if (confirmBtn) {
+            confirmBtn.onclick = () => {
+                window.closeOverspendModal();
+                // מבצע את אותה פעולה כמו לחיצה על המנעול עם diff שלילי (חריגה)
+                window.executeCloseCategory(cat.category_name, budget - spent, cat.category_name);
+            };
+        }
+        const o = document.getElementById('overspendOverlay');
+        if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
+    };
+
+    window.closeOverspendModal = function() {
+        const o = document.getElementById('overspendOverlay');
+        if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
+    };
+
+    // =====================================================
+    // HAMBURGER MENU
+    // =====================================================
+    window.toggleHamburgerMenu = function() {
+        const menu = document.getElementById('hamburgerMenu');
+        const backdrop = document.getElementById('hamburgerBackdrop');
+        if (!menu) return;
+        const isHidden = menu.classList.contains('hidden');
+        menu.classList.toggle('hidden', !isHidden);
+        backdrop.classList.toggle('hidden', !isHidden);
+    };
+
+    window.closeHamburgerMenu = function() {
+        const menu = document.getElementById('hamburgerMenu');
+        const backdrop = document.getElementById('hamburgerBackdrop');
+        if (menu) menu.classList.add('hidden');
+        if (backdrop) backdrop.classList.add('hidden');
+    };
+
+    window.shareApp = function() {
+        const url = 'https://urielshavat.github.io/MoneyBoss/';
+        if (navigator.share) {
+            navigator.share({ title: 'MoneyBoss', text: 'ניהול תקציב משפחתי', url }).catch(() => {});
+        } else {
+            navigator.clipboard.writeText(url)
+                .then(() => window.showToast('הקישור הועתק!', 'check'))
+                .catch(() => {});
+        }
+    };
+
+    window.copyExpensesList = function() {
+        if (!state.transactions || state.transactions.length === 0) {
+            window.showToast('אין הוצאות להעתקה', 'circle-xmark');
+            return;
+        }
+        const sorted = [...state.transactions].sort((a, b) => parseLocalDate(b.date) - parseLocalDate(a.date));
+        const lines = sorted.map(tx => {
+            const amount = Math.round(safeParseFloat(tx.amount));
+            return `${tx.date}  ${tx.name}  ${amount.toLocaleString()}`;
+        });
+        const text = lines.join('\n');
+        navigator.clipboard.writeText(text)
+            .then(() => window.showToast('הרשימה הועתקה!', 'check'))
+            .catch(() => window.showToast('שגיאה בהעתקה', 'circle-xmark'));
     };
 
     // =====================================================
