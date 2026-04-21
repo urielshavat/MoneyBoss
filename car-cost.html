@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מחשבון עלות החזקת רכב חודשית</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;direction:rtl;background:#f5f5f2;color:#1a1a1a;padding:1rem}
+.wrap{padding:1rem 0.5rem;max-width:700px;margin:0 auto}
+h1{font-size:20px;font-weight:500;color:#1a1a1a;margin-bottom:1.5rem;text-align:center}
+.section{background:#fff;border:0.5px solid #ddd;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;border-bottom:0.5px solid #eee;padding-bottom:0.5rem}
+.section-title{font-size:15px;font-weight:500;color:#1a1a1a}
+.section-cost{font-size:13px;font-weight:500;color:#bbb;background:#f0f0ec;padding:2px 10px;border-radius:20px;border:0.5px solid #ddd;white-space:nowrap}
+.section-cost.has-value{color:#1a1a1a}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:10px}
+.field{display:flex;flex-direction:column;gap:4px}
+label{font-size:13px;color:#666}
+input,select{width:100%;padding:7px 10px;border:0.5px solid #ccc;border-radius:8px;font-size:14px;background:#fff;color:#1a1a1a;font-family:Arial,sans-serif}
+input:focus,select:focus{outline:none;border-color:#999}
+.toggle-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.toggle-btn{flex:1;padding:6px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#666;font-size:13px;cursor:pointer;font-family:Arial,sans-serif;transition:background 0.15s;min-width:80px}
+.toggle-btn.active{background:#f0f0ec;border-color:#999;color:#1a1a1a;font-weight:500}
+.panel{display:none}
+.panel.visible{display:block}
+.breakdown .brow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid #eee;font-size:14px}
+.breakdown .brow:last-child{border-bottom:none;font-weight:500;font-size:15px}
+.zero{color:#bbb}
+.total-card{background:#f0f0ec;border-radius:12px;padding:1.25rem;text-align:center;border:0.5px solid #ccc;margin-top:1rem}
+.total-label{font-size:14px;color:#666;margin-bottom:6px}
+.total-value{font-size:32px;font-weight:500;color:#1a1a1a}
+.fuel-type-row{display:flex;gap:8px;margin-bottom:12px}
+.fuel-type-btn{flex:1;padding:8px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#666;font-size:14px;cursor:pointer;font-family:Arial,sans-serif;transition:background 0.15s;text-align:center}
+.fuel-type-btn.active{background:#f0f0ec;border-color:#999;color:#1a1a1a;font-weight:500}
+.hint{font-size:12px;color:#999;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>מחשבון עלות החזקת רכב חודשית</h1>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">דלק / אנרגיה</div>
+    <div class="section-cost" id="cost-energy">₪0 / חודש</div>
+  </div>
+  <div class="fuel-type-row">
+    <button class="fuel-type-btn active" id="ftype-fuel" onclick="setFuelType('fuel')">⛽ דלק</button>
+    <button class="fuel-type-btn" id="ftype-electric" onclick="setFuelType('electric')">⚡ חשמל</button>
+  </div>
+  <div id="fuel-section">
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="btn-fmonth" onclick="setFuelMode('monthly')">סכום חודשי</button>
+      <button class="toggle-btn" id="btn-fkm" onclick="setFuelMode('km-liter')">ק"מ לליטר</button>
+      <button class="toggle-btn" id="btn-fl100" onclick="setFuelMode('l100')">ליטר ל-100 ק"מ</button>
+    </div>
+    <div class="panel visible" id="panel-fmonth">
+      <div class="field"><label>סכום חודשי (₪)</label><input type="number" id="fuel-monthly" value="600" oninput="calc()"></div>
+    </div>
+    <div class="panel" id="panel-fkm">
+      <div class="row3">
+        <div class="field"><label>ק"מ שנתי</label><input type="number" id="f-km-annual" value="15000" oninput="calc()"></div>
+        <div class="field"><label>ק"מ לליטר</label><input type="number" id="f-km-per-liter" value="12" oninput="calc()"></div>
+        <div class="field"><label>מחיר ליטר (₪)</label><input type="number" id="f-liter-price" value="7.20" step="0.01" oninput="calc()"></div>
+      </div>
+    </div>
+    <div class="panel" id="panel-fl100">
+      <div class="row3">
+        <div class="field"><label>ק"מ שנתי</label><input type="number" id="f-km-annual-l100" value="15000" oninput="calc()"></div>
+        <div class="field"><label>ליטר ל-100 ק"מ</label><input type="number" id="f-l100" value="8" step="0.1" oninput="calc()"></div>
+        <div class="field"><label>מחיר ליטר (₪)</label><input type="number" id="f-liter-price-l100" value="7.20" step="0.01" oninput="calc()"></div>
+      </div>
+    </div>
+  </div>
+  <div id="electric-section" style="display:none">
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="btn-emonth" onclick="setElecMode('monthly')">סכום חודשי</button>
+      <button class="toggle-btn" id="btn-ekwh100" onclick="setElecMode('kwh100')">קוו"ט ל-100 ק"מ</button>
+      <button class="toggle-btn" id="btn-ekmkwh" onclick="setElecMode('km-kwh')">ק"מ לקוו"ט</button>
+    </div>
+    <div class="panel visible" id="panel-emonth">
+      <div class="field"><label>סכום חודשי (₪)</label><input type="number" id="elec-monthly" value="150" oninput="calc()"></div>
+    </div>
+    <div class="panel" id="panel-ekwh100">
+      <div class="row3">
+        <div class="field"><label>ק"מ שנתי</label><input type="number" id="e-km-annual-kwh100" value="15000" oninput="calc()"></div>
+        <div class="field"><label>קוו"ט ל-100 ק"מ</label><input type="number" id="e-kwh100" value="17" step="0.1" oninput="calc()"></div>
+        <div class="field"><label>מחיר קוו"ט (₪)</label><input type="number" id="e-kwh-price-100" value="0.6432" step="0.0001" oninput="calc()"></div>
+      </div>
+    </div>
+    <div class="panel" id="panel-ekmkwh">
+      <div class="row3">
+        <div class="field"><label>ק"מ שנתי</label><input type="number" id="e-km-annual-kmkwh" value="15000" oninput="calc()"></div>
+        <div class="field"><label>ק"מ לקוו"ט</label><input type="number" id="e-km-per-kwh" value="6" step="0.1" oninput="calc()"></div>
+        <div class="field"><label>מחיר קוו"ט (₪)</label><input type="number" id="e-kwh-price-km" value="0.6432" step="0.0001" oninput="calc()"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">ביטוחים (עלות שנתית)</div>
+    <div class="section-cost" id="cost-ins">₪0 / חודש</div>
+  </div>
+  <div class="row">
+    <div class="field"><label>ביטוח חובה (₪)</label><input type="number" id="ins-mandatory" value="0" oninput="calc()"></div>
+    <div class="field">
+      <label>סוג ביטוח נוסף</label>
+      <select id="ins-type" onchange="insTypeChange();calc()">
+        <option value="comprehensive">מקיף</option>
+        <option value="third">צד ג'</option>
+        <option value="none">ללא</option>
+      </select>
+    </div>
+  </div>
+  <div class="row" id="ins-extra-wrap">
+    <div class="field"><label id="ins-extra-label">ביטוח מקיף (₪)</label><input type="number" id="ins-extra" value="0" oninput="calc()"></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">הוצאות שנתיות קבועות</div>
+    <div class="section-cost" id="cost-fixed">₪0 / חודש</div>
+  </div>
+  <div class="row">
+    <div class="field"><label>רישיון רכב + טסט (₪)</label><input type="number" id="license" value="0" oninput="calc()"></div>
+    <div class="field"><label>טיפול שנתי (₪)</label><input type="number" id="service" value="0" oninput="calc()"></div>
+  </div>
+  <div class="field"><label>אחזקה נוספת — מצבר, צמיגים, נורות, מגבים וכד' (₪ לשנה)</label><input type="number" id="maintenance" value="0" oninput="calc()"></div>
+</div>
+
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">ירידת ערך ותכנון החלפת רכב</div>
+    <div class="section-cost" id="cost-deprec">₪0 / חודש</div>
+  </div>
+  <div class="row">
+    <div class="field"><label>ערך הרכב הנוכחי (₪)</label><input type="number" id="car-current" value="0" oninput="calc()"></div>
+    <div class="field"><label>עלות הרכב הבא (₪)</label><input type="number" id="car-next" value="0" oninput="calc()"></div>
+  </div>
+  <div class="toggle-row" style="margin-bottom:12px">
+    <button class="toggle-btn active" id="btn-sell-manual" onclick="setSellMode('manual')">תמורה צפויה במכירה</button>
+    <button class="toggle-btn" id="btn-sell-pct" onclick="setSellMode('pct')">אחוז ירידת ערך שנתי</button>
+  </div>
+  <div class="panel visible" id="panel-sell-manual">
+    <div class="field"><label>תמורה צפויה במכירה (₪)</label><input type="number" id="car-sell" value="0" oninput="calc()"></div>
+  </div>
+  <div class="panel" id="panel-sell-pct">
+    <div class="field">
+      <label>ירידת ערך שנתית (%)</label>
+      <input type="number" id="depreciation-pct" value="15" step="0.5" min="0" max="100" oninput="calc()">
+      <div class="hint" id="sell-hint"></div>
+    </div>
+  </div>
+  <div class="field" style="max-width:180px;margin-top:10px"><label>שנים עד להחלפה</label><input type="number" id="years" value="3" min="1" oninput="calc()"></div>
+</div>
+
+<div class="section">
+  <div class="section-title" style="margin-bottom:0.75rem">סיכום חודשי</div>
+  <div class="breakdown" id="breakdown"></div>
+  <div class="total-card">
+    <div class="total-label">סה"כ עלות חודשית</div>
+    <div class="total-value" id="grand-total">₪0</div>
+  </div>
+</div>
+</div>
+
+<script>
+let fuelType='fuel', fuelMode='monthly', elecMode='monthly', sellMode='manual';
+
+function setFuelType(t){
+  fuelType=t;
+  document.getElementById('ftype-fuel').classList.toggle('active',t==='fuel');
+  document.getElementById('ftype-electric').classList.toggle('active',t==='electric');
+  document.getElementById('fuel-section').style.display=t==='fuel'?'':'none';
+  document.getElementById('electric-section').style.display=t==='electric'?'':'none';
+  calc();
+}
+function setFuelMode(m){
+  fuelMode=m;
+  document.getElementById('btn-fmonth').classList.toggle('active',m==='monthly');
+  document.getElementById('btn-fkm').classList.toggle('active',m==='km-liter');
+  document.getElementById('btn-fl100').classList.toggle('active',m==='l100');
+  ['panel-fmonth','panel-fkm','panel-fl100'].forEach(id=>document.getElementById(id).classList.remove('visible'));
+  document.getElementById({monthly:'panel-fmonth','km-liter':'panel-fkm',l100:'panel-fl100'}[m]).classList.add('visible');
+  calc();
+}
+function setElecMode(m){
+  elecMode=m;
+  document.getElementById('btn-emonth').classList.toggle('active',m==='monthly');
+  document.getElementById('btn-ekwh100').classList.toggle('active',m==='kwh100');
+  document.getElementById('btn-ekmkwh').classList.toggle('active',m==='km-kwh');
+  ['panel-emonth','panel-ekwh100','panel-ekmkwh'].forEach(id=>document.getElementById(id).classList.remove('visible'));
+  document.getElementById({monthly:'panel-emonth',kwh100:'panel-ekwh100','km-kwh':'panel-ekmkwh'}[m]).classList.add('visible');
+  calc();
+}
+function setSellMode(m){
+  sellMode=m;
+  document.getElementById('btn-sell-manual').classList.toggle('active',m==='manual');
+  document.getElementById('btn-sell-pct').classList.toggle('active',m==='pct');
+  document.getElementById('panel-sell-manual').classList.toggle('visible',m==='manual');
+  document.getElementById('panel-sell-pct').classList.toggle('visible',m==='pct');
+  calc();
+}
+function insTypeChange(){
+  const v=document.getElementById('ins-type').value;
+  document.getElementById('ins-extra-wrap').style.display=v==='none'?'none':'';
+  document.getElementById('ins-extra-label').textContent=v==='comprehensive'?'ביטוח מקיף (₪)':'ביטוח צד ג\' (₪)';
+}
+function n(id){return parseFloat(document.getElementById(id).value)||0;}
+function fmt(v){return '₪'+Math.round(v).toLocaleString('he-IL');}
+function badge(id,val){
+  const el=document.getElementById(id);
+  el.textContent=fmt(val)+' / חודש';
+  el.classList.toggle('has-value',val>0);
+}
+function getSellValue(){
+  const curr=n('car-current');
+  if(sellMode==='manual') return n('car-sell');
+  const pct=n('depreciation-pct')/100;
+  const years=n('years')||1;
+  const sell=curr*Math.pow(1-pct,years);
+  const hint=document.getElementById('sell-hint');
+  hint.textContent=curr>0?'תמורה מחושבת: '+fmt(sell):'הזן ערך רכב נוכחי לחישוב';
+  return sell;
+}
+function calcEnergy(){
+  if(fuelType==='fuel'){
+    if(fuelMode==='monthly') return n('fuel-monthly');
+    if(fuelMode==='km-liter'){const kpl=n('f-km-per-liter');return kpl>0?(n('f-km-annual')/kpl*n('f-liter-price'))/12:0;}
+    if(fuelMode==='l100') return(n('f-km-annual-l100')*n('f-l100')/100*n('f-liter-price'))/12;
+  } else {
+    if(elecMode==='monthly') return n('elec-monthly');
+    if(elecMode==='kwh100') return(n('e-km-annual-kwh100')*n('e-kwh100')/100*n('e-kwh-price-100'))/12;
+    if(elecMode==='km-kwh'){const kpk=n('e-km-per-kwh');return kpk>0?(n('e-km-annual-kmkwh')/kpk*n('e-kwh-price-km'))/12:0;}
+  }
+  return 0;
+}
+function calc(){
+  const energy=calcEnergy();
+  const insType=document.getElementById('ins-type').value;
+  const ins=n('ins-mandatory')/12+(insType==='none'?0:n('ins-extra')/12);
+  const fixed=(n('license')+n('service')+n('maintenance'))/12;
+  const months=(n('years')||1)*12;
+  const curr=n('car-current');
+  const sell=getSellValue();
+  const next=n('car-next');
+  const depreciation=months>0&&curr>sell?(curr-sell)/months:0;
+  const upgrade=months>0&&next>curr?(next-curr)/months:0;
+
+  badge('cost-energy',energy);
+  badge('cost-ins',ins);
+  badge('cost-fixed',fixed);
+  badge('cost-deprec',depreciation+upgrade);
+
+  const energyLabel=fuelType==='fuel'?'דלק':'חשמל';
+  const rows=[
+    {label:energyLabel,val:energy},
+    {label:'ביטוחים',val:ins},
+    {label:'רישיון, טסט, טיפול ואחזקה',val:fixed},
+    {label:'חיסכון לקניית רכב באותו שווי',val:depreciation},
+    {label:'חיסכון עבור תוספת לשדרוג הרכב',val:upgrade},
+  ];
+  const total=rows.reduce((s,r)=>s+r.val,0);
+  document.getElementById('breakdown').innerHTML=
+    rows.map(r=>`<div class="brow${r.val===0?' zero':''}"><span>${r.label}</span><span>${fmt(r.val)}</span></div>`).join('')+
+    `<div class="brow"><span>סה"כ</span><span>${fmt(total)}</span></div>`;
+  document.getElementById('grand-total').textContent=fmt(total);
+}
+calc();
+</script>
+</body>
+</html>
