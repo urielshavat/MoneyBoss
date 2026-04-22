@@ -112,9 +112,7 @@
     <div id="loginScreen" class="hidden">
         <div class="w-full max-w-xs flex flex-col items-center">
             <div class="mb-8 text-center">
-                <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-3 mx-auto shadow-lg shadow-blue-200">
-                    <i class="fa-solid fa-wallet text-white text-2xl"></i>
-                </div>
+                <img src="apple-touch-icon.png" alt="MoneyBoss" class="w-16 h-16 rounded-2xl mx-auto mb-3 shadow-lg">
                 <h1 class="text-2xl font-black text-slate-900">MoneyBoss</h1>
                 <p class="text-xs text-slate-400 font-semibold mt-1">ניהול תקציב משפחתי</p>
             </div>
@@ -131,13 +129,7 @@
                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center mb-2">הטוקן שלך — לחץ להעתקה</p>
                     <div id="newTokenDisplay" class="token-display mb-3" onclick="window.copyToken()">------</div>
                     <p class="text-[9px] text-red-500 font-bold text-center mb-3">⚠️ שמור את הטוקן — אין אפשרות לשחזר!</p>
-                    <button id="copyNewUrlBtn" onclick="window.copyTokenUrl()" class="w-full bg-blue-50 border border-blue-200 text-blue-600 font-bold py-3 rounded-2xl text-xs mb-2 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-link text-xs"></i>העתק קישור לאתר עם הטוקן
-                    </button>
-                    <button onclick="window.openShortcutsModal()" class="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3 rounded-2xl text-xs mb-2 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-mobile-screen text-xs"></i>הגדרת קיצורים לאייפון
-                    </button>
-                    <button onclick="window.enterWithToken()" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-2xl text-sm">כניסה לחשבון</button>
+                    <button onclick="window.enterWithToken()" class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-2xl text-sm">כניסה לחשבון</button>
                 </div>
             </div>
             <div id="panelExist" class="w-full hidden">
@@ -461,7 +453,10 @@
                     <i class="fa-brands fa-google text-sm"></i>ייבוא היסטוריה מ-Google Sheets
                 </button>
                 <button onclick="window.openShortcutsModal()" class="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-mobile-screen text-sm"></i>הגדרת קיצורים לאייפון
+                    <i class="fa-brands fa-apple text-sm"></i>הגדרת קיצורים לאייפון
+                </button>
+                <button onclick="window.openAndroidShortcutsModal()" class="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
+                    <i class="fa-brands fa-android text-sm text-green-600"></i>הגדרת קיצורים לאנדרואיד
                 </button>
                 <button onclick="window.logout()" class="w-full bg-red-50 border border-red-100 text-red-500 font-bold py-3 rounded-xl text-xs">התנתק</button>
             </div>
@@ -493,6 +488,31 @@
             <div class="flex gap-2 mt-5">
                 <button id="shortcutsPrevBtn" onclick="window.shortcutsNav(-1)" class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-xl text-sm hidden">הקודם</button>
                 <button id="shortcutsNextBtn" onclick="window.shortcutsNav(1)" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl text-sm">המשך</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Android Shortcuts Modal -->
+    <div id="androidShortcutsOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-900">קיצורים לאנדרואיד</h2>
+                <button onclick="window.closeAndroidShortcutsModal()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <!-- Progress bar -->
+            <div class="mb-5">
+                <div class="flex justify-between items-center mb-1.5">
+                    <span id="androidStepLabel" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">שלב 1 מתוך 5</span>
+                    <span id="androidStepTitle" class="text-[10px] font-bold text-blue-600"></span>
+                </div>
+                <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div id="androidProgressBar" class="h-full bg-blue-500 rounded-full transition-all duration-300" style="width:20%"></div>
+                </div>
+            </div>
+            <div id="androidStepContent" class="min-h-[260px] overflow-y-auto"></div>
+            <div class="flex gap-2 mt-5">
+                <button id="androidPrevBtn" onclick="window.androidNav(-1)" class="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-xl text-sm hidden">הקודם</button>
+                <button id="androidNextBtn" onclick="window.androidNav(1)" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl text-sm">המשך</button>
             </div>
         </div>
     </div>
@@ -1163,8 +1183,19 @@
     };
 
     window.copyToken = function() {
-        const tok = document.getElementById('newTokenDisplay').textContent;
-        navigator.clipboard.writeText(tok).then(() => window.showToast('הטוקן הועתק!', 'check')).catch(() => {});
+        const el = document.getElementById('newTokenDisplay');
+        const tok = el.textContent;
+        navigator.clipboard.writeText(tok).then(() => {
+            window.showToast('הטוקן הועתק!', 'check');
+            el.style.background = '#dcfce7';
+            el.style.borderColor = '#86efac';
+            el.style.color = '#16a34a';
+            setTimeout(() => {
+                el.style.background = '';
+                el.style.borderColor = '';
+                el.style.color = '';
+            }, 1200);
+        }).catch(() => {});
     };
 
     window.copyTokenUrl = function() {
@@ -3400,7 +3431,7 @@
             content: () => `
                 <p class="text-sm text-slate-600 mb-3 leading-relaxed">הגדרת אוטומציה לתיעוד הוצאה אוטומטי בכל תשלום Apple Pay.</p>
                 <ol class="space-y-2.5 text-sm text-slate-700">
-                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span><span>הורידו את <a href="https://www.icloud.com/shortcuts/240c96ca8d6b452a85a1fb6a626d4081" target="_blank" class="text-blue-600 font-bold underline">Apple Pay</a></span></li>
+                    <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span><span>הורידו את <a href="https://www.icloud.com/shortcuts/beba04d0149441df8de3f723a04b6d7e" target="_blank" class="text-blue-600 font-bold underline">Apple Pay</a></span></li>
                     <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">2</span><span>לחצו על <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הגדרת קיצור</span></span></li>
                     <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">3</span><span>בחרו בקיצור <span class="font-bold">הוצאה</span> ← <span class="inline-flex items-center bg-[#007AFF] text-white text-xs font-semibold px-2.5 py-1 rounded-lg">הוספת קיצור</span></span></li>
                     <li class="flex gap-3"><span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">4</span><span>פתחו את אפליקציית <span class="font-bold">קיצורים</span></span></li>
@@ -3483,6 +3514,212 @@
         }
         shortcutsCurrentStep = Math.max(0, Math.min(total - 1, shortcutsCurrentStep + dir));
         renderShortcutsStep();
+    };
+
+    // =====================================================
+    // ANDROID SHORTCUTS MODAL
+    // =====================================================
+    var androidCurrentStep = 0;
+    var ANDROID_URL = 'https://drive.google.com/uc?export=download&id=1_PHqd0saFLsYhsf87b_UswnZTqHuaBgi';
+
+    var androidSteps = [
+        {
+            title: 'התקנת האפליקציה',
+            content: function() { return `
+                <p class="text-sm text-slate-600 mb-4 leading-relaxed">ראשית, התקינו את האפליקציה שתשמש לקיצורי הדרך.</p>
+                <ol class="space-y-3 text-sm text-slate-700">
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span>
+                        <span>הורידו את <a href="https://play.google.com/store/apps/datasafety?id=ch.rmy.android.http_shortcuts" target="_blank" class="text-blue-600 font-bold underline">HTTP Shortcuts</a> מחנות האפליקציות</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">2</span>
+                        <span>פתחו את האפליקציה לאחר ההתקנה</span>
+                    </li>
+                </ol>`; }
+        },
+        {
+            title: 'ייבוא הקיצורים',
+            content: function() {
+                return `
+                <p class="text-sm text-slate-600 mb-4 leading-relaxed">ייבאו את קיצורי MoneyBoss לתוך האפליקציה.</p>
+                <ol class="space-y-3 text-sm text-slate-700">
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span>
+                        <span>ב-HTTP Shortcuts לחצו על <span class="font-bold">3 נקודות</span> בצד ← <span class="font-bold">יבוא/יצוא</span> ← <span class="font-bold">יבוא מכתובת URL</span></span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">2</span>
+                        <div class="flex-1">
+                            <span>הדביקו את הכתובת הבאה ולחצו <span class="font-bold">אישור</span>:</span>
+                            <div class="mt-2 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2">
+                                <span class="font-mono text-[10px] text-slate-600 break-all flex-1">${ANDROID_URL}</span>
+                                <button onclick="window.copyAndroidUrl()" id="copyAndroidUrlBtn" class="flex-shrink-0 bg-blue-50 border border-blue-200 text-blue-600 font-bold text-[10px] px-2 py-1 rounded-lg whitespace-nowrap">העתק</button>
+                            </div>
+                        </div>
+                    </li>
+                </ol>`; }
+        },
+        {
+            title: 'הזנת הטוקן',
+            content: function() {
+                const tok = USER_TOKEN || '------';
+                return `
+                <p class="text-sm text-slate-600 mb-4 leading-relaxed">חברו את הקיצורים לחשבון שלכם.</p>
+                <ol class="space-y-3 text-sm text-slate-700">
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span>
+                        <span>לחצו על הקיצור <span class="font-bold">טוקן</span> באפליקציה</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">2</span>
+                        <div class="flex-1">
+                            <span>הדביקו את הטוקן שלכם ולחצו <span class="font-bold">אישור</span>:</span>
+                            <div class="mt-2 bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2 cursor-pointer" onclick="window.copyAndroidToken()" id="androidTokenDisplay">
+                                <span class="font-mono font-black text-xl tracking-widest text-slate-800 flex-1 text-center">${tok}</span>
+                                <i class="fa-solid fa-copy text-slate-400 text-sm flex-shrink-0"></i>
+                            </div>
+                            <p class="text-[9px] text-slate-400 text-center mt-1">לחץ להעתקה</p>
+                        </div>
+                    </li>
+                </ol>`; }
+        },
+        {
+            title: 'הוספת ווידג\'טים',
+            content: function() { return `
+                <p class="text-sm text-slate-600 mb-3 leading-relaxed">הוסיפו ווידג'טים למסך הבית לגישה מהירה.</p>
+                <ol class="space-y-2.5 text-sm text-slate-700">
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span>
+                        <span>לחיצה ארוכה על מסך הבית ← <span class="font-bold">יישומונים</span> ← בחרו <span class="font-bold">"קיצורי דרך HTTP"</span></span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">2</span>
+                        <span>לחיצה ארוכה על <span class="font-bold">"קיצורי דרך"</span> וגרירה למסך ← בחרו <span class="font-bold">"מאזן"</span></span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">3</span>
+                        <span>חזרו על שלב 1–2 ובחרו <span class="font-bold">"תיעוד"</span></span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">4</span>
+                        <span>לחיצה ארוכה על מסך הבית ← <span class="font-bold">יישומונים</span> ← <span class="font-bold">"קיצורי דרך HTTP"</span> ← גררו <span class="font-bold">"Variable widget"</span> ← בחרו <span class="font-bold">"balance"</span></span>
+                    </li>
+                </ol>`; }
+        },
+        {
+            title: 'שמירת האתר בדף הבית',
+            content: function() {
+                return `
+                <p class="text-sm text-slate-600 mb-4 leading-relaxed">הוסיפו את אתר MoneyBoss למסך הבית כאפליקציה — אתם כבר נמצאים בו!</p>
+                <ol class="space-y-3 text-sm text-slate-700">
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">1</span>
+                        <span>לחצו על <span class="font-bold">3 נקודות</span> בפינה העליונה של הדפדפן</span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">2</span>
+                        <span>לחצו על <span class="font-bold">הוספה לדף הבית</span></span>
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold flex items-center justify-center mt-0.5">3</span>
+                        <span>אשרו את שם האפליקציה ולחצו <span class="font-bold">הוסף</span></span>
+                    </li>
+                </ol>`; }
+        },
+        {
+            title: 'בדיקה',
+            content: function() { return `
+                <p class="text-sm text-slate-600 mb-3 leading-relaxed">נבדוק שהכל עובד כראוי:</p>
+                <div class="space-y-3">
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                        <p class="text-xs font-bold text-blue-800 mb-1">1. לחצו על אייקון MoneyBoss בדף הבית</p>
+                        <p class="text-xs text-blue-700">האתר אמור להיפתח עם המשתמש שלכם (בדקו שמופיע המאזן ולא מסך ההתחברות)</p>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                        <p class="text-xs font-bold text-blue-800 mb-1">2. לחצו על ווידג'ט <span class="font-black">מאזן</span></p>
+                        <p class="text-xs text-blue-700">הודעה עם המאזן הנוכחי תופיע, ובווידג'ט "Variable widget" יופיע המאזן</p>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                        <p class="text-xs font-bold text-blue-800 mb-1">3. לחצו על <span class="font-black">תיעוד</span></p>
+                        <ul class="text-xs text-blue-700 mr-3 space-y-0.5 mt-1" style="list-style:disc">
+                            <li>הזינו שם לדוגמא: <span class="font-bold">קניות</span></li>
+                            <li>הזינו כמות לדוגמא: <span class="font-bold">10</span></li>
+                            <li>המאזן בווידג'ט אמור להתעדכן</li>
+                        </ul>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                        <p class="text-xs font-bold text-blue-800 mb-1">4. היכנסו לאתר MoneyBoss</p>
+                        <p class="text-xs text-blue-700">ודאו שההוצאה נרשמה — לאחר הבדיקה ניתן למחוק אותה</p>
+                    </div>
+                </div>`; }
+        }
+    ];
+
+    function renderAndroidStep() {
+        var step = androidSteps[androidCurrentStep];
+        var total = androidSteps.length;
+        var pct = Math.round(((androidCurrentStep + 1) / total) * 100);
+        document.getElementById('androidStepLabel').textContent = 'שלב ' + (androidCurrentStep + 1) + ' מתוך ' + total;
+        document.getElementById('androidStepTitle').textContent = step.title;
+        document.getElementById('androidProgressBar').style.width = pct + '%';
+        document.getElementById('androidStepContent').innerHTML = step.content();
+        document.getElementById('androidPrevBtn').classList.toggle('hidden', androidCurrentStep === 0);
+        document.getElementById('androidNextBtn').textContent = androidCurrentStep === total - 1 ? 'סיום' : 'המשך';
+    }
+
+    window.openAndroidShortcutsModal = function() {
+        var settingsEl = document.getElementById('settingsOverlay');
+        if (settingsEl && !settingsEl.classList.contains('hidden')) window.toggleSettings();
+        androidCurrentStep = 0;
+        renderAndroidStep();
+        var o = document.getElementById('androidShortcutsOverlay');
+        if (o) { o.classList.remove('hidden'); setTimeout(function(){ o.classList.add('opacity-100'); }, 10); }
+    };
+
+    window.closeAndroidShortcutsModal = function() {
+        var o = document.getElementById('androidShortcutsOverlay');
+        if (o) { o.classList.remove('opacity-100'); setTimeout(function(){ o.classList.add('hidden'); }, 300); }
+    };
+
+    window.androidNav = function(dir) {
+        var total = androidSteps.length;
+        if (dir === 1 && androidCurrentStep === total - 1) { window.closeAndroidShortcutsModal(); return; }
+        androidCurrentStep = Math.max(0, Math.min(total - 1, androidCurrentStep + dir));
+        renderAndroidStep();
+    };
+
+    window.copyAndroidUrl = function() {
+        var btn = document.getElementById('copyAndroidUrlBtn');
+        navigator.clipboard.writeText(ANDROID_URL).then(function() {
+            if (btn) { btn.textContent = '✓ הועתק'; btn.classList.add('bg-green-50','border-green-200','text-green-600'); btn.classList.remove('bg-blue-50','border-blue-200','text-blue-600'); }
+            setTimeout(function() {
+                if (btn) { btn.textContent = 'העתק'; btn.classList.remove('bg-green-50','border-green-200','text-green-600'); btn.classList.add('bg-blue-50','border-blue-200','text-blue-600'); }
+            }, 2000);
+        }).catch(function(){});
+    };
+
+    window.copyAndroidToken = function() {
+        var tok = USER_TOKEN || '';
+        if (!tok) return;
+        var el = document.getElementById('androidTokenDisplay');
+        navigator.clipboard.writeText(tok).then(function() {
+            window.showToast('הטוקן הועתק!', 'check');
+            if (el) { el.style.background = '#dcfce7'; el.style.borderColor = '#86efac'; }
+            setTimeout(function() { if (el) { el.style.background = ''; el.style.borderColor = ''; } }, 1200);
+        }).catch(function(){});
+    };
+
+    window.copyAndroidSiteUrl = function() {
+        var tok = USER_TOKEN || '';
+        var url = 'https://urielshavat.github.io/MoneyBoss/' + (tok ? '?token=' + tok : '');
+        var btn = document.getElementById('copyAndroidSiteBtn');
+        navigator.clipboard.writeText(url).then(function() {
+            if (btn) { btn.textContent = '✓ הועתק'; btn.classList.add('bg-green-50','border-green-200','text-green-600'); btn.classList.remove('bg-blue-50','border-blue-200','text-blue-600'); }
+            setTimeout(function() {
+                if (btn) { btn.textContent = 'העתק'; btn.classList.remove('bg-green-50','border-green-200','text-green-600'); btn.classList.add('bg-blue-50','border-blue-200','text-blue-600'); }
+            }, 2000);
+        }).catch(function(){});
     };
     window.openAnnualHelp = function() {
         const o = document.getElementById('annualHelpOverlay');
