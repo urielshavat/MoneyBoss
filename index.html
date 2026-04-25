@@ -382,9 +382,35 @@
 
             <!-- Main actions -->
             <button onclick="window.closeHamburgerMenu(); window.toggleSettings();" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
-                <i class="fa-solid fa-cog text-slate-400 w-4 text-center flex-shrink-0"></i>
-                <span>הגדרות</span>
+                <i class="fa-solid fa-circle-user text-blue-500 w-4 text-center flex-shrink-0"></i>
+                <span>החשבון שלי</span>
             </button>
+            <div class="border-t border-slate-100 mx-3"></div>
+            <!-- התקנה with submenu -->
+            <div id="installMenuWrapper">
+                <button onclick="window.toggleInstallSubmenu()" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                    <i class="fa-solid fa-download text-slate-400 w-4 text-center flex-shrink-0"></i>
+                    <span class="flex-1 text-right">התקנה</span>
+                    <i id="installChevron" class="fa-solid fa-chevron-left text-[10px] text-slate-300 flex-shrink-0 transition-transform duration-200"></i>
+                </button>
+                <!-- Submenu inline, below the button -->
+                <div id="installSubmenu" class="hidden bg-blue-50 border-t border-b border-blue-100">
+                    <button onclick="window.closeHamburgerMenu(); window.openImportModal();" class="w-full flex items-center gap-3 px-6 py-3 text-sm font-bold text-slate-700 hover:bg-blue-100 active:bg-blue-200 transition-colors">
+                        <i class="fa-brands fa-google text-amber-500 w-4 text-center flex-shrink-0"></i>
+                        <span>ייבא היסטוריה מ-Google Sheets</span>
+                    </button>
+                    <div class="border-t border-blue-100 mx-4"></div>
+                    <button onclick="window.closeHamburgerMenu(); window.openShortcutsModal();" class="w-full flex items-center gap-3 px-6 py-3 text-sm font-bold text-slate-700 hover:bg-blue-100 active:bg-blue-200 transition-colors">
+                        <i class="fa-brands fa-apple text-slate-600 w-4 text-center flex-shrink-0"></i>
+                        <span>התקנת קיצורים לאייפון</span>
+                    </button>
+                    <div class="border-t border-blue-100 mx-4"></div>
+                    <button onclick="window.closeHamburgerMenu(); window.openAndroidShortcutsModal();" class="w-full flex items-center gap-3 px-6 py-3 text-sm font-bold text-slate-700 hover:bg-blue-100 active:bg-blue-200 transition-colors">
+                        <i class="fa-brands fa-android text-green-500 w-4 text-center flex-shrink-0"></i>
+                        <span>התקנת קיצורים לאנדרואיד</span>
+                    </button>
+                </div>
+            </div>
             <div class="border-t border-slate-100 mx-3"></div>
             <button onclick="window.closeHamburgerMenu(); window.openOnboarding();" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
                 <i class="fa-solid fa-circle-info text-blue-400 w-4 text-center flex-shrink-0"></i>
@@ -431,7 +457,10 @@
     <div id="settingsOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold text-slate-900">הגדרות</h2>
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-circle-user text-blue-500 text-xl"></i>
+                    <h2 class="text-xl font-bold text-slate-900">החשבון שלי</h2>
+                </div>
                 <button onclick="window.toggleSettings()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="space-y-5">
@@ -440,24 +469,17 @@
                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">הטוקן שלך</p>
                     <span id="settingsTokenDisplay" class="font-mono font-black text-2xl tracking-widest text-slate-800">------</span>
                 </div>
-                <div class="pt-2 border-t border-slate-100">
-                    <div class="flex justify-between items-center">
+                <!-- Privacy toggle with explanation -->
+                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <div class="flex justify-between items-center mb-2">
                         <span class="font-bold text-slate-700 text-sm">מצב Privacy</span>
                         <label class="toggle-switch">
                             <input type="checkbox" id="privacyToggle" onchange="window.togglePrivacyMode()">
                             <span class="slider"></span>
                         </label>
                     </div>
+                    <p class="text-[10px] text-slate-400 leading-relaxed">מצב שמסתיר את הסכומים האמיתיים ומחליף אותם בנתונים משוקללים — שימושי כשמציגים את האפליקציה לאחרים.</p>
                 </div>
-                <button onclick="window.openImportModal()" class="w-full bg-amber-50 border border-amber-200 text-amber-700 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
-                    <i class="fa-brands fa-google text-sm"></i>ייבוא היסטוריה מ-Google Sheets
-                </button>
-                <button onclick="window.openShortcutsModal()" class="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
-                    <i class="fa-brands fa-apple text-sm"></i>הגדרת קיצורים לאייפון
-                </button>
-                <button onclick="window.openAndroidShortcutsModal()" class="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
-                    <i class="fa-brands fa-android text-sm text-green-600"></i>הגדרת קיצורים לאנדרואיד
-                </button>
                 <button onclick="window.logout()" class="w-full bg-red-50 border border-red-100 text-red-500 font-bold py-3 rounded-xl text-xs">התנתק</button>
             </div>
         </div>
@@ -1030,47 +1052,44 @@
                 <div class="w-10 h-1.5 bg-slate-200 rounded-full"></div>
             </div>
             <div class="flex items-center gap-3 mb-5">
-                <div class="w-11 h-11 bg-blue-600 rounded-2xl flex items-center justify-center shadow-md shadow-blue-200 flex-shrink-0">
-                    <i class="fa-solid fa-wallet text-white text-lg"></i>
-                </div>
+                <img src="apple-touch-icon.png" alt="MoneyBoss" class="w-11 h-11 rounded-2xl shadow-md flex-shrink-0">
                 <div>
-                    <h2 class="text-lg font-black text-slate-900">ברוכים הבאים ל-MoneyBoss</h2>
-                    <p class="text-[11px] text-slate-400 font-semibold">קצת על השיטה לפני שמתחילים</p>
+                    <h2 class="text-lg font-bold text-slate-900">איך MoneyBoss עובד?</h2>
+                    <p class="text-[11px] text-slate-400 font-semibold">שלושה שלבים פשוטים</p>
                 </div>
             </div>
 
             <div class="space-y-3 mb-6">
                 <div class="flex gap-3 items-start bg-blue-50 rounded-2xl p-3 border border-blue-100">
-                    <span class="text-xl mt-0.5">📊</span>
+                    <div class="w-7 h-7 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span class="text-white text-xs font-bold">1</span>
+                    </div>
                     <div>
-                        <p class="text-sm font-bold text-slate-800">תקציב יומי = הכנסות פחות הוצאות</p>
-                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">מגדירים הכנסות והוצאות קבועות — המערכת מחשבת כמה אפשר להוציא ביום.</p>
+                        <p class="text-sm font-bold text-slate-800">הגדירו הכנסות והוצאות קבועות</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">בעמוד <span class="font-bold text-slate-700">תקציב</span> — הכניסו את כל ההכנסות החודשיות שלכם ואת ההוצאות הקבועות: שכר דירה, ביטוחים, חיסכון וכד'.</p>
                     </div>
                 </div>
-                <div class="flex gap-3 items-start bg-slate-50 rounded-2xl p-3 border border-slate-100">
-                    <span class="text-xl mt-0.5">💰</span>
+                <div class="flex gap-3 items-start bg-blue-50 rounded-2xl p-3 border border-blue-100">
+                    <div class="w-7 h-7 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span class="text-white text-xs font-bold">2</span>
+                    </div>
                     <div>
-                        <p class="text-sm font-bold text-slate-800">המאזן גדל כל יום</p>
-                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">כל יום שלא הוצאתם כלום — המאזן עולה. כל הוצאה מורידה אותו. המטרה: לשמור אותו חיובי.</p>
+                        <p class="text-sm font-bold text-slate-800">הגדירו הוצאות מתוכננות</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">בעמוד <span class="font-bold text-slate-700">תקציב</span> — הוסיפו הוצאות גדולות שאינן חודשיות: חופשות, אחזקת רכב, קייטנות. הן מנוהלות בנפרד תחת עמוד <span class="font-bold text-slate-700">מתוכנן</span>.</p>
                     </div>
                 </div>
-                <div class="flex gap-3 items-start bg-slate-50 rounded-2xl p-3 border border-slate-100">
-                    <span class="text-xl mt-0.5">📅</span>
-                    <div>
-                        <p class="text-sm font-bold text-slate-800">הוצאות מתוכננות בנפרד</p>
-                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">חופשות, ביגוד, רכב — מנוהלות בעמוד "מתוכנן" ולא מפריעות למאזן השוטף.</p>
+                <div class="flex gap-3 items-start bg-slate-900 rounded-2xl p-3 border border-slate-800">
+                    <div class="w-7 h-7 bg-white rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span class="text-slate-900 text-xs font-bold">3</span>
                     </div>
-                </div>
-                <div class="flex gap-3 items-start bg-amber-50 rounded-2xl p-3 border border-amber-100">
-                    <span class="text-xl mt-0.5">🚀</span>
                     <div>
-                        <p class="text-sm font-bold text-slate-800">שלבי ההתחלה</p>
-                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">① הגדירו הכנסות והוצאות קבועות בעמוד <span class="font-bold">תקציב</span> ← ② ייבאו היסטוריה מגוגל שיט (אם יש) מהגדרות ← ③ התחילו לתעד הוצאות יומיות.</p>
+                        <p class="text-sm font-bold text-white">מה שנשאר — זה העו"ש החדש שלכם</p>
+                        <p class="text-xs text-slate-300 mt-0.5 leading-relaxed">הסכום שנותר מחולק ל-30 ומתווסף למאזן כל יום כ<span class="font-bold text-white">הכנסה יומית</span>. כל הוצאה שתרשמו מורידה את המאזן. המטרה: לשמור אותו חיובי תמיד.</p>
                     </div>
                 </div>
             </div>
 
-            <button onclick="window.closeOnboarding()" class="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl text-sm">
+            <button onclick="window.closeOnboarding()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-sm shadow-lg shadow-blue-200">
                 הבנתי — נתחיל!
             </button>
         </div>
@@ -1626,7 +1645,9 @@
     // GOOGLE SHEETS IMPORT
     // =====================================================
     window.openImportModal = function() {
-        window.toggleSettings();
+        // סגור את חלון ההגדרות רק אם הוא פתוח
+        const settingsEl = document.getElementById('settingsOverlay');
+        if (settingsEl && !settingsEl.classList.contains('hidden')) window.toggleSettings();
         const o = document.getElementById('importOverlay');
         if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
         const prog = document.getElementById('importProgress');
@@ -2468,6 +2489,8 @@
         const isHidden = menu.classList.contains('hidden');
         menu.classList.toggle('hidden', !isHidden);
         backdrop.classList.toggle('hidden', !isHidden);
+        // Reset submenu when closing
+        if (!isHidden) window.closeInstallSubmenu();
     };
 
     window.closeHamburgerMenu = function() {
@@ -2475,6 +2498,23 @@
         const backdrop = document.getElementById('hamburgerBackdrop');
         if (menu) menu.classList.add('hidden');
         if (backdrop) backdrop.classList.add('hidden');
+        window.closeInstallSubmenu();
+    };
+
+    window.toggleInstallSubmenu = function() {
+        const sub = document.getElementById('installSubmenu');
+        const chevron = document.getElementById('installChevron');
+        if (!sub) return;
+        const isHidden = sub.classList.contains('hidden');
+        sub.classList.toggle('hidden', !isHidden);
+        if (chevron) chevron.style.transform = isHidden ? 'rotate(-90deg)' : '';
+    };
+
+    window.closeInstallSubmenu = function() {
+        const sub = document.getElementById('installSubmenu');
+        const chevron = document.getElementById('installChevron');
+        if (sub) sub.classList.add('hidden');
+        if (chevron) chevron.style.transform = '';
     };
 
     window.shareApp = function() {
