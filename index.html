@@ -2323,7 +2323,6 @@
 
     // ── Budget item edit via ellipsis ─────────────────────────────────────
     window.initBudgetItemEdit = function(dbName) {
-        // Find item in all budget lists
         const allItems = [...state.budget.incomes, ...state.budget.fixed, ...state.budget.annual];
         const sep = dbName.indexOf(' > ');
         const searchName = sep !== -1 ? dbName.slice(sep + 3).trim() : dbName.trim();
@@ -2333,7 +2332,7 @@
             (!searchParent || (i.parent_group || '').trim() === searchParent)
         );
         if (!item) return;
-        state.pendingBudgetItem = { dbName, item };
+        state.pendingBudgetItem = { dbName, item, itemId: item.id };
         const titles = { income: 'עריכת הכנסה', fixed: 'עריכת הוצאה קבועה', annual: 'עריכת הוצאה מתוכננת' };
         const titleEl = document.getElementById('budgetItemEditTitle');
         if (titleEl) titleEl.textContent = titles[item.type] || 'עריכה';
@@ -2350,33 +2349,38 @@
 
     window.saveBudgetItemEdit = async function() {
         if (!sbClient || !state.pendingBudgetItem) return;
-        const { dbName } = state.pendingBudgetItem;
+        const { dbName, item, itemId } = state.pendingBudgetItem;
         const newName = document.getElementById('budgetItemEditName').value.trim();
         const newAmt  = safeParseFloat(document.getElementById('budgetItemEditAmount').value.replace(/,/g, ''));
         if (!newName) return;
         window.closeBudgetItemEditModal();
         setLoading(true, true);
         try {
-            // Build new DB name (preserve parent if exists)
-            const sep = dbName.indexOf(' > ');
-            const parentPrefix = sep !== -1 ? dbName.slice(0, sep + 3) : '';
-            const newDbName = parentPrefix + newName;
-            const updates = {};
-            if (newDbName !== dbName) updates.category_name = newDbName;
-            updates.budget_amount = state.isPrivacyMode ? denormalizeAmount(newAmt) : newAmt;
-            const { error } = await sbClient
-                .from('budget_settings')
-                .update(updates)
-                .eq('category_name', dbName)
-                .eq('user_token', USER_TOKEN);
+            const updates = { budget_amount: state.isPrivacyMode ? denormalizeAmount(newAmt) : newAmt };
+            const oldName = item.category_name.trim();
+            if (newName !== oldName) updates.category_name = newName;
+
+            // Use id if available, otherwise fall back to matching by category_name + parent_group
+            let query = sbClient.from('budget_settings').update(updates).eq('user_token', USER_TOKEN);
+            if (itemId) {
+                query = query.eq('id', itemId);
+            } else {
+                query = query.eq('category_name', oldName);
+                if (item.parent_group) query = query.eq('parent_group', item.parent_group);
+            }
+            const { error } = await query;
             if (error) throw error;
-            // If renamed, update transactions too
-            if (newDbName !== dbName) {
-                const oldChildName = sep !== -1 ? dbName.slice(sep + 3).trim() : dbName;
+
+            // If renamed, update transactions
+            if (newName !== oldName) {
                 await sbClient.from('transactions').update({ category: newName })
-                    .eq('category', oldChildName).eq('user_token', USER_TOKEN);
-                await sbClient.from('transactions').update({ category: newName })
-                    .eq('category', dbName).eq('user_token', USER_TOKEN);
+                    .eq('category', oldName).eq('user_token', USER_TOKEN);
+                // Also update with parent prefix if it existed
+                const sep = dbName.indexOf(' > ');
+                if (sep !== -1) {
+                    await sbClient.from('transactions').update({ category: newName })
+                        .eq('category', dbName).eq('user_token', USER_TOKEN);
+                }
             }
             await window.fetchBudgetData();
             window.showToast('עודכן', 'check');
@@ -2390,15 +2394,18 @@
 
     window.deleteBudgetItem = async function() {
         if (!sbClient || !state.pendingBudgetItem) return;
-        const { dbName } = state.pendingBudgetItem;
+        const { item, itemId } = state.pendingBudgetItem;
         window.closeBudgetItemEditModal();
         setLoading(true, true);
         try {
-            const { error } = await sbClient
-                .from('budget_settings')
-                .delete()
-                .eq('category_name', dbName)
-                .eq('user_token', USER_TOKEN);
+            let query = sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN);
+            if (itemId) {
+                query = query.eq('id', itemId);
+            } else {
+                query = query.eq('category_name', item.category_name.trim());
+                if (item.parent_group) query = query.eq('parent_group', item.parent_group);
+            }
+            const { error } = await query;
             if (error) throw error;
             await window.fetchBudgetData();
             window.showToast('נמחק', 'check');
