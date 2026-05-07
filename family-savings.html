@@ -47,6 +47,7 @@
       import { Settings, Plus, Trash2, Calculator, Download, Upload, TrendingUp, Wallet, Sparkles, Info, AlertCircle, ChevronDown, Clock, ChevronUp, FileText } from 'lucide-react';
       import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
+      const parseStartDate = (s) => { const [y, m] = s.split('-'); return new Date(+y, +m - 1, 1); };
       const addMonths = (date, months) => { const d = new Date(date); d.setMonth(d.getMonth() + months); return d; };
       const formatDate = (date) => new Intl.DateTimeFormat('he-IL', { month: 'short', year: 'numeric' }).format(date);
       const getMonthlyRate = (annualRate) => Math.pow(1 + annualRate / 100, 1 / 12) - 1;
@@ -96,6 +97,11 @@
 
       const solveRequiredDeposit = (bal, cb, ncb, start, startIdx, events, params) => {
         if (events.length === 0) return 0;
+        const evMap0 = new Map();
+        events.forEach(e => { if(!evMap0.has(e.monthOffset)) evMap0.set(e.monthOffset, []); evMap0.get(e.monthOffset).push(e); });
+        const maxIdx0 = Math.max(...events.map(e => e.monthOffset));
+        const zeroSim = runSimulationPeriod(bal, cb, ncb, start, startIdx, maxIdx0 - startIdx + 1, 0, params, evMap0);
+        if (!zeroSim.failed) return 0;
         let low = 0, high = 20000000, result = high;
         const maxIdx = Math.max(...events.map(e => e.monthOffset));
         const evMap = new Map();
@@ -109,18 +115,24 @@
       };
 
       const calculateSavingsPlan = (params, events) => {
-        const sorted = [...events].sort((a,b) => a.monthOffset - b.monthOffset);
+        const planStart = parseStartDate(params.startDate);
+        const eventsWithOffset = events.map(e => {
+          const evDate = parseStartDate(e.withdrawalDate || params.startDate);
+          const offset = (evDate.getFullYear() - planStart.getFullYear()) * 12 + (evDate.getMonth() - planStart.getMonth());
+          return { ...e, monthOffset: Math.max(0, offset) };
+        });
+        const sorted = [...eventsWithOffset].sort((a,b) => a.monthOffset - b.monthOffset);
         if (sorted.length === 0) return { success: true, schedule: [], finalBalance: params.initialCapital, totalDeposited: 0, totalTaxPaid: 0, totalWithdrawnNet: 0 };
         const fullSchedule = []; let curBal = params.initialCapital, curCB = params.initialCapital, curNCB = params.initialCapital, curMonth = 0, maxDepConstraint = Infinity;
         const eventMonths = Array.from(new Set(sorted.map(e => e.monthOffset))).sort((a,b) => a-b);
         for (const mIdx of eventMonths) {
           const rem = sorted.filter(e => e.monthOffset >= curMonth);
-          const requiredForFuture = solveRequiredDeposit(curBal, curCB, curNCB, addMonths(new Date(params.startDate), curMonth), curMonth, rem, params);
+          const requiredForFuture = solveRequiredDeposit(curBal, curCB, curNCB, addMonths(parseStartDate(params.startDate), curMonth), curMonth, rem, params);
           let deposit = Math.min(requiredForFuture, maxDepConstraint);
           maxDepConstraint = deposit;
           const segmentEvents = new Map();
           segmentEvents.set(mIdx, sorted.filter(e => e.monthOffset === mIdx));
-          const sim = runSimulationPeriod(curBal, curCB, curNCB, addMonths(new Date(params.startDate), curMonth), curMonth, mIdx - curMonth + 1, deposit, params, segmentEvents);
+          const sim = runSimulationPeriod(curBal, curCB, curNCB, addMonths(parseStartDate(params.startDate), curMonth), curMonth, mIdx - curMonth + 1, deposit, params, segmentEvents);
           fullSchedule.push(...sim.schedule);
           curBal = sim.finalBalance; curCB = sim.finalCostBasis; curNCB = sim.finalNominalBasis;
           curMonth = mIdx + 1;
@@ -156,7 +168,8 @@
       const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none transition-all";
 
       const App = () => {
-        const [params, setParams] = useState({ startDate: new Date().toISOString().split('T')[0], annualReturn: 7, annualInflation: 2, capitalGainsTax: 25, initialCapital: 0 });
+        const todayMonthYear = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; };
+        const [params, setParams] = useState({ startDate: todayMonthYear(), annualReturn: 7, annualInflation: 2, capitalGainsTax: 25, initialCapital: 0 });
         const [events, setEvents] = useState([]);
         const [simulation, setSimulation] = useState(null);
         const [isCalculating, setIsCalculating] = useState(false);
@@ -168,22 +181,32 @@
         };
 
         const handleAdd = () => {
-          const lastOffset = events.length ? Math.max(...events.map(e => e.monthOffset)) : 0;
-          setEvents([...events, { id: generateId(), name: `אירוע ${events.length + 1}`, targetAmount: 10000, monthOffset: lastOffset + 12 }]);
+          const lastDate = events.length
+            ? events.reduce((max, e) => e.withdrawalDate > max ? e.withdrawalDate : max, events[0].withdrawalDate)
+            : params.startDate;
+          const d = parseStartDate(lastDate);
+          d.setMonth(d.getMonth() + 12);
+          const nextDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+          setEvents([...events, { id: generateId(), name: `אירוע ${events.length + 1}`, targetAmount: 10000, withdrawalDate: nextDate }]);
         };
 
         const handleUpd = (id, f, v) => setEvents(events.map(e => e.id === id ? {...e, [f]: v} : e));
         const handleDel = (id) => setEvents(events.filter(e => e.id !== id));
 
         const dateOptions = useMemo(() => {
-          const start = new Date(params.startDate);
-          return Array.from({ length: 481 }, (_, i) => {
-            const d = addMonths(start, i);
-            const y = Math.floor(i/12), m = i%12;
-            const diff = i === 0 ? "החודש" : `${y > 0 ? y + ' ש\'' : ''} ${m > 0 ? m + ' ח\'' : ''}`.trim();
-            return { v: i, l: `${d.getMonth() + 1}/${d.getFullYear()} (${diff})` };
+          const now = new Date();
+          now.setDate(1);
+          const base = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+          return Array.from({ length: 600 }, (_, i) => {
+            const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
+            const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+            const diffMonths = (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth());
+            const y = Math.floor(Math.abs(diffMonths) / 12), m = Math.abs(diffMonths) % 12;
+            const sign = diffMonths < 0 ? 'לפני ' : '';
+            const diff = diffMonths === 0 ? 'החודש' : `${sign}${y > 0 ? y + ' ש\'' : ''} ${m > 0 ? m + ' ח\'' : ''}`.trim();
+            return { v: val, l: `${d.getMonth() + 1}/${d.getFullYear()} (${diff})` };
           });
-        }, [params.startDate]);
+        }, []);
 
         return (
           <div className="min-h-screen pb-24">
@@ -205,13 +228,25 @@
                       <FileText size={16} />
                     </button>
                   )}
-                  <button onClick={() => { const blob = new Blob([JSON.stringify({ params, events })], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'savings.json'; a.click(); }} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition no-print">
+                  <button onClick={() => {
+                    const start = new Date(params.startDate);
+                    const exportedEvents = events.map(ev => {
+                      const { monthOffset, ...rest } = ev;
+                      return rest;
+                    });
+                    const blob = new Blob([JSON.stringify({ params, events: exportedEvents })], { type: 'application/json' });
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'savings.json'; a.click();
+                  }} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition no-print">
                     <Download size={16} />
                   </button>
                   <button onClick={() => fileRef.current.click()} className="p-2 text-slate-400 hover:bg-slate-100 rounded-xl transition no-print">
                     <Upload size={16} />
                   </button>
-                  <input type="file" ref={fileRef} className="hidden" onChange={(e) => { const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = (ev) => { try { const d = JSON.parse(ev.target.result); setParams(d.params); setEvents(d.events); setSimulation(null); } catch(e) { alert('קובץ לא תקין'); } }; r.readAsText(f); }} />
+                  <input type="file" ref={fileRef} className="hidden" onChange={(e) => { const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = (ev) => { try {
+                    const d = JSON.parse(ev.target.result);
+                    const loadedParams = d.params;
+                    setParams(loadedParams); setEvents(d.events); setSimulation(null);
+                  } catch(e) { alert('קובץ לא תקין'); } }; r.readAsText(f); }} />
                 </div>
               </div>
             </header>
@@ -221,7 +256,21 @@
               <Section title="הגדרות השקעה" icon={Settings} defaultOpen={true}>
                 <div className="pt-3 grid grid-cols-2 gap-3">
                   <Field label="תאריך התחלה">
-                    <input type="date" value={params.startDate} onChange={e => setParams({...params, startDate: e.target.value})} className={inputCls} />
+                    {(() => {
+                      const [sy, sm] = (params.startDate || '').split('-');
+                      const heMonths = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+                      const years = Array.from({length: 50}, (_, i) => new Date().getFullYear() - 2 + i);
+                      return (
+                        <div className="flex gap-1">
+                          <select value={sm || ''} onChange={x => { const v = x.target.value; setParams(p => ({...p, startDate: `${p.startDate.split('-')[0]}-${v}`})); }} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-sm font-bold focus:outline-none">
+                            {heMonths.map((name, i) => { const val = String(i+1).padStart(2,'0'); return <option key={val} value={val}>{name}</option>; })}
+                          </select>
+                          <select value={sy || ''} onChange={x => { const v = x.target.value; setParams(p => ({...p, startDate: `${v}-${p.startDate.split('-')[1]}`})); }} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-sm font-bold focus:outline-none">
+                            {years.map(y => <option key={y} value={y}>{y}</option>)}
+                          </select>
+                        </div>
+                      );
+                    })()}
                   </Field>
                   <Field label="הון התחלתי (₪)">
                     <input type="number" step="1000" value={params.initialCapital} onChange={e => setParams({...params, initialCapital: +e.target.value})} className={inputCls} />
@@ -248,7 +297,10 @@
                   )}
                   {events.map((e) => {
                     const inflation = getMonthlyRate(params.annualInflation);
-                    const adjusted = e.targetAmount * Math.pow(1 + inflation, e.monthOffset);
+                    const start0 = parseStartDate(params.startDate);
+                    const evDate0 = parseStartDate(e.withdrawalDate || params.startDate);
+                    const dynOffset = (evDate0.getFullYear() - start0.getFullYear()) * 12 + (evDate0.getMonth() - start0.getMonth());
+                    const adjusted = e.targetAmount * Math.pow(1 + inflation, Math.max(0, dynOffset));
                     return (
                       <div key={e.id} className="animate-slide-in bg-slate-50 border border-slate-100 rounded-2xl p-3 space-y-2">
                         <div className="flex items-center gap-2">
@@ -261,7 +313,7 @@
                           <div>
                             <label className="text-[9px] font-black text-slate-400 uppercase">מועד</label>
                             <div className="relative">
-                              <select value={e.monthOffset} onChange={x => handleUpd(e.id, 'monthOffset', +x.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold appearance-none focus:outline-none">
+                              <select value={e.withdrawalDate} onChange={x => handleUpd(e.id, 'withdrawalDate', x.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold appearance-none focus:outline-none">
                                 {dateOptions.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
                               </select>
                               <ChevronDown className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={12} />
@@ -293,18 +345,18 @@
               {simulation && (
                 <div className="space-y-3 animate-slide-in">
                   {/* Summary cards */}
-                  <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
-                    <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">הפקדה חודשית מומלצת</p>
-                    <p className="text-4xl font-black text-slate-900">{formatCurrency(simulation.schedule[0]?.deposit || 0)}</p>
-                    <p className="text-xs text-slate-400 font-bold mt-1">הסכום המרבי להפקדה — עשוי לרדת לאחר אירועים</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <div className="bg-white rounded-2xl border border-slate-100 p-3 shadow-sm">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">יתרה סופית</p>
+                      <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">הפקדה חודשית</p>
+                      <p className="text-2xl font-black text-slate-900">{formatCurrency(simulation.schedule[0]?.deposit || 0)}</p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-1">עשוי לרדת לאחר אירועים</p>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-slate-100 p-3 shadow-sm">
+                      <p className="text-xs font-bold text-slate-400 uppercase mb-1">יתרה סופית</p>
                       <p className="text-2xl font-black text-blue-600">{formatCurrency(simulation.finalBalance)}</p>
                     </div>
                     <div className="bg-white rounded-2xl border border-slate-100 p-3 shadow-sm">
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">סה"כ הפקדות</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase mb-1">סה"כ הפקדות</p>
                       <p className="text-2xl font-black text-slate-700">{formatCurrency(simulation.totalDeposited)}</p>
                     </div>
                   </div>
