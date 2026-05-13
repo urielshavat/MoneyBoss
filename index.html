@@ -4555,6 +4555,16 @@
     window.setCategoryType = function(type) {
         const input = document.getElementById('categoryTypeInput');
         if (input) input.value = type;
+
+        const eCat = document.getElementById('categoryNameInput');
+        const expId = document.getElementById('expenseCategoryIdInput');
+        if (type === 'current') {
+            if (eCat) eCat.value = 'שוטף';
+            if (expId) expId.value = '';
+        } else {
+            if (eCat) eCat.value = '';
+            if (expId) expId.value = '';
+        }
         
         ['current', 'fixed', 'planned'].forEach(t => {
             const b = document.getElementById('catType' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
@@ -4572,6 +4582,16 @@
     window.setEditCategoryType = function(type) {
         const input = document.getElementById('editCategoryTypeInput');
         if (input) input.value = type;
+
+        const eCat = document.getElementById('editRowCategory');
+        const expId = document.getElementById('expenseCategoryIdInput_EditHidden');
+        if (type === 'current') {
+            if (eCat) eCat.value = 'שוטף';
+            if (expId) expId.value = '';
+        } else {
+            if (eCat) eCat.value = '';
+            if (expId) expId.value = '';
+        }
         
         ['current', 'fixed', 'planned'].forEach(t => {
             const b = document.getElementById('editCatType' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
