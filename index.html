@@ -30,8 +30,9 @@
         .card { background: #ffffff; border-radius: 1rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); }
         .input-field { border: 1px solid #e2e8f0; background-color: #f9fafb; transition: all 0.2s; }
         .input-field:focus { border-color: #3b82f6; background-color: #ffffff; outline: none; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.15s ease-out forwards; }
+        #transactionList { transition: opacity 0.2s; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .sticky-header { position: sticky; top: 0; z-index: 10; background-color: rgba(243, 244, 246, 0.95); backdrop-filter: blur(4px); }
         .budget-input { background: transparent; border: none; text-align: left; width: 65px; padding: 1px 4px; outline: none; }
@@ -115,6 +116,9 @@
         .token-input { font-family: 'Courier New', monospace; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.35em; text-align: center; text-transform: uppercase; }
         @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
         .shake { animation: shake 0.4s ease; }
+        input[type=number].no-spin::-webkit-inner-spin-button,
+        input[type=number].no-spin::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number].no-spin { -moz-appearance: textfield; appearance: textfield; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center p-4 large-text">
@@ -168,12 +172,12 @@
                 <button onclick="window.toggleHamburgerMenu()" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
                     <i class="fa-solid fa-bars text-lg"></i>
                 </button>
-                <h1 id="pageTitle" class="text-xl font-bold text-slate-800 tracking-tight">הוצאות שוטפות</h1>
+                <h1 id="pageTitle" class="text-xl font-bold text-slate-800 tracking-tight">הוצאות</h1>
                 <button id="budgetAiBtn" onclick="window.showBudgetRecommendation()" class="hidden w-6 h-6 rounded-full bg-amber-100 text-amber-600 text-xs font-bold flex items-center justify-center hover:bg-amber-200 transition-colors ai-pulse" title="המלצה">
                     <i class="fa-solid fa-lightbulb text-[10px]"></i>
                 </button>
                 <button id="budgetHelpBtn" onclick="window.openBudgetHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="איך למלא את התקציב">?</button>
-                <button id="mainHelpBtn" onclick="window.openMainHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="הסבר על הוצאות שוטפות">?</button>
+                <button id="mainHelpBtn" onclick="window.openMainHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="הסבר על הוצאות">?</button>
                 <button id="annualHelpBtn" onclick="window.openAnnualHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="הסבר על הוצאות מתוכננות">?</button>
                 <button id="onboardingBtn" onclick="window.openOnboarding()" class="hidden bg-blue-50 border border-blue-200 text-blue-600 text-[10px] font-bold px-2.5 py-1 rounded-full hover:bg-blue-100 transition-colors whitespace-nowrap" title="איך מתחילים?">איך מתחילים?</button>
             </div>
@@ -191,7 +195,7 @@
         </div>
 
         <div id="mainView" class="view-content">
-            <header class="mb-4">
+            <header class="mb-2">
                 <div class="bg-white px-4 py-4 rounded-3xl shadow-sm border border-slate-100 flex items-center">
                     <!-- מאזן נוכחי — חצי ימין -->
                     <div class="flex-1 flex flex-col items-center border-l border-slate-100">
@@ -215,26 +219,26 @@
             <!-- Savings reminders -->
             <div id="savingsRemindersContainer"></div>
 
-            <!-- Category summary strip -->
-            <div id="categorySummarySection" class="mb-3 hidden">
-                <div class="flex justify-between items-center mb-2 px-1">
-                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">קטגוריות</h2>
-                    <button onclick="window.openManageCategoriesModal()" class="text-[10px] font-bold text-blue-500 flex items-center gap-1">
-                        <i class="fa-solid fa-sliders text-[9px]"></i>נהל
-                    </button>
+            <!-- View Switcher -->
+            <div class="mb-1.5 px-1">
+                <div class="flex bg-slate-100 p-1 rounded-xl">
+                    <button onclick="window.setMainViewFilter('current')" id="filterCurrentBtn" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
+                    <button onclick="window.setMainViewFilter('planned')" id="filterPlannedBtn" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">מתוכנן</button>
+                    <button onclick="window.setMainViewFilter('fixed')" id="filterFixedBtn" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
+                    <button onclick="window.setMainViewFilter('all')" id="filterAllBtn" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">הכל</button>
                 </div>
+            </div>
+
+            <!-- Category summary strip -->
+            <div id="categorySummarySection" class="mb-1.5 hidden">
                 <div id="categorySummaryStrip" class="flex gap-2 overflow-x-auto pb-1 no-scrollbar"></div>
             </div>
 
             <section class="flex flex-col pb-6">
-                <div class="flex justify-between items-center mb-2 px-1">
-                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">רשימת הוצאות</h2>
+                <div class="flex justify-between items-center mb-1 px-1">
                     <div class="flex items-center gap-1.5">
                         <button id="noCategoriesNudge" onclick="window.openManageCategoriesModal()" class="btn-toggle-annual hidden">
                             צור קטגוריות
-                        </button>
-                        <button id="toggleAnnualBtn" onclick="window.toggleShowAnnualMain()" class="btn-toggle-annual">
-                            הצג הוצאות מתוכננות
                         </button>
                     </div>
                 </div>
@@ -261,6 +265,7 @@
                     </div>
                 </div>
             </div>
+            
             <div class="card p-6 mb-4 border border-slate-200 bg-white shadow-sm flex flex-col items-center">
                 <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-6 self-start">התפלגות הוצאות</h3>
                 <div id="chartContainer" class="w-full aspect-square max-w-[240px] relative mb-6">
@@ -268,9 +273,16 @@
                 </div>
                 <div id="chartLegend" class="w-full space-y-2"></div>
             </div>
+
+            <!-- Stats view filter selector -->
+            <div class="flex bg-slate-100 p-1 rounded-xl mb-4">
+                <button onclick="window.setStatsFilter('current')" id="statsFilterCurrentBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
+                <button onclick="window.setStatsFilter('fixed')" id="statsFilterFixedBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
+                <button onclick="window.setStatsFilter('planned')" id="statsFilterPlannedBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all text-slate-400">מתוכנן</button>
+            </div>
             <!-- Category breakdown pie -->
             <div id="catStatsCard" class="card p-6 mb-4 border border-slate-200 bg-white shadow-sm flex-col items-center hidden">
-                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות שוטפות לפי קטגוריה</h3>
+                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות לפי קטגוריה</h3>
                 <div id="catChartContainer" class="w-full aspect-square max-w-[240px] relative mb-4 mx-auto">
                     <canvas id="catStatsChart"></canvas>
                 </div>
@@ -280,6 +292,34 @@
                 <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3 self-start w-full border-t border-slate-100 pt-4">מגמה חודשית</h3>
                 <div class="w-full relative" style="height:220px">
                     <canvas id="catTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Planned Category breakdown pie -->
+            <div id="plannedCatStatsCard" class="card p-6 mb-4 border border-slate-200 bg-white shadow-sm flex-col items-center hidden">
+                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות מתוכננות לפי קטגוריה</h3>
+                <div id="plannedCatChartContainer" class="w-full aspect-square max-w-[240px] relative mb-4 mx-auto">
+                    <canvas id="plannedCatStatsChart"></canvas>
+                </div>
+                <div id="plannedCatChartLegend" class="w-full space-y-1 mb-4"></div>
+                <!-- Monthly trend chart for planned -->
+                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3 self-start w-full border-t border-slate-100 pt-4">מגמה חודשית (מתוכננות)</h3>
+                <div class="w-full relative" style="height:220px">
+                    <canvas id="plannedTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Fixed Category breakdown pie -->
+            <div id="fixedCatStatsCard" class="card p-6 mb-4 border border-slate-200 bg-white shadow-sm flex-col items-center hidden">
+                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות קבועות לפי קטגוריה</h3>
+                <div id="fixedCatChartContainer" class="w-full aspect-square max-w-[240px] relative mb-4 mx-auto">
+                    <canvas id="fixedCatStatsChart"></canvas>
+                </div>
+                <div id="fixedCatChartLegend" class="w-full space-y-1 mb-4"></div>
+                <!-- Monthly trend chart for fixed -->
+                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3 self-start w-full border-t border-slate-100 pt-4">מגמה חודשית (קבועות)</h3>
+                <div class="w-full relative" style="height:220px">
+                    <canvas id="fixedTrendChart"></canvas>
                 </div>
             </div>
             <!-- Export section -->
@@ -440,6 +480,33 @@
                         <a href="car-cost.html" target="_blank" class="text-blue-600 underline font-bold">Car Cost</a>
                     </div>
                 </div>
+                <div class="card overflow-hidden mt-3">
+                    <button onclick="window.toggleUsefulInfo('loanInfo')" class="w-full flex justify-between items-center p-4 bg-white text-right active:bg-slate-50 transition-colors">
+                        <span class="text-xs font-bold text-slate-800">מחשבון הלוואה</span>
+                        <i id="loanInfoIcon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200"></i>
+                    </button>
+                    <div id="loanInfoContent" class="hidden bg-slate-50 p-4 text-xs text-slate-600 border-t border-slate-100 leading-relaxed">
+                        מחשבון הלוואה - חשבו את ההחזר החודשי ואת העלות הכוללת של ההלוואה
+                        <a href="loan.html" target="_blank" class="text-blue-600 underline font-bold mt-2 flex items-center gap-2">
+                            <i class="fa-solid fa-calculator text-green-500"></i>
+                            למחשבון הלוואה
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card overflow-hidden mt-3">
+                    <button onclick="window.toggleUsefulInfo('investInfo')" class="w-full flex justify-between items-center p-4 bg-white text-right active:bg-slate-50 transition-colors">
+                        <span class="text-xs font-bold text-slate-800">מחשבון השקעה</span>
+                        <i id="investInfoIcon" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200"></i>
+                    </button>
+                    <div id="investInfoContent" class="hidden bg-slate-50 p-4 text-xs text-slate-600 border-t border-slate-100 leading-relaxed">
+                        מחשבון השקעה וריבית דריבית - בדקו כמה הכסף שלכם יכול לצמוח
+                        <a href="invest.html" target="_blank" class="text-blue-600 underline font-bold mt-2 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-emerald-500"></i>
+                            למחשבון השקעה
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -448,7 +515,7 @@
     <nav class="bottom-nav">
         <button id="navHome" onclick="window.setNav('main')" class="nav-btn active">
             <span class="nav-icon-entity">&#8645;</span>
-            <span class="nav-text">שוטף</span>
+            <span class="nav-text">הוצאות</span>
         </button>
         <button id="navBudget" onclick="window.setNav('budget')" class="nav-btn">
             <i class="fa-solid fa-wallet text-lg"></i>
@@ -508,7 +575,7 @@
                 </div>
             </div>
             <div class="border-t border-slate-100 mx-3"></div>
-            <button onclick="window.closeHamburgerMenu(); window.openOnboarding();" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+            <button id="menuOnboardingBtn" onclick="window.closeHamburgerMenu(); window.openOnboarding();" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
                 <i class="fa-solid fa-circle-info text-blue-400 w-4 text-center flex-shrink-0"></i>
                 <span>איך מתחילים?</span>
             </button>
@@ -536,6 +603,16 @@
             <a href="family-savings.html" target="_blank" onclick="window.closeHamburgerMenu();" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
                 <i class="fa-solid fa-piggy-bank text-pink-400 w-4 text-center flex-shrink-0"></i>
                 <span>חסכון לילדים</span>
+            </a>
+            <div class="border-t border-slate-100 mx-3"></div>
+            <a href="loan.html" target="_blank" onclick="window.closeHamburgerMenu();" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-calculator text-green-500 w-4 text-center flex-shrink-0"></i>
+                <span>מחשבון הלוואה</span>
+            </a>
+            <div class="border-t border-slate-100 mx-3"></div>
+            <a href="invest.html" target="_blank" onclick="window.closeHamburgerMenu();" class="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-chart-line text-emerald-500 w-4 text-center flex-shrink-0"></i>
+                <span>מחשבון השקעה</span>
             </a>
 
         </div>
@@ -688,25 +765,78 @@
         </div>
     </div>
 
-    <!-- Add Expense Modal -->
+    <!-- Car Replacement Calculator Modal -->
+    <div id="carCalcOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[170] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-lg font-bold text-slate-900">מחשבון החלפת רכב</h3>
+                <button onclick="window.closeCarCalc()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">שווי רכב נוכחי (₪)</label>
+                    <input type="number" id="carCalcCurrent" placeholder="40,000" oninput="window.calculateCarSavings()" class="input-field w-full px-4 py-3 rounded-xl font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">שווי רכב רצוי (₪)</label>
+                    <input type="number" id="carCalcTarget" placeholder="50,000" oninput="window.calculateCarSavings()" class="input-field w-full px-4 py-3 rounded-xl font-bold border-blue-100">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">בעוד כמה שנים להחליף?</label>
+                    <input type="number" id="carCalcYears" placeholder="3" oninput="window.calculateCarSavings()" class="input-field w-full px-4 py-3 rounded-xl font-bold">
+                </div>
+                
+                <div id="carCalcResult" class="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-center">
+                    <p class="text-[10px] font-bold text-blue-400 uppercase mb-1">הפקדה חודשית מומלצת</p>
+                    <div class="flex items-baseline justify-center gap-1">
+                        <span class="text-xs text-blue-600 font-bold">₪</span>
+                        <span id="carCalcValue" class="text-3xl font-black text-blue-600">0</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button id="carCalcApplyBtn" onclick="window.applyCarSavings()" class="flex-1 bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-200">שמור</button>
+                </div>
+                <p class="text-[9px] text-slate-400 text-center leading-relaxed">החישוב מתבסס על ירידת ערך שנתית של 15% לרכב הקיים.</p>
+            </div>
+        </div>
+    </div>
+
     <div id="addExpenseOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
             <h3 class="text-lg font-bold text-slate-900 mb-6 text-center">תיעוד הוצאה חדשה</h3>
             <form id="expenseFormModal" onsubmit="window.handleAddExpense(event)" class="space-y-4">
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">כמה?</label>
-                    <input type="number" id="amountInput" step="any" inputmode="decimal" placeholder="0" required class="input-field w-full px-4 py-3 rounded-xl font-bold text-lg">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">כמה?</label>
+                        <input type="text" id="amountInput" step="any" inputmode="decimal" pattern="-?[0-9]*" placeholder="0" required class="input-field w-full px-4 py-3 rounded-xl font-bold text-lg">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סוג</label>
+                        <div class="flex bg-slate-100 p-1 rounded-xl">
+                            <button type="button" id="typeExpenseBtn" onclick="window.setTxType('expense')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">הוצאה</button>
+                            <button type="button" id="typeIncomeBtn" onclick="window.setTxType('income')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">הכנסה</button>
+                        </div>
+                        <input type="hidden" id="txTypeInput" value="expense">
+                    </div>
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">על מה?</label>
                     <input type="text" id="nameInput" placeholder="מה קנית?" required class="input-field w-full px-4 py-3 rounded-xl">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">קטגוריה מתוכננת</label>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סוג הוצאה</label>
+                    <div class="flex bg-slate-100 p-1 rounded-xl mb-3">
+                        <button type="button" id="catTypeCurrentBtn" onclick="window.setCategoryType('current')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
+                        <button type="button" id="catTypeFixedBtn" onclick="window.setCategoryType('fixed')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
+                        <button type="button" id="catTypePlannedBtn" onclick="window.setCategoryType('planned')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">מתוכנן</button>
+                    </div>
+                    <input type="hidden" id="categoryTypeInput" value="current">
+                    
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">בחירת קטגוריה</label>
                     <div id="addExpenseCategoryPicker" class="space-y-1"></div>
-                    <select id="categorySelect" class="hidden">
-                        <option value="שוטף">ללא (שוטף)</option>
-                    </select>
+                    <input type="hidden" id="categoryNameInput" value="שוטף">
+                    <input type="hidden" id="expenseCategoryIdInput" value="">
                 </div>
                 <div class="flex gap-2 pt-2">
                     <button type="submit" id="submitBtnModal" class="flex-1 bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
@@ -751,35 +881,40 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סכום</label>
-                        <input type="number" id="editRowAmount" step="any" inputmode="decimal" class="input-field w-full px-4 py-3 rounded-xl font-bold text-lg">
+                        <input type="text" id="editRowAmount" step="any" inputmode="decimal" pattern="-?[0-9]*" class="input-field w-full px-4 py-3 rounded-xl font-bold text-lg">
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תאריך</label>
-                        <input type="date" id="editRowDate" class="input-field w-full px-3 py-3 rounded-xl text-sm font-bold text-slate-700">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סוג</label>
+                        <div class="flex bg-slate-100 p-1 rounded-xl">
+                            <button type="button" id="editTypeExpenseBtn" onclick="window.setEditTxType('expense')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">הוצאה</button>
+                            <button type="button" id="editTypeIncomeBtn" onclick="window.setEditTxType('income')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">הכנסה</button>
+                        </div>
+                        <input type="hidden" id="editTxTypeInput" value="expense">
                     </div>
+                </div>
+                <div>
+                   <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תאריך</label>
+                   <input type="date" id="editRowDate" class="input-field w-full px-3 py-3 rounded-xl text-sm font-bold text-slate-700">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תיאור</label>
                     <input type="text" id="editRowName" class="input-field w-full px-4 py-3 rounded-xl">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">קטגוריה (מתוכנן)</label>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סוג הוצאה</label>
+                    <div class="flex bg-slate-100 p-1 rounded-xl mb-3">
+                        <button type="button" id="editCatTypeCurrentBtn" onclick="window.setEditCategoryType('current')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
+                        <button type="button" id="editCatTypeFixedBtn" onclick="window.setEditCategoryType('fixed')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
+                        <button type="button" id="editCatTypePlannedBtn" onclick="window.setEditCategoryType('planned')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">מתוכנן</button>
+                    </div>
+                    <input type="hidden" id="editCategoryTypeInput" value="current">
+
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">בחירת קטגוריה</label>
                     <div id="editRowCategoryPicker" class="space-y-1">
                         <!-- populated by JS -->
                     </div>
-                    <!-- hidden select keeps the value for saveRowEdit -->
-                    <select id="editRowCategory" class="hidden">
-                        <option value="שוטף">ללא (שוטף)</option>
-                    </select>
-                </div>
-
-                <!-- Quick expense category -->
-                <div id="editRowExpCatSection" class="bg-slate-50 rounded-2xl p-3 border border-slate-100">
-                    <div class="flex items-center justify-between mb-2">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">קטגוריה (שוטף)</label>
-                        <span id="editRowCatLabel" class="text-xs font-bold text-slate-500">לא מקוטלג</span>
-                    </div>
-                    <div id="editRowCatButtons" class="flex flex-wrap gap-1.5"></div>
+                    <input type="hidden" id="editRowCategory" value="שוטף">
+                    <input type="hidden" id="expenseCategoryIdInput_EditHidden" value="">
                 </div>
 
                 <!-- Primary actions -->
@@ -966,22 +1101,24 @@
             </div>
             <div class="overflow-y-auto p-6 space-y-4 text-sm text-slate-600 leading-relaxed">
                 <p>כאן תראו את כל ההוצאות השנתיות שהגדרתם בתקציב — כמה הקצבתם לכל קטגוריה וכמה כבר הוצאתם ממנה.</p>
+                
                 <div>
                     <p class="font-bold text-slate-800 mb-1.5">📊 מה רואים לכל קטגוריה?</p>
                     <ul class="text-xs space-y-1 mr-3" style="list-style:disc">
-                        <li>כמה הוצאתם עד כה מתוך התקציב השנתי</li>
-                        <li>פס התקדמות המראה את אחוז הניצול</li>
-                        <li>את ההוצאות הספציפיות ששויכו לאותה קטגוריה</li>
+                        <li>כמה הוצאתם עד כה מתוך התקציב השנתי.</li>
+                        <li>פס התקדמות המראה את אחוז הניצול של התקציב.</li>
                     </ul>
                 </div>
+
                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                    <p class="font-bold text-slate-800 mb-1.5">💰 שיריון בצד (יתרה מצטברת)</p>
-                    <p class="text-xs text-slate-600">הסכום שמוצג בחלק העליון ("שיריון בצד") מחושב כך:</p>
-                    <p class="text-xs text-slate-500 mt-1.5">מתחילת השנה, כל חודש "מופרש" חלק מהתקציב השנתי — בהתאם למספר החודשים שעברו. הסכום הזה מייצג כמה <strong>היה צריך להיות מופרש</strong> עד היום, בניכוי מה שכבר הוצא בפועל.</p>
-                    <ul class="text-xs mt-2 space-y-1 mr-3" style="list-style:disc">
-                        <li>מספר חיובי — יש יתרה, ניתן להוציא עוד</li>
-                        <li>מספר שלילי — הוצאתם יותר ממה שצבר התקציב עד כה</li>
-                    </ul>
+                    <p class="font-bold text-slate-800 mb-1.5">💰 שיריון בצד</p>
+                    <p class="text-xs text-slate-600 leading-relaxed">הסכום למעלה מייצג כמה כסף "צברנו" עד היום עבור כלל ההוצאות המתוכננות (בניכוי מה שהוצאנו).
+                    בכל חודש מופרש חלק מהתקציב השנתי, והשריון מראה אם אנחנו עומדים בקצב הצבירה.</p>
+                </div>
+
+                <div>
+                    <p class="font-bold text-slate-800 mb-1.5">🔒 כפתור המנעול (סגירת קטגוריה)</p>
+                    <p class="text-xs text-slate-600 leading-relaxed">סיימתם עם הוצאה מסוימת (למשל חזרתם מחופשה)? לחצו על המנעול. יתרת התקציב שנשארה באותה קטגוריה <strong>תעבור למאזן השוטף שלכם</strong> ותגדיל לכם את התקציב היומי!</p>
                 </div>
             </div>
             <div class="p-4 border-t border-slate-100">
@@ -994,29 +1131,30 @@
     <div id="mainHelpOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col max-h-[85vh]">
             <div class="flex justify-between items-center p-6 pb-4 border-b border-slate-100">
-                <h3 class="text-lg font-bold text-slate-900">הוצאות שוטפות</h3>
+                <h3 class="text-lg font-bold text-slate-900">הסבר: ניהול הוצאות</h3>
                 <button onclick="window.closeMainHelp()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="overflow-y-auto p-6 space-y-4 text-sm text-slate-600 leading-relaxed">
-                <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
-                    <p>לאחר שמילאתם את עמוד התקציב וקבעתם תקציב חודשי לשוטף, הסכום מחולק ב-30 לקבלת <strong>תקציב יומי</strong> — וסכום זה מתווסף למאזן שלכם כל יום.</p>
-                    <p class="mt-2">לדוגמא: תקציב חודשי של ₪3,000 = תקציב יומי של ₪100. בכל יום המאזן גדל ב-₪100.</p>
+                <div>
+                    <p class="font-bold text-slate-800 mb-1">📋 תיעוד הוצאות</p>
+                    <p class="text-xs text-slate-500 italic pb-2 inline-block">כל מה שיוצא מהכיס/אשראי - מתעדים כאן.</p>
+                    <p>כאשר אתם רוכשים משהו (סופר, פארם, בילוי) - לחצו על ה-<b>+</b> הכחול. אם זו הוצאה "רגילה", היא פשוט תרד מהמאזן היומי שלכם.</p>
                 </div>
 
-                <div>
-                    <p class="font-bold text-slate-800 mb-1.5">📋 תיעוד הוצאות</p>
-                    <p>כאן ירשמו ההוצאות שתתעדו. יש לתעד את <strong>כל</strong> ההוצאות שלא ציינתם תחת "הוצאות קבועות" בעמוד התקציב.</p>
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <p class="font-bold text-slate-800 mb-1">🏷️ קטלוג הוצאות</p>
+                    <p class="text-xs text-slate-600 leading-relaxed">ניתן לשייך כל הוצאה ל<b>קטגוריה שוטפת</b> כדי לעקוב לאן הכסף הולך. 
+                    בנוסף, אם הוספתם הוצאה שהיא דווקא "קבועה" (כמו מנוי שנשכח) - ניתן לסמן אותה כזו (רשות) כדי לשמור על סדר.</p>
                 </div>
 
-                <div>
-                    <p class="font-bold text-slate-800 mb-1.5">➕ כיצד לתעד הוצאה</p>
-                    <p>לחצו על הכפתור <strong>+</strong> הכחול למטה, ציינו שם וסכום. ניתן לתעד בקלות ישירות מהנייד — לחצו על הגדרות לקבלת הסבר.</p>
+                <div class="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                    <p class="font-bold text-amber-800 text-xs mb-1">📅 ומה לגבי הוצאה מתוכננת?</p>
+                    <p class="text-xs text-amber-700 leading-relaxed">אם הוצאתם כסף על משהו שכבר "שמרתם לו כסף" (כמו טסט לרכב או חופשה) - בחרו את הקטגוריה המתאימה בעת התיעוד. הוצאה כזו <strong>לא תפגע במאזן היומי</strong> שלכם, כי הכסף כבר נשמר בצד!</p>
                 </div>
 
-                <div>
-                    <p class="font-bold text-slate-800 mb-1.5">📅 הוצאה מתוכננת</p>
-                    <p>אם ההוצאה שייכת לקטגוריה שתכננתם תחת "הוצאות מתוכננות" — סמנו את הקטגוריה המתאימה. הוצאה זו <strong>לא תרד מהמאזן</strong> אלא מהתקציב שהגדרתם לאותה קטגוריה.</p>
-                    <p class="mt-2 text-xs text-slate-500">הוצאות מתוכננות מוסתרות ברשימה. ללחצו על <strong>"הצג הוצאות מתוכננות"</strong> כדי להציג אותן.</p>
+                <div class="bg-blue-600 rounded-2xl p-4 text-white shadow-lg shadow-blue-100">
+                    <p class="text-xs font-bold opacity-90 mb-1">איך עובד המאזן?</p>
+                    <p class="text-sm font-bold leading-relaxed">בכל יום בחצות, התקציב היומי שלכם מתווסף אוטומטית למאזן. מנגד, כל הוצאה שוטפת שאתם מתעדים מפחיתה את היתרה במאזן. המטרה היא תמיד להישאר מעל ה-0!</p>
                 </div>
             </div>
             <div class="p-4 border-t border-slate-100">
@@ -1029,51 +1167,29 @@
     <div id="budgetHelpOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col max-h-[85vh]">
             <div class="flex justify-between items-center p-6 pb-4 border-b border-slate-100">
-                <h3 class="text-lg font-bold text-slate-900">איך למלא את התקציב?</h3>
+                <h3 class="text-lg font-bold text-slate-900">איך בונים תקציב?</h3>
                 <button onclick="window.closeBudgetHelp()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="overflow-y-auto p-6 space-y-5 text-sm text-slate-600 leading-relaxed">
-                <p class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 font-semibold">
-                    כל מה שצריך זה גישה לחשבון העובר ושב ולתדפיסי האשראי של 3 חודשים אחרונים
-                </p>
-
                 <div>
-                    <p class="font-bold text-green-700 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-circle-arrow-up text-sm"></i>הכנסות</p>
-                    <p>מלאו את ההכנסות שלכם מתוך חשבון העובר ושב. אם ההכנסות משתנות — סכמו את כל ההכנסות בשנה האחרונה וחלקו ב-12, או שימו את ההכנסה המינימלית שבטוח תהיה.</p>
+                    <p class="font-bold text-green-700 mb-1 flex items-center gap-1.5"><i class="fa-solid fa-circle-arrow-up text-sm"></i>שלב 1: הכנסות</p>
+                    <p class="text-xs">מה נכנס נטו לבנק? משכורות, קצבאות, שכירות. אם זה משתנה - קחו ממוצע שמרני.</p>
                 </div>
 
                 <div>
-                    <p class="font-bold text-red-600 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-circle-arrow-down text-sm"></i>הוצאות קבועות</p>
-                    <p>פותחים עובר ושב ואשראי ורושמים אילו תשלומים יורדים כל חודש באופן קבוע.</p>
-                    <ul class="mt-2 space-y-1 text-xs mr-3" style="list-style:disc">
-                        <li>עבור הוצאות שיורדות פעם בחודשיים (חשמל, ארנונה) — רושמים חצי מהסכום</li>
-                        <li>אם יש רכישה שיורדת בתשלומים לאורך זמן — כדאי להוסיף גם אותה</li>
-                        <li class="font-semibold text-slate-700">מוסיפים כאן גם את סכום החיסכון החודשי שאתם מפקידים</li>
-                    </ul>
+                    <p class="font-bold text-red-600 mb-1 flex items-center gap-1.5"><i class="fa-solid fa-circle-arrow-down text-sm"></i>שלב 2: הוצאות קבועות</p>
+                    <p class="text-xs">כל מה שיורד כל חודש בלי שחשבנו על זה: משכנתא/שכירות, חשבונות, חוגים, מנויים. את <b>הפקדות לחסכון</b> מומלץ לרשום תחת קטגוריית "חסכונות".</p>
                 </div>
 
                 <div>
-                    <p class="font-bold text-amber-600 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-calendar text-sm"></i>הוצאות מתוכננות</p>
-                    <p>הוסיפו הוצאות גדולות שאתם יודעים שתרצו להוציא אך אינן יוצאות כל חודש:</p>
-                    <ul class="mt-2 space-y-1 text-xs mr-3" style="list-style:disc">
-                        <li>חופשה — הקציבו תקציב שנתי</li>
-                        <li>טיפול ורישוי שנתי לרכב — העריכו כמה זה יעלה בשנה</li>
-                        <li>קייטנות קיץ</li>
-                    </ul>
+                    <p class="font-bold text-amber-600 mb-1 flex items-center gap-1.5"><i class="fa-solid fa-calendar text-sm"></i>שלב 3: הוצאות מתוכננות (שנתי)</p>
+                    <p class="text-xs">כאן שומרים כסף בצד להוצאות גדולות: חופשה, טיפול רכב, טסט, קייטנות. הסכום כאן הוא <strong>שנתי</strong> והמערכת תפרוס אותו לחודשים.</p>
                 </div>
 
-                <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                    <p class="text-xs font-bold text-slate-700 mb-1.5">📱 תקציב נותר לשוטף ותקציב מוגדר</p>
-                    <p class="text-xs text-slate-600">בתחתית הסיכום החודשי מופיעים שני ערכים:</p>
-                    <ul class="text-xs mt-1.5 space-y-1 mr-3 text-slate-600" style="list-style:disc">
-                        <li><strong>תקציב נותר לשוטף</strong> — מחושב אוטומטית: הכנסות פחות הוצאות קבועות פחות חלק החודשי של ההוצאות המתוכננות. זה הסכום שנשאר לכיסוי הוצאות יומיומיות.</li>
-                        <li><strong>תקציב מוגדר לשוטף</strong> — ניתן לשנות ידנית. ברוב המקרים כדאי להשאיר אותו זהה לתקציב הנותר, אך ניתן להקטינו אם רוצים להוסיף חיסכון נוסף. סכום זה מחולק ב-30 לקבלת <strong>התקציב היומי</strong> שמצטבר במאזן כל יום.</li>
-                    </ul>
-                </div>
-
-                <div class="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                    <p class="text-xs font-bold text-amber-700 mb-1.5">💡 טיפ למתקדמים</p>
-                    <p class="text-xs text-amber-800">אם יש הוצאות חינוך קבועות (מעון, צהרון, חוגים) שאינן נגבות בחודשי הקיץ — ניתן "להחזיר" אותן על ידי הוספת הוצאה שנתית <strong>שלילית</strong> בגובה פעמיים אותן הוצאות (עבור יולי ואוגוסט).</p>
+                <div class="bg-blue-600 rounded-2xl p-4 text-white shadow-lg">
+                    <p class="font-bold text-xs mb-1">השלב הכי חשוב: התקציב היומי</p>
+                    <p class="text-xs opacity-90 leading-relaxed">מה שנשאר לכם אחרי כל אלו - זה מה שיש לכם ל"שוטף" (סופר, דלק, בילויים).
+                    הסכום שמוצג ב<b>"תקציב מוגדר לשוטף"</b> הוא זה שיחולק ב-30 ויהפוך ל<b>תקציב היומי</b> שלכם.</p>
                 </div>
             </div>
             <div class="p-4 border-t border-slate-100">
@@ -1228,38 +1344,6 @@
         </div>
     </div>
 
-    <!-- Main View Help Modal -->
-    <div id="mainHelpOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
-        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col max-h-[85vh]">
-            <div class="flex justify-between items-center p-6 pb-4 border-b border-slate-100">
-                <h3 class="text-lg font-bold text-slate-900">הוצאות שוטפות</h3>
-                <button onclick="window.closeMainHelp()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="overflow-y-auto p-6 space-y-4 text-sm text-slate-600 leading-relaxed">
-                <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
-                    <p>לאחר שמילאתם את עמוד התקציב וקבעתם תקציב חודשי לשוטף, הסכום מחולק ב-30 לקבלת <strong>תקציב יומי</strong> — וסכום זה מתווסף למאזן שלכם כל יום.</p>
-                    <p class="mt-2">לדוגמא: תקציב חודשי של ₪3,000 = תקציב יומי של ₪100. בכל יום המאזן גדל ב-₪100.</p>
-                </div>
-                <div>
-                    <p class="font-bold text-slate-800 mb-1.5">📋 תיעוד הוצאות</p>
-                    <p>כאן ירשמו ההוצאות שתתעדו. יש לתעד את <strong>כל</strong> ההוצאות שלא ציינתם תחת "הוצאות קבועות" בעמוד התקציב.</p>
-                </div>
-                <div>
-                    <p class="font-bold text-slate-800 mb-1.5">➕ כיצד לתעד הוצאה</p>
-                    <p>לחצו על הכפתור <strong>+</strong> הכחול למטה, ציינו שם וסכום. ניתן לתעד בקלות ישירות מהנייד — לחצו על הגדרות לקבלת הסבר.</p>
-                </div>
-                <div>
-                    <p class="font-bold text-slate-800 mb-1.5">📅 הוצאה מתוכננת</p>
-                    <p>אם ההוצאה שייכת לקטגוריה שתכננתם תחת "הוצאות מתוכננות" — סמנו את הקטגוריה המתאימה. הוצאה זו <strong>לא תרד מהמאזן</strong> אלא מהתקציב שהגדרתם לאותה קטגוריה.</p>
-                    <p class="mt-2 text-xs text-slate-500">הוצאות מתוכננות מוסתרות ברשימה. לחצו על <strong>"הצג הוצאות מתוכננות"</strong> כדי להציג אותן.</p>
-                </div>
-            </div>
-            <div class="p-4 border-t border-slate-100">
-                <button onclick="window.closeMainHelp()" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-sm">הבנתי, תודה</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Manage Expense Categories Modal -->
     <div id="manageCategoriesOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col max-h-[85vh]">
@@ -1301,7 +1385,73 @@
                 <h3 id="editCategoryTitle" class="text-lg font-bold text-slate-900">קטגוריה חדשה</h3>
                 <button onclick="window.closeEditCategoryModal()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="space-y-4">
+            
+            <!-- Step 1: Pre-defined categories -->
+            <div id="catPresetStep" class="space-y-4">
+                <p class="text-xs text-slate-400 font-bold mb-3">בחר קטגוריה מוכנה או צור חדשה:</p>
+                <div class="grid grid-cols-1 gap-2">
+                    <button id="preset-food" onclick="window.selectCatPreset('מזון', 'green', 'utensils', 'preset-food')" class="w-full flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100 transition-all text-right group">
+                        <div class="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-active:scale-95">
+                            <i class="fa-solid fa-utensils text-white"></i>
+                        </div>
+                        <span class="font-bold text-slate-700 flex-grow">מזון</span>
+                        <div class="check-box w-6 h-6 rounded-full border-2 border-slate-200 flex items-center justify-center transition-colors">
+                            <i class="fa-solid fa-check text-white text-[10px] hidden"></i>
+                        </div>
+                    </button>
+                    <button id="preset-clothing" onclick="window.selectCatPreset('ביגוד', 'blue', 'shirt', 'preset-clothing')" class="w-full flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100 transition-all text-right group">
+                        <div class="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-active:scale-95">
+                            <i class="fa-solid fa-shirt text-white"></i>
+                        </div>
+                        <span class="font-bold text-slate-700 flex-grow">ביגוד</span>
+                        <div class="check-box w-6 h-6 rounded-full border-2 border-slate-200 flex items-center justify-center transition-colors">
+                            <i class="fa-solid fa-check text-white text-[10px] hidden"></i>
+                        </div>
+                    </button>
+                    <button id="preset-entertainment" onclick="window.selectCatPreset('בילוי', 'purple', 'mug-hot', 'preset-entertainment')" class="w-full flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100 transition-all text-right group">
+                        <div class="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-active:scale-95">
+                            <i class="fa-solid fa-mug-hot text-white"></i>
+                        </div>
+                        <span class="font-bold text-slate-700 flex-grow">בילוי</span>
+                        <div class="check-box w-6 h-6 rounded-full border-2 border-slate-200 flex items-center justify-center transition-colors">
+                            <i class="fa-solid fa-check text-white text-[10px] hidden"></i>
+                        </div>
+                    </button>
+                    <button id="preset-health" onclick="window.selectCatPreset('טיפוח', 'pink', 'droplet', 'preset-health')" class="w-full flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100 transition-all text-right group">
+                        <div class="w-10 h-10 bg-pink-500 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-active:scale-95">
+                            <i class="fa-solid fa-droplet text-white"></i>
+                        </div>
+                        <span class="font-bold text-slate-700 flex-grow">טיפוח</span>
+                        <div class="check-box w-6 h-6 rounded-full border-2 border-slate-200 flex items-center justify-center transition-colors">
+                            <i class="fa-solid fa-check text-white text-[10px] hidden"></i>
+                        </div>
+                    </button>
+                    <button id="preset-other" onclick="window.selectCatPreset('שונות', 'slate', 'ellipsis', 'preset-other')" class="w-full flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100 transition-all text-right group">
+                        <div class="w-10 h-10 bg-slate-500 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-active:scale-95">
+                            <i class="fa-solid fa-ellipsis text-white"></i>
+                        </div>
+                        <span class="font-bold text-slate-700 flex-grow">שונות</span>
+                        <div class="check-box w-6 h-6 rounded-full border-2 border-slate-200 flex items-center justify-center transition-colors">
+                            <i class="fa-solid fa-check text-white text-[10px] hidden"></i>
+                        </div>
+                    </button>
+                    <button onclick="window.showCatFormStep()" class="w-full flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors text-right mt-2">
+                        <div class="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid fa-plus text-slate-400"></i>
+                        </div>
+                        <span class="font-bold text-slate-500">קטגוריה מותאמת אישית...</span>
+                    </button>
+                </div>
+                <div id="addPresetsBtnContainer" class="hidden mt-6">
+                    <button onclick="window.saveMultiplePresets()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-200 hover:bg-blue-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>הוסף קטגוריות שנבחרו</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Full form -->
+            <div id="catFormStep" class="space-y-4 hidden">
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">שם הקטגוריה</label>
                     <input type="text" id="catEditName" placeholder="מזון, בילויים..." class="input-field w-full px-4 py-3 rounded-xl">
@@ -1355,38 +1505,51 @@
             </div>
 
             <div class="space-y-3 mb-6">
+                <!-- Step 1 -->
                 <div class="flex gap-3 items-start bg-blue-50 rounded-2xl p-3 border border-blue-100">
                     <div class="w-7 h-7 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
                         <span class="text-white text-xs font-bold">1</span>
                     </div>
-                    <div>
-                        <p class="text-sm font-bold text-slate-800">הגדירו הכנסות והוצאות קבועות</p>
-                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">בעמוד <span class="font-bold text-slate-700">תקציב</span> — הכניסו את כל ההכנסות החודשיות שלכם ואת ההוצאות הקבועות: שכר דירה, ביטוחים, חיסכון וכד'.</p>
+                    <div class="flex-1">
+                        <p class="text-sm font-bold text-slate-800">שלב ראשון — בנו תקציב</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">התקציב יאפשר לכם לדעת כמה כסף נשאר לכם להוצאות השוטפות אחרי כל המחויבויות.</p>
+                        <button onclick="window.closeOnboarding(); window.openWizard();" class="mt-2 text-[10px] font-bold text-white bg-blue-600 border border-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm active:scale-95">בנה תקציב</button>
                     </div>
                 </div>
+                <!-- Step 2 -->
                 <div class="flex gap-3 items-start bg-blue-50 rounded-2xl p-3 border border-blue-100">
                     <div class="w-7 h-7 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
                         <span class="text-white text-xs font-bold">2</span>
                     </div>
-                    <div>
-                        <p class="text-sm font-bold text-slate-800">הגדירו הוצאות מתוכננות</p>
-                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">בעמוד <span class="font-bold text-slate-700">תקציב</span> — הוסיפו הוצאות גדולות שאינן חודשיות: חופשות, אחזקת רכב, קייטנות. הן מנוהלות בנפרד תחת עמוד <span class="font-bold text-slate-700">מתוכנן</span>.</p>
+                    <div class="flex-1">
+                        <p class="text-sm font-bold text-slate-800">שלב שני — התקנת קיצורים</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">התקנת קיצורים לטלפון הנייד מאפשרת תיעוד נוח ומהיר של הוצאות ישירות ממסך הבית.</p>
+                        <div class="flex gap-2 mt-2">
+                            <button onclick="window.closeOnboarding(); window.setNav('install'); setTimeout(()=>window.openShortcutsModal(), 100);" class="text-[10px] font-bold text-white bg-blue-600 border border-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm active:scale-95">אייפון</button>
+                            <button onclick="window.closeOnboarding(); window.setNav('install'); setTimeout(()=>window.openAndroidShortcutsModal(), 100);" class="text-[10px] font-bold text-white bg-blue-600 border border-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm active:scale-95">אנדרואיד</button>
+                        </div>
                     </div>
                 </div>
-                <div class="flex gap-3 items-start bg-slate-900 rounded-2xl p-3 border border-slate-800">
-                    <div class="w-7 h-7 bg-white rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span class="text-slate-900 text-xs font-bold">3</span>
+                <!-- Step 3 -->
+                <div class="flex gap-3 items-start bg-blue-50 rounded-2xl p-3 border border-blue-100">
+                    <div class="w-7 h-7 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span class="text-white text-xs font-bold">3</span>
                     </div>
-                    <div>
-                        <p class="text-sm font-bold text-white">מה שנשאר — זה העו"ש החדש שלכם</p>
-                        <p class="text-xs text-slate-300 mt-0.5 leading-relaxed">הסכום שנותר מחולק ל-30 ומתווסף למאזן כל יום כ<span class="font-bold text-white">הכנסה יומית</span>. כל הוצאה שתרשמו מורידה את המאזן. המטרה: לשמור אותו חיובי תמיד.</p>
+                    <div class="flex-1">
+                        <p class="text-sm font-bold text-slate-800">שלב שלישי — תיעוד ושליטה</p>
+                        <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">תיעוד יומיומי של ההוצאות מאפשר לכם לעקוב אחרי המאזן ולשמור עליו חיובי תמיד.</p>
                     </div>
                 </div>
             </div>
 
-            <button onclick="window.closeOnboarding()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-sm shadow-lg shadow-blue-200">
-                הבנתי — נתחיל!
-            </button>
+            <div class="flex gap-3">
+                <button onclick="window.closeOnboarding(true)" class="flex-1 bg-green-600 text-white font-bold py-4 rounded-2xl text-sm shadow-lg shadow-green-200 transition-all active:scale-95">
+                    סיימתי
+                </button>
+                <button onclick="window.closeOnboarding(false)" class="flex-1 bg-slate-100 text-slate-700 font-bold py-4 rounded-2xl text-sm transition-all active:scale-95">
+                    המשך אחר כך
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1709,6 +1872,8 @@
         dirtyBudgetItems: {},
         isDirty: true,
         showAnnualInMain: false,
+        mainViewFilter: 'current', // 'all', 'current', 'fixed', 'planned'
+        statsFilter: 'current',    // 'current', 'fixed', 'planned'
         isPrivacyMode: localStorage.getItem('isPrivacyMode') === 'true',
         showZeroSections: { income: false, fixed: false, annual: false, savings: false },
         displayedTransactionsCount: 30,
@@ -2195,18 +2360,53 @@
     // TRANSACTION OPERATIONS
     // =====================================================
 
+    window.setTxType = function(type) {
+        const eb = document.getElementById('typeExpenseBtn');
+        const ib = document.getElementById('typeIncomeBtn');
+        const hi = document.getElementById('txTypeInput');
+        if (!eb || !ib || !hi) return;
+        hi.value = type;
+        if (type === 'expense') {
+            eb.classList.add('bg-white', 'text-slate-700', 'shadow-sm'); eb.classList.remove('text-slate-400');
+            ib.classList.remove('bg-white', 'text-slate-700', 'shadow-sm'); ib.classList.add('text-slate-400');
+        } else {
+            ib.classList.add('bg-white', 'text-slate-700', 'shadow-sm'); ib.classList.remove('text-slate-400');
+            eb.classList.remove('bg-white', 'text-slate-700', 'shadow-sm'); eb.classList.add('text-slate-400');
+        }
+    };
+
+    window.setEditTxType = function(type) {
+        const eb = document.getElementById('editTypeExpenseBtn');
+        const ib = document.getElementById('editTypeIncomeBtn');
+        const hi = document.getElementById('editTxTypeInput');
+        if (!eb || !ib || !hi) return;
+        hi.value = type;
+        if (type === 'expense') {
+            eb.classList.add('bg-white', 'text-slate-700', 'shadow-sm'); eb.classList.remove('text-slate-400');
+            ib.classList.remove('bg-white', 'text-slate-700', 'shadow-sm'); ib.classList.add('text-slate-400');
+        } else {
+            ib.classList.add('bg-white', 'text-slate-700', 'shadow-sm'); ib.classList.remove('text-slate-400');
+            eb.classList.remove('bg-white', 'text-slate-700', 'shadow-sm'); eb.classList.add('text-slate-400');
+        }
+    };
+
     window.handleAddExpense = async function(e) {
         e.preventDefault();
         if (!sbClient || !USER_TOKEN) return window.toggleSettings();
         const aInp = document.getElementById('amountInput');
         const nInp = document.getElementById('nameInput');
-        const cSel = document.getElementById('categorySelect');
+        const cInp  = document.getElementById('categoryNameInput');
+        const tInp  = document.getElementById('txTypeInput');
+        const expInp = document.getElementById('expenseCategoryIdInput');
         if (!aInp || !nInp) return;
 
-        const amount = safeParseFloat(aInp.value);
+        const rawAmount = safeParseFloat(aInp.value);
+        const type = tInp ? tInp.value : 'expense';
+        const amount = type === 'income' ? -Math.abs(rawAmount) : Math.abs(rawAmount);
+
         const name = nInp.value.trim();
-        const category = (cSel ? cSel.value : null) || 'שוטף';
-        if (amount === null || amount === undefined || isNaN(amount) || !name) return;
+        const category = (cInp ? cInp.value : null) || 'שוטף';
+        if (rawAmount === null || rawAmount === undefined || isNaN(rawAmount) || !name) return;
 
         setLoading(true, false, true);
         try {
@@ -2214,7 +2414,14 @@
             const now = new Date();
             const { error: insertErr } = await sbClient
                 .from('transactions')
-                .insert({ amount, name, category, user_token: USER_TOKEN, created_at: now.toISOString() });
+                .insert({ 
+                    amount, 
+                    name, 
+                    category, 
+                    expense_category_id: expInp?.value || null,
+                    user_token: USER_TOKEN, 
+                    created_at: now.toISOString() 
+                });
             if (insertErr) throw insertErr;
 
             // קבל מאזן מעודכן מה-DB
@@ -2229,7 +2436,8 @@
                 name, amount,
                 date: `${day}/${mon}/${now.getFullYear()}`,
                 time: now.toLocaleTimeString('he-IL'),
-                tag: category !== 'שוטף' ? category : null
+                tag: category !== 'שוטף' ? category : null,
+                expense_category_id: expInp?.value || null
             };
             state.transactions = [newTx, ...state.transactions];
             state.balance = newBalance;
@@ -2241,8 +2449,9 @@
 
             render();
             document.getElementById('expenseFormModal').reset();
+            window.setTxType('expense');
             window.closeAddExpenseModal();
-            window.showToast('הוצאה נרשמה', 'check');
+            window.showToast(type === 'income' ? 'הכנסה נרשמה' : 'הוצאה נרשמה', 'check');
 
             // רענן לקבלת ID אמיתי, ואז בדוק חריגה בקטגוריה מתוכננת
             setTimeout(async () => {
@@ -2253,7 +2462,7 @@
             }, 800);
         } catch (e) {
             console.error(e);
-            window.showToast('שגיאה בהוספת הוצאה: ' + (e.message || e), 'circle-xmark');
+            window.showToast('שגיאה: ' + (e.message || e), 'circle-xmark');
         } finally {
             setLoading(false, false, true);
         }
@@ -2261,21 +2470,25 @@
 
     window.saveRowEdit = async function() {
         if (!sbClient || !state.pendingActionRow) return;
-        // Read all values BEFORE closing modal
         const enInp = document.getElementById('editRowName');
         const eaInp = document.getElementById('editRowAmount');
+        const etInp = document.getElementById('editTxTypeInput');
         const eDateInp = document.getElementById('editRowDate');
         const eCat  = document.getElementById('editRowCategory');
+        const expInp = document.getElementById('expenseCategoryIdInput_EditHidden');
+        
         const name     = enInp?.value || '';
-        const amount   = safeParseFloat(eaInp?.value || '0');
+        const rawAmount = safeParseFloat(eaInp?.value || '0');
+        const type     = etInp?.value || 'expense';
+        const amount   = type === 'income' ? -Math.abs(rawAmount) : Math.abs(rawAmount);
         const category = (eCat?.value) || 'שוטף';
+        const expense_category_id = expInp?.value || null;
         const dateVal  = eDateInp?.value || '';
+
         window.closeEditRowModal();
         setLoading(true, true);
         try {
-            const isPlanned = category !== 'שוטף';
-            const updateData = { name, amount, category };
-            if (isPlanned) updateData.expense_category_id = null;
+            const updateData = { name, amount, category, expense_category_id };
             if (dateVal) {
                 const origTx = state.transactions.find(t => t.row === state.pendingActionRow.row);
                 let timeStr = '12:00:00';
@@ -2290,6 +2503,7 @@
                 }
                 updateData.created_at = `${dateVal}T${timeStr}`;
             }
+
             const { error } = await sbClient
                 .from('transactions')
                 .update(updateData)
@@ -3000,7 +3214,8 @@
 
     let _editingCatId = null;
     let _editingCatColor = CAT_COLORS[0].id;
-    let _editingCatIcon = CAT_ICONS[0].id;
+    let _editingCatIcon  = CAT_ICONS[0].id;
+    let _selectedPresets = [];
 
     // Fetch categories from Supabase
     window.fetchExpenseCategories = async function() {
@@ -3038,53 +3253,118 @@
         return new Date(now.getFullYear(), now.getMonth(), 1);
     }
 
+    function currentYearStart() {
+        const now = new Date();
+        return new Date(now.getFullYear(), 0, 1);
+    }
+
     // Render category summary strip
     function renderCategorySummary() {
         const summarySection = document.getElementById('categorySummarySection');
         const strip = document.getElementById('categorySummaryStrip');
         if (!summarySection || !strip) return;
 
-        const cats = state.expenseCategories;
-        if (cats.length === 0) {
+        const filter = state.mainViewFilter;
+        let catsShown = [];
+        let txsToShow = [];
+        const monthStart = currentMonthStart();
+
+        const isBudgetFilter = filter === 'fixed' || filter === 'planned';
+
+        if (filter === 'fixed') {
+             catsShown = state.budget.fixed;
+             txsToShow = state.transactions.filter(tx => {
+                if (!tx.tag || tx.isAdjustment) return false;
+                const d = parseLocalDate(tx.date);
+                return d >= monthStart && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+             });
+        } else if (filter === 'planned') {
+             catsShown = state.budget.annual;
+             const yearStart = currentYearStart();
+             txsToShow = state.transactions.filter(tx => {
+                if (!tx.tag || tx.isAdjustment) return false;
+                const d = parseLocalDate(tx.date);
+                return d >= yearStart && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+             });
+        } else {
+             // current or all - show expenseCategories (original behavior)
+             catsShown = state.expenseCategories;
+             txsToShow = state.transactions.filter(tx => {
+                const d = parseLocalDate(tx.date);
+                return d >= monthStart && !tx.tag && !tx.isAdjustment;
+             });
+        }
+
+        if (catsShown.length === 0) {
             summarySection.classList.add('hidden');
             const nudge = document.getElementById('noCategoriesNudge');
-            if (nudge) nudge.classList.remove('hidden');
+            if (nudge && (filter === 'current' || filter === 'all')) nudge.classList.remove('hidden');
             return;
         }
         summarySection.classList.remove('hidden');
         const nudge = document.getElementById('noCategoriesNudge');
         if (nudge) nudge.classList.add('hidden');
 
-        const monthStart = currentMonthStart();
-        const monthTxs = state.transactions.filter(tx => {
-            const d = parseLocalDate(tx.date);
-            return d >= monthStart && !tx.tag && !tx.isAdjustment;
-        });
-
         // Compute totals per category
         const totals = {};
-        monthTxs.forEach(tx => {
-            const cid = tx.expense_category_id || null;
-            if (cid) totals[cid] = (totals[cid] || 0) + safeParseFloat(tx.amount);
-            else totals['__none__'] = (totals['__none__'] || 0) + safeParseFloat(tx.amount);
+        txsToShow.forEach(tx => {
+            if (isBudgetFilter) {
+                // Group by the actual budget category name
+                const cat = catsShown.find(c => tagMatchesCat(tx.tag, c));
+                if (cat) {
+                    const key = cat.id || cat.category_name;
+                    totals[key] = (totals[key] || 0) + safeParseFloat(tx.amount);
+                }
+            } else {
+                const cid = tx.expense_category_id || null;
+                if (cid) totals[cid] = (totals[cid] || 0) + safeParseFloat(tx.amount);
+                else totals['__none__'] = (totals['__none__'] || 0) + safeParseFloat(tx.amount);
+            }
         });
 
         strip.innerHTML = '';
 
+        const budgetDefaultColors = [
+            { hex: '#3b82f6', bg: '#eff6ff' }, // Blue
+            { hex: '#8b5cf6', bg: '#f5f3ff' }, // Violet
+            { hex: '#ec4899', bg: '#fdf2f8' }, // Pink
+            { hex: '#f59e0b', bg: '#fffbeb' }, // Amber
+            { hex: '#ef4444', bg: '#fef2f2' }, // Red
+            { hex: '#10b981', bg: '#ecfdf5' }, // Emerald
+        ];
+
         // Category cards
-        cats.forEach(cat => {
-            const color = getCatColor(cat.color);
-            const icon = getCatIcon(cat.icon);
-            const spent = Math.round(totals[cat.id] || 0);
-            const budget = safeParseFloat(cat.monthly_budget || 0);
+        catsShown.forEach((cat, idx) => {
+            const catId = cat.id || cat.category_name;
+            const spent = Math.round(totals[catId] || 0);
+
+            // User requirement: Do not show categories with 0 spent in "Fixed" view
+            if (isBudgetFilter && spent === 0) return;
+
+            let color, icon;
+            if (isBudgetFilter) {
+                color = budgetDefaultColors[idx % budgetDefaultColors.length];
+                icon = { fa: filter === 'fixed' ? 'fa-lock' : 'fa-calendar-check' };
+            } else {
+                color = getCatColor(cat.color);
+                icon = getCatIcon(cat.icon);
+            }
+
+            const budget = isBudgetFilter 
+                ? (filter === 'planned' ? safeParseFloat(cat.budget_amount) : safeParseFloat(cat.budget_amount))
+                : safeParseFloat(cat.monthly_budget || 0);
+            
             const hasBudget = budget > 0;
             const remaining = budget - spent;
-            const pct = hasBudget ? Math.round((spent / budget) * 100) : 0;  // allow >100
-            const barPct = Math.min(100, pct);  // bar capped at 100
+            const pct = hasBudget ? Math.round((spent / budget) * 100) : 0;
+            const barPct = Math.min(100, pct);
             const isOver = hasBudget && spent > budget;
-            const isActive = state.activeCategoryFilter === cat.id;
+            
+            const filterId = isBudgetFilter ? 'budget:' + catId : catId;
+            const isActive = state.activeCategoryFilter === filterId;
 
             const card = document.createElement('button');
+            card.type = 'button';
             card.className = `flex-shrink-0 flex flex-col gap-1.5 p-3 rounded-2xl border transition-all text-right ${isActive ? 'shadow-md' : 'bg-white border-slate-100'}`;
             card.style.borderColor = isActive ? color.hex : '';
             card.style.background = isActive ? color.bg : '';
@@ -3095,42 +3375,58 @@
                     <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
                 </div>
                 <div class="flex justify-between items-center w-full">
-                    <span class="text-[9px] font-bold ${isOver ? 'text-red-500' : 'text-slate-500'}">${isOver ? 'חריגה ₪' + Math.abs(remaining).toLocaleString() : 'נותר ₪' + remaining.toLocaleString()}</span>
+                    <span class="text-[9px] font-bold ${isOver ? 'text-red-500' : 'text-slate-500'}">${isOver ? 'חריגה ₪' + Math.abs(Math.round(remaining)).toLocaleString() : 'נותר ₪' + Math.round(remaining).toLocaleString()}</span>
                     <span class="text-[9px] font-bold ${isOver ? 'text-red-500' : 'text-slate-500'} ltr-num">${pct}%</span>
                 </div>` : '';
 
+            const displayName = cat.parent_group ? `${cat.parent_group} > ${cat.category_name}` : (cat.name || cat.category_name);
             card.innerHTML = `
                 <div class="flex items-center gap-1.5 w-full">
                     <div class="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style="background:${color.hex}">
                         <i class="fa-solid ${icon.fa} text-white text-[9px]"></i>
                     </div>
-                    <span class="text-[10px] font-bold text-slate-700 truncate flex-1">${cat.name}</span>
+                    <span class="text-[10px] font-bold text-slate-700 truncate flex-1">${displayName}</span>
                 </div>
                 <div class="flex items-baseline gap-1 w-full justify-end" dir="ltr">
                     <span class="text-sm font-black ltr-num" style="color:${color.hex}">₪${spent.toLocaleString()}</span>
                     ${hasBudget ? `<span class="text-[9px] font-bold text-slate-500">/ ₪${Math.round(budget).toLocaleString()}</span>` : ''}
                 </div>
                 ${barHtml}`;
-            card.onclick = () => window.toggleCategoryFilter(cat.id);
+            card.onclick = () => window.toggleCategoryFilter(filterId);
             strip.appendChild(card);
         });
 
         // Uncategorized chip
-        const noneTotal = Math.round(totals['__none__'] || 0);
-        const isNoneActive = state.activeCategoryFilter === '__none__';
-        const noneChip = document.createElement('button');
-        noneChip.className = `flex-shrink-0 flex flex-col gap-1.5 p-3 rounded-2xl border transition-all text-right ${isNoneActive ? 'border-slate-400 bg-slate-50 shadow-md' : 'bg-white border-slate-100'}`;
-        noneChip.style.minWidth = '110px';
-        noneChip.innerHTML = `
-            <div class="flex items-center gap-1.5 w-full">
-                <div class="w-6 h-6 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0">
-                    <i class="fa-solid fa-tag text-slate-400 text-[9px]"></i>
+        if (!isBudgetFilter) {
+            const noneTotal = Math.round(totals['__none__'] || 0);
+            const isNoneActive = state.activeCategoryFilter === '__none__';
+            const noneChip = document.createElement('button');
+            noneChip.className = `flex-shrink-0 flex flex-col gap-1.5 p-3 rounded-2xl border transition-all text-right ${isNoneActive ? 'border-slate-400 bg-slate-50 shadow-md' : 'bg-white border-slate-100'}`;
+            noneChip.style.minWidth = '110px';
+            noneChip.innerHTML = `
+                <div class="flex items-center gap-1.5 w-full">
+                    <div class="w-6 h-6 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid fa-tag text-slate-400 text-[9px]"></i>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-400 flex-1">${isNoneActive ? 'לחץ לסימון' : 'לא מקוטלג'}</span>
                 </div>
-                <span class="text-[10px] font-bold text-slate-400 flex-1">${isNoneActive ? 'לחץ לסימון' : 'לא מקוטלג'}</span>
-            </div>
-            <span class="text-sm font-black text-slate-400 ltr-num">₪${noneTotal.toLocaleString()}</span>`;
-        noneChip.onclick = () => window.toggleCategoryFilter('__none__');
-        strip.appendChild(noneChip);
+                <span class="text-sm font-black text-slate-400 ltr-num">₪${noneTotal.toLocaleString()}</span>`;
+            noneChip.onclick = () => window.toggleCategoryFilter('__none__');
+            strip.appendChild(noneChip);
+
+            // Manage categories chip
+            const manageChip = document.createElement('button');
+            manageChip.type = 'button';
+            manageChip.className = "flex-shrink-0 flex flex-col gap-1.5 p-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 transition-all text-right items-center justify-center";
+            manageChip.style.minWidth = '110px';
+            manageChip.innerHTML = `
+                <div class="w-7 h-7 rounded-lg bg-white border border-slate-100 flex items-center justify-center mb-1 shadow-sm">
+                    <i class="fa-solid fa-sliders text-blue-500 text-[11px]"></i>
+                </div>
+                <span class="text-[10px] font-bold text-blue-600">נהל קטגוריות</span>`;
+            manageChip.onclick = () => window.openManageCategoriesModal();
+            strip.appendChild(manageChip);
+        }
     }
 
     window.toggleCategoryFilter = function(catId) {
@@ -3299,6 +3595,30 @@
         const cat = catId ? getExpCatById(catId) : null;
         _editingCatColor = cat ? cat.color : CAT_COLORS[0].id;
         _editingCatIcon  = cat ? cat.icon  : CAT_ICONS[0].id;
+        _selectedPresets = []; // Reset highlights on open
+        
+        // Clear visually and hide duplicates
+        const existingNames = (state.expenseCategories || []).map(c => c.name);
+        let availablePresetsCount = 0;
+        document.querySelectorAll('[id^="preset-"]').forEach(btn => {
+            const name = btn.querySelector('span').textContent.trim();
+            if (existingNames.includes(name)) {
+                btn.classList.add('hidden');
+            } else {
+                btn.classList.remove('hidden');
+                availablePresetsCount++;
+                btn.classList.remove('bg-blue-50', 'border-blue-500', 'shadow-md');
+                btn.classList.add('bg-slate-50', 'border-slate-100');
+                const check = btn.querySelector('.check-box');
+                if(check) {
+                    check.classList.remove('bg-blue-600', 'border-blue-600');
+                    check.classList.add('border-slate-200');
+                    check.querySelector('i').classList.add('hidden');
+                }
+            }
+        });
+        const addBtn = document.getElementById('addPresetsBtnContainer');
+        if(addBtn) addBtn.classList.add('hidden');
 
         const titleEl = document.getElementById('editCategoryTitle');
         if (titleEl) titleEl.textContent = cat ? 'עריכת קטגוריה' : 'קטגוריה חדשה';
@@ -3309,6 +3629,20 @@
         const delBtn = document.getElementById('deleteCategoryBtn');
         if (delBtn) delBtn.classList.toggle('hidden', !cat);
 
+        // Visibility based on Create vs Edit
+        const presetStep = document.getElementById('catPresetStep');
+        const formStep = document.getElementById('catFormStep');
+        
+        if (catId || availablePresetsCount === 0) {
+            // EDIT MODE or no presets: show form directly
+            if (presetStep) presetStep.classList.add('hidden');
+            if (formStep) formStep.classList.remove('hidden');
+        } else {
+            // CREATE MODE: show presets step first
+            if (presetStep) presetStep.classList.remove('hidden');
+            if (formStep) formStep.classList.add('hidden');
+        }
+
         renderColorPicker();
         renderIconPicker();
         updateCatPreview();
@@ -3316,6 +3650,85 @@
         const o = document.getElementById('editCategoryOverlay');
         if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
     };
+
+    window.selectCatPreset = function(name, colorId, iconId, btnId) {
+        const index = _selectedPresets.findIndex(p => p.btnId === btnId);
+        const btn = document.getElementById(btnId);
+        
+        if (index > -1) {
+            // Unselect
+            _selectedPresets.splice(index, 1);
+            if (btn) {
+                btn.classList.remove('bg-blue-50', 'border-blue-500', 'shadow-md');
+                btn.classList.add('bg-slate-50', 'border-slate-100');
+                const check = btn.querySelector('.check-box');
+                if(check) {
+                    check.classList.remove('bg-blue-600', 'border-blue-600');
+                    check.classList.add('border-slate-200');
+                    check.querySelector('i').classList.add('hidden');
+                }
+            }
+        } else {
+            // Select
+            _selectedPresets.push({ name, colorId, iconId, btnId });
+            if (btn) {
+                btn.classList.add('bg-blue-50', 'border-blue-500', 'shadow-md');
+                btn.classList.remove('bg-slate-50', 'border-slate-100');
+                const check = btn.querySelector('.check-box');
+                if(check) {
+                    check.classList.add('bg-blue-600', 'border-blue-600');
+                    check.classList.remove('border-slate-200');
+                    check.querySelector('i').classList.remove('hidden');
+                }
+            }
+        }
+        
+        const addBtnContainer = document.getElementById('addPresetsBtnContainer');
+        if (addBtnContainer) {
+            addBtnContainer.classList.toggle('hidden', _selectedPresets.length === 0);
+        }
+    };
+
+    window.saveMultiplePresets = async function() {
+        if (_selectedPresets.length === 0 || !sbClient || !USER_TOKEN) return;
+        
+        try {
+            setLoading(true);
+            const toInsert = _selectedPresets.map(preset => ({
+                name: preset.name,
+                color: preset.colorId,
+                icon: preset.iconId,
+                monthly_budget: 0,
+                user_token: USER_TOKEN
+            }));
+
+            const { error } = await sbClient.from('expense_categories').insert(toInsert);
+            if (error) throw error;
+
+            window.closeEditCategoryModal();
+            await window.fetchExpenseCategories();
+            renderCategoriesListModal();
+            render();
+            window.showToast('נשמר', 'check');
+        } catch (e) {
+            console.error("Error saving multiple presets:", e);
+            window.showToast('שגיאה בשמירה', 'circle-xmark');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    window.showCatFormStep = function() {
+        const presetStep = document.getElementById('catPresetStep');
+        const formStep = document.getElementById('catFormStep');
+        if (presetStep) presetStep.classList.add('hidden');
+        if (formStep) formStep.classList.remove('hidden');
+        
+        renderColorPicker();
+        renderIconPicker();
+        updateCatPreview();
+    };
+
     window.closeEditCategoryModal = function() {
         const o = document.getElementById('editCategoryOverlay');
         if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
@@ -3441,40 +3854,6 @@
             window.showToast('שגיאה', 'circle-xmark');
         }
     };
-
-    // Populate quick category section in edit modal
-    function populateEditRowCatSection(tx) {
-        const section = document.getElementById('editRowExpCatSection');
-        const label   = document.getElementById('editRowCatLabel');
-        const btns    = document.getElementById('editRowCatButtons');
-        if (!section || !label || !btns) return;
-
-        const cats = state.expenseCategories;
-        if (cats.length === 0) { section.classList.add('hidden'); return; }
-        section.classList.remove('hidden');
-
-        const currentCatId = tx?.expense_category_id || null;
-        const currentCat = currentCatId ? getExpCatById(currentCatId) : null;
-        label.textContent = currentCat ? currentCat.name : 'לא מקוטלג';
-        if (currentCat) {
-            label.style.color = getCatColor(currentCat.color).hex;
-        } else {
-            label.style.color = '';
-        }
-
-        btns.innerHTML = '';
-        cats.forEach(cat => {
-            const color = getCatColor(cat.color);
-            const icon  = getCatIcon(cat.icon);
-            const isActive = cat.id === currentCatId;
-            const btn = document.createElement('button');
-            btn.className = `flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-all ${isActive ? 'text-white border-transparent shadow-sm' : 'bg-white border-slate-200 text-slate-600'}`;
-            btn.style.background = isActive ? color.hex : '';
-            btn.innerHTML = `<i class="fa-solid ${icon.fa} text-[10px]"></i>${cat.name}`;
-            btn.onclick = () => window.quickAssignCategory(isActive ? '__none__' : cat.id);
-            btns.appendChild(btn);
-        });
-    }
 
     // =====================================================
     // HAMBURGER MENU
@@ -3638,7 +4017,7 @@
             const el = document.getElementById(v + 'View');
             if (el) el.classList.toggle('hidden', state.currentView !== v);
         });
-        const titles = { main: 'הוצאות שוטפות', budget: 'ניהול תקציב', annual: 'הוצאות מתוכננות', stats: 'נתונים וסטטיסטיקה' };
+        const titles = { main: 'הוצאות', budget: 'ניהול תקציב', annual: 'הוצאות מתוכננות', stats: 'נתונים וסטטיסטיקה' };
         const pt = document.getElementById('pageTitle'); if (pt) pt.innerText = titles[state.currentView];
         const helpBtn = document.getElementById('budgetHelpBtn');
         if (helpBtn) helpBtn.classList.toggle('hidden', state.currentView !== 'budget');
@@ -3646,11 +4025,14 @@
         if (mainHelpBtn) mainHelpBtn.classList.toggle('hidden', state.currentView !== 'main');
         const annualHelpBtn = document.getElementById('annualHelpBtn');
         if (annualHelpBtn) annualHelpBtn.classList.toggle('hidden', state.currentView !== 'annual');
-        // כפתור "איך מתחילים?" — מוצג בכל עמוד כל עוד לא הוגדר תקציב חודשי
+        // כפתור "איך מתחילים?" — מוצג כל עוד לא סומן כסיום ולא הוגדר תקציב חודשי
         const onboardingBtn = document.getElementById('onboardingBtn');
-        if (onboardingBtn) {
-            const hasG4 = safeParseFloat(state.budget.g4) > 0;
-            onboardingBtn.classList.toggle('hidden', hasG4);
+        const menuOnboardingBtn = document.getElementById('menuOnboardingBtn');
+        if (onboardingBtn || menuOnboardingBtn) {
+            const isFinished = localStorage.getItem('onboarding_finished') === 'true';
+            const shouldHide = isFinished;
+            if (onboardingBtn) onboardingBtn.classList.toggle('hidden', shouldHide);
+            if (menuOnboardingBtn) menuOnboardingBtn.classList.toggle('hidden', shouldHide);
         }
         ['main','budget','annual'].forEach(v => {
             const btn = document.getElementById(v === 'main' ? 'mainSyncBtn' : (v + 'SyncBtn' + (v === 'annual' ? 'Top' : '')));
@@ -3707,12 +4089,26 @@
         renderSavingsReminders();
 
         const filteredTxs = state.transactions.filter(tx => {
-            if (tx.isAdjustment) return state.showAnnualInMain;
-            const passAnnual = state.showAnnualInMain || !tx.tag;
-            if (!passAnnual) return false;
-            // Apply expense category filter
+            if (tx.isAdjustment) return state.mainViewFilter === 'all' || state.mainViewFilter === 'planned';
+            
+            // Filter by type
+            const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+            const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+            const isCurrent = !isPlanned && !isFixed;
+
+            if (state.mainViewFilter === 'current' && !isCurrent) return false;
+            if (state.mainViewFilter === 'planned' && !isPlanned) return false;
+            if (state.mainViewFilter === 'fixed'   && !isFixed)   return false;
+
+            // Apply expense category filter (the pill strip filter)
             if (state.activeCategoryFilter) {
                 if (state.activeCategoryFilter === '__none__') return !tx.expense_category_id && !tx.tag;
+                if (state.activeCategoryFilter.startsWith('budget:')) {
+                    const catId = state.activeCategoryFilter.slice(7);
+                    const allBudget = [...state.budget.fixed, ...state.budget.annual];
+                    const cat = allBudget.find(b => String(b.id || b.category_name) === catId);
+                    return cat ? tagMatchesCat(tx.tag, cat) : false;
+                }
                 return tx.expense_category_id === state.activeCategoryFilter;
             }
             return true;
@@ -3732,15 +4128,20 @@
         });
         const listEl = document.getElementById('transactionList');
         if (listEl) {
-            listEl.innerHTML = '';
+            const fragment = document.createDocumentFragment();
             Object.keys(grouped).sort((a,b) => parseLocalDate(b) - parseLocalDate(a)).forEach(date => {
                 const g = grouped[date];
                 const h = document.createElement('div');
                 h.className = 'sticky-header py-1 px-1 text-[9px] font-bold text-slate-400 flex justify-between tracking-wider';
                 h.innerHTML = `<span>${date}</span><span>₪${Math.round(formatDisplayAmount(g.total)).toLocaleString()}</span>`;
-                listEl.appendChild(h);
-                g.items.forEach(tx => listEl.appendChild(createTransactionEl(tx)));
+                fragment.appendChild(h);
+                g.items.forEach((tx, idx) => {
+                    const el = createTransactionEl(tx);
+                    fragment.appendChild(el);
+                });
             });
+            listEl.innerHTML = '';
+            listEl.appendChild(fragment);
         }
         const lmBtn = document.getElementById('loadMoreBtn');
         if (lmBtn) lmBtn.classList.toggle('hidden', state.displayedTransactionsCount >= filteredTxs.length || filteredTxs.length === 0);
@@ -3750,7 +4151,7 @@
         const d = document.createElement('div');
         const isSelectMode = state.activeCategoryFilter === '__none__';
 
-        d.className = `bg-white compact-tx rounded-xl shadow-sm animate-fade-in transition-colors`;
+        d.className = `bg-white compact-tx rounded-xl shadow-sm transition-colors`;
         d.dataset.txRow = tx.row; // for direct DOM selection
 
         // Expense category badge
@@ -3764,6 +4165,10 @@
             }
         }
 
+        const amountValue = safeParseFloat(tx.amount);
+        const isNegative = amountValue < 0;
+        const colorClass = isNegative ? 'text-green-500' : 'text-red-500';
+
         d.innerHTML = `
             <div class="tx-inner">
                 ${catBadgeHtml}
@@ -3775,7 +4180,7 @@
                     ${!hideDate ? `<span class="text-[8px] text-slate-400 font-bold">${tx.date}</span>` : ''}
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="text-red-500 font-bold text-xs ltr-num">₪${Math.round(formatDisplayAmount(safeParseFloat(tx.amount))).toLocaleString()}</div>
+                    <div class="${colorClass} font-bold text-xs ltr-num">₪${Math.round(Math.abs(formatDisplayAmount(amountValue))).toLocaleString()}</div>
                     ${isSelectMode
                         ? ''
                         : `<button onclick="window.initEditRow('${tx.row}')" class="p-1.5"><i class="fa-solid fa-ellipsis-vertical text-[10px] text-slate-300"></i></button>`
@@ -3952,7 +4357,6 @@
 
         const updateBtn = document.getElementById('batchUpdateBtn');
         if (updateBtn) updateBtn.classList.toggle('visible', state.currentView === 'budget' && Object.keys(state.dirtyBudgetItems).length > 0);
-        updateCategoryDropdown();
     }
 
     window.handleBudgetInput = (cellOrKey, val) => {
@@ -4123,25 +4527,109 @@
         renderBudget();
     };
 
-    function updateCategoryDropdown() {
-        const select = document.getElementById('categorySelect');
-        if (!select) return;
-        select.innerHTML = '<option value="שוטף">ללא (שוטף)</option>';
-        const activeAnnuals = state.budget.annual.filter(a => safeParseFloat(a.budget_amount) > 0);
-        activeAnnuals.forEach(cat => {
-            const opt = document.createElement('option');
-            opt.value = cat.category_name;
-            opt.innerText = cat.parent_group ? `${cat.parent_group} > ${cat.category_name}` : cat.category_name;
-            select.appendChild(opt);
+    window.setMainViewFilter = function(filter) {
+        state.mainViewFilter = filter;
+        state.activeCategoryFilter = null; // Clear category filter when switching view types
+        const btns = {
+            all: document.getElementById('filterAllBtn'),
+            current: document.getElementById('filterCurrentBtn'),
+            fixed: document.getElementById('filterFixedBtn'),
+            planned: document.getElementById('filterPlannedBtn')
+        };
+        
+        Object.entries(btns).forEach(([k, b]) => {
+            if (b) {
+                b.classList.remove('bg-white', 'text-slate-700', 'shadow-sm');
+                b.classList.add('text-slate-400');
+            }
         });
-    }
+        
+        if (btns[filter]) {
+            btns[filter].classList.add('bg-white', 'text-slate-700', 'shadow-sm');
+            btns[filter].classList.remove('text-slate-400');
+        }
+        
+        render();
+    };
 
-    function populateAddExpenseCategoryPicker(currentTag) {
-        const picker = document.getElementById('addExpenseCategoryPicker');
-        const eCat   = document.getElementById('categorySelect');
+    window.setCategoryType = function(type) {
+        const input = document.getElementById('categoryTypeInput');
+        if (input) input.value = type;
+        
+        ['current', 'fixed', 'planned'].forEach(t => {
+            const b = document.getElementById('catType' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
+            if (b) {
+                b.classList.toggle('bg-white', t === type);
+                b.classList.toggle('text-slate-700', t === type);
+                b.classList.toggle('shadow-sm', t === type);
+                b.classList.toggle('text-slate-400', t !== type);
+            }
+        });
+        
+        window.populateAddExpenseCategoryPicker(null, null, true);
+    };
+
+    window.setEditCategoryType = function(type) {
+        const input = document.getElementById('editCategoryTypeInput');
+        if (input) input.value = type;
+        
+        ['current', 'fixed', 'planned'].forEach(t => {
+            const b = document.getElementById('editCatType' + t.charAt(0).toUpperCase() + t.slice(1) + 'Btn');
+            if (b) {
+                b.classList.toggle('bg-white', t === type);
+                b.classList.toggle('text-slate-700', t === type);
+                b.classList.toggle('shadow-sm', t === type);
+                b.classList.toggle('text-slate-400', t !== type);
+            }
+        });
+        
+        // Hide/Show ongoing cat section based on type
+        const expCatSection = document.getElementById('editRowExpCatSection');
+        if (expCatSection) {
+            expCatSection.classList.toggle('hidden', type !== 'current');
+        }
+
+        window.populateEditRowCategoryPicker(null, null, true);
+    };
+
+    window.populateAddExpenseCategoryPicker = function(currentTag, currentCatId, forceOpen = false) {
+        populateCategoryPicker({
+            pickerId: 'addExpenseCategoryPicker',
+            selectId: 'categoryNameInput',
+            expCatInputId: 'expenseCategoryIdInput',
+            typeInputId: 'categoryTypeInput',
+            currentTag,
+            currentCatId,
+            forceOpen,
+            onPopulate: (t, c, f) => window.populateAddExpenseCategoryPicker(t, c, f)
+        });
+    };
+
+    window.populateEditRowCategoryPicker = function(currentTag, currentCatId, forceOpen = false) {
+        populateCategoryPicker({
+            pickerId: 'editRowCategoryPicker',
+            selectId: 'editRowCategory',
+            expCatInputId: 'expenseCategoryIdInput_EditHidden', // We might need this for edit too
+            typeInputId: 'editCategoryTypeInput',
+            currentTag,
+            currentCatId,
+            forceOpen,
+            onPopulate: (t, c, f) => window.populateEditRowCategoryPicker(t, c, f)
+        });
+    };
+
+    function populateCategoryPicker(config) {
+        const picker = document.getElementById(config.pickerId);
+        const eCat   = document.getElementById(config.selectId);
+        const expInp = document.getElementById(config.expCatInputId);
+        const typeInp = document.getElementById(config.typeInputId);
+        const type = typeInp ? typeInp.value : 'current';
+        
         if (!picker) return;
 
         const activeAnnuals = state.budget.annual.filter(a => safeParseFloat(a.budget_amount) > 0);
+        const activeFixed   = (state.budget.fixed || []).filter(f => safeParseFloat(f.budget_amount) > 0);
+        const ongoingCats   = state.expenseCategories || [];
 
         function getSpent(cat) {
             return state.transactions
@@ -4149,85 +4637,154 @@
                 .reduce((s, t) => s + safeParseFloat(t.amount), 0);
         }
 
-        const groups = {};
-        const standalone = [];
-        activeAnnuals.forEach(cat => {
-            if (cat.parent_group) {
-                groups[cat.parent_group] = groups[cat.parent_group] || [];
-                groups[cat.parent_group].push(cat);
-            } else standalone.push(cat);
-        });
-
         picker.innerHTML = '';
 
-        const selectedCat = currentTag
-            ? activeAnnuals.find(c => c.category_name.trim() === currentTag.trim())
-            : null;
-        const selectedLabel = selectedCat
-            ? (selectedCat.parent_group ? `${selectedCat.parent_group} › ${selectedCat.category_name}` : selectedCat.category_name)
-            : 'ללא (שוטף)';
+        let selectedLabel = 'ללא';
+        if (config.currentTag) {
+            const cat = [...activeAnnuals, ...activeFixed].find(c => c.category_name.trim() === config.currentTag.trim());
+            if (cat) selectedLabel = (cat.parent_group ? `${cat.parent_group} › ${cat.category_name}` : cat.category_name);
+        } else if (config.currentCatId) {
+            const cat = ongoingCats.find(c => c.id === config.currentCatId);
+            if (cat) selectedLabel = cat.name;
+        }
 
-        // Collapsed view
+        // Hide the whole picker section if no categories exist for this type
+        // and it's not a type that requires a default "None" (only 'current' shows "None" as a fallback, 
+        // but user says if no categories in current/planned - hide)
+        let hasCats = false;
+        if (type === 'current') hasCats = ongoingCats.length > 0;
+        else if (type === 'fixed') hasCats = activeFixed.length > 0;
+        else if (type === 'planned') hasCats = activeAnnuals.length > 0;
+
+        const container = picker.parentElement;
+        // The label is usually the previous sibling of the picker
+        let label = picker.previousElementSibling;
+        if (label && label.tagName !== 'LABEL') {
+            // Fallback: search for label in parent
+            label = container ? Array.from(container.querySelectorAll('label')).find(l => l.textContent.includes('בחירת קטגוריה')) : null;
+        }
+
+        if (!hasCats) {
+            picker.classList.add('hidden');
+            if (label) label.classList.add('hidden');
+            return;
+        } else {
+            picker.classList.remove('hidden');
+            if (label) label.classList.remove('hidden');
+        }
+
         const collapsed = document.createElement('div');
-        collapsed.id = 'addExpensePickerCollapsed';
+        const isSet = config.currentTag || config.currentCatId;
         collapsed.className = 'flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all ' +
-            (currentTag ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100');
+            (isSet ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100');
         collapsed.innerHTML = `
-            <span class="text-xs font-bold ${currentTag ? 'text-blue-700' : 'text-slate-500'}">${selectedLabel}</span>
+            <span class="text-xs font-bold ${isSet ? 'text-blue-700' : 'text-slate-500'}">${selectedLabel}</span>
             <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>`;
         collapsed.onclick = () => { expanded.classList.toggle('hidden'); collapsed.classList.toggle('hidden'); };
         picker.appendChild(collapsed);
 
-        // Expanded view
         const expanded = document.createElement('div');
-        expanded.id = 'addExpensePickerExpanded';
-        expanded.className = 'hidden bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden';
+        expanded.className = (config.forceOpen ? '' : 'hidden') + ' bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden flex flex-col max-h-[260px] overflow-y-auto mb-2';
+        if (config.forceOpen) collapsed.classList.add('hidden');
 
-        function makeItem(cat, isChild = false) {
-            const budget = safeParseFloat(cat.budget_amount);
-            const spent  = getSpent(cat);
-            const remaining = budget - spent;
-            const isOver = remaining < 0;
-            const isSelected = currentTag && currentTag.trim() === cat.category_name.trim();
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = `w-full flex items-center justify-between px-4 py-2.5 text-right transition-colors ${isChild ? 'pr-7' : ''} ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`;
-            btn.innerHTML = `
-                <span class="text-xs font-bold ${isSelected ? 'text-blue-700' : 'text-slate-700'}">${isSelected ? '✓ ' : ''}${cat.category_name}</span>
-                <span class="text-[10px] font-bold ${isOver ? 'text-red-400' : 'text-slate-400'} ltr-num flex-shrink-0 mr-2">${isOver ? '−' : '+'}₪${Math.round(Math.abs(remaining)).toLocaleString()}</span>`;
-            btn.onclick = () => {
-                const newTag = isSelected ? null : cat.category_name;
-                if (eCat) eCat.value = newTag || 'שוטף';
-                populateAddExpenseCategoryPicker(newTag);
+        // Only show "None" for 'current' type per user request
+        if (type === 'current') {
+            const noneBtn = document.createElement('button');
+            noneBtn.type = 'button';
+            const isNone = !isSet;
+            noneBtn.className = `w-full flex items-center px-4 py-2.5 text-right transition-colors border-b border-slate-100 flex-shrink-0 ${isNone ? 'bg-blue-50' : 'hover:bg-slate-50'}`;
+            noneBtn.innerHTML = `<span class="text-xs font-bold ${isNone ? 'text-blue-700' : 'text-slate-500'}">${isNone ? '✓ ' : ''}ללא</span>`;
+            noneBtn.onclick = () => { 
+                if (eCat) eCat.value = 'שוטף'; 
+                if (expInp) expInp.value = '';
+                config.onPopulate(null, null, false); 
             };
-            return btn;
+            expanded.appendChild(noneBtn);
         }
 
-        const noneBtn = document.createElement('button');
-        noneBtn.type = 'button';
-        const isNone = !currentTag;
-        noneBtn.className = `w-full flex items-center px-4 py-2.5 text-right transition-colors border-b border-slate-100 ${isNone ? 'bg-blue-50' : 'hover:bg-slate-50'}`;
-        noneBtn.innerHTML = `<span class="text-xs font-bold ${isNone ? 'text-blue-700' : 'text-slate-500'}">${isNone ? '✓ ' : ''}ללא (שוטף)</span>`;
-        noneBtn.onclick = () => { if (eCat) eCat.value = 'שוטף'; populateAddExpenseCategoryPicker(null); };
-        expanded.appendChild(noneBtn);
-
-        if (activeAnnuals.length === 0) {
-            const p = document.createElement('p');
-            p.className = 'text-[10px] text-slate-400 text-center py-3';
-            p.textContent = 'אין קטגוריות מתוכננות';
-            expanded.appendChild(p);
-        } else {
-            Object.entries(groups).forEach(([parentName, cats]) => {
-                const header = document.createElement('div');
-                header.className = 'px-4 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-wider bg-slate-50 border-t border-b border-slate-100';
-                header.textContent = parentName;
-                expanded.appendChild(header);
-                cats.forEach(cat => expanded.appendChild(makeItem(cat, true)));
+        if (type === 'current') {
+            if (ongoingCats.length === 0) {
+                const p = document.createElement('p'); p.className = 'text-[10px] text-slate-400 text-center py-5';
+                p.textContent = 'אין קטגוריות שוטפות'; expanded.appendChild(p);
+            } else {
+                ongoingCats.forEach(cat => {
+                    const isSelected = config.currentCatId === cat.id;
+                    const btn = document.createElement('button'); btn.type = 'button';
+                    btn.className = `w-full flex items-center px-4 py-2.5 text-right transition-colors border-b border-slate-50 flex-shrink-0 ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`;
+                    const c = getCatColor(cat.color);
+                    btn.innerHTML = `<div class="w-3 h-3 rounded-full mr-1 ml-2" style="background:${c.hex}"></div>
+                        <span class="text-xs font-bold ${isSelected ? 'text-blue-700' : 'text-slate-700'}">${isSelected ? '✓ ' : ''}${cat.name}</span>`;
+                    btn.onclick = () => {
+                        if (eCat) eCat.value = 'שוטף';
+                        if (expInp) expInp.value = cat.id;
+                        config.onPopulate(null, cat.id, false);
+                    };
+                    expanded.appendChild(btn);
+                });
+            }
+        } else if (type === 'fixed') {
+            const groups = {}; const standalone = [];
+            activeFixed.forEach(cat => {
+                if (cat.parent_group) { (groups[cat.parent_group] = groups[cat.parent_group] || []).push(cat); } else standalone.push(cat);
             });
-            if (standalone.length > 0) {
-                if (Object.keys(groups).length > 0) {
-                    const sep = document.createElement('div'); sep.className = 'border-t border-slate-100'; expanded.appendChild(sep);
+
+            if (activeFixed.length === 0) {
+                const p = document.createElement('p'); p.className = 'text-[10px] text-slate-400 text-center py-5';
+                p.textContent = 'אין קטגוריות קבועות'; expanded.appendChild(p);
+            } else {
+                function makeFixedItem(cat, isChild = false) {
+                    const isSelected = config.currentTag && config.currentTag.trim() === cat.category_name.trim();
+                    const btn = document.createElement('button'); btn.type = 'button';
+                    btn.className = `w-full flex items-center px-4 py-2.5 text-right transition-colors border-b border-slate-50 flex-shrink-0 ${isChild ? 'pr-7' : ''} ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`;
+                    btn.innerHTML = `<span class="text-xs font-bold ${isSelected ? 'text-blue-700' : 'text-slate-700'}">${isSelected ? '✓ ' : ''}${cat.category_name}</span>`;
+                    btn.onclick = () => {
+                        if (eCat) eCat.value = cat.category_name;
+                        if (expInp) expInp.value = '';
+                        config.onPopulate(cat.category_name, null, false);
+                    };
+                    return btn;
                 }
+                Object.entries(groups).forEach(([parentName, cats]) => {
+                    const header = document.createElement('div');
+                    header.className = 'px-4 py-1.5 text-[9px] font-bold text-slate-400 bg-slate-50/50 border-b border-slate-50 flex-shrink-0';
+                    header.textContent = parentName;
+                    expanded.appendChild(header);
+                    cats.forEach(cat => expanded.appendChild(makeFixedItem(cat, true)));
+                });
+                standalone.forEach(cat => expanded.appendChild(makeFixedItem(cat)));
+            }
+        } else if (type === 'planned') {
+            const groups = {}; const standalone = [];
+            activeAnnuals.forEach(cat => {
+                if (cat.parent_group) { (groups[cat.parent_group] = groups[cat.parent_group] || []).push(cat); } else standalone.push(cat);
+            });
+
+            if (activeAnnuals.length === 0) {
+                const p = document.createElement('p'); p.className = 'text-[10px] text-slate-400 text-center py-5';
+                p.textContent = 'אין קטגוריות מתוכננות'; expanded.appendChild(p);
+            } else {
+                function makeItem(cat, isChild = false) {
+                    const budget = safeParseFloat(cat.budget_amount); const spent  = getSpent(cat);
+                    const remaining = budget - spent; const isOver = remaining < 0;
+                    const isSelected = config.currentTag && config.currentTag.trim() === cat.category_name.trim();
+                    const btn = document.createElement('button'); btn.type = 'button';
+                    btn.className = `w-full flex items-center justify-between px-4 py-2.5 text-right transition-colors flex-shrink-0 ${isChild ? 'pr-7' : ''} ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`;
+                    btn.innerHTML = `<span class="text-xs font-bold ${isSelected ? 'text-blue-700' : 'text-slate-700'}">${isSelected ? '✓ ' : ''}${cat.category_name}</span>
+                        <span class="text-[10px] font-bold ${isOver ? 'text-red-400' : 'text-slate-400'} ltr-num flex-shrink-0 mr-2">${isOver ? '−' : '+'}₪${Math.round(Math.abs(remaining)).toLocaleString()}</span>`;
+                    btn.onclick = () => {
+                        if (eCat) eCat.value = cat.category_name;
+                        if (expInp) expInp.value = '';
+                        config.onPopulate(cat.category_name, null, false);
+                    };
+                    return btn;
+                }
+                Object.entries(groups).forEach(([parentName, cats]) => {
+                    const header = document.createElement('div');
+                    header.className = 'px-4 py-1.5 text-[9px] font-bold text-slate-400 bg-slate-50/50 border-b border-slate-50 flex-shrink-0';
+                    header.textContent = parentName;
+                    expanded.appendChild(header);
+                    cats.forEach(cat => expanded.appendChild(makeItem(cat, true)));
+                });
                 standalone.forEach(cat => expanded.appendChild(makeItem(cat)));
             }
         }
@@ -4415,139 +4972,36 @@
         const eaInp = document.getElementById('editRowAmount');
         const eDateInp = document.getElementById('editRowDate');
         const eCat  = document.getElementById('editRowCategory');
-        if (enInp && eaInp) { enInp.value = tx.name; eaInp.value = safeParseFloat(tx.amount).toString(); }
+        const expInpEdit = document.getElementById('expenseCategoryIdInput_EditHidden');
+        
+        if (enInp && eaInp) { 
+            enInp.value = tx.name; 
+            eaInp.value = Math.abs(safeParseFloat(tx.amount)).toString(); 
+        }
+        window.setEditTxType(safeParseFloat(tx.amount) < 0 ? 'income' : 'expense');
         if (eDateInp && tx.date) {
             const parts = tx.date.split('/');
             if (parts.length === 3) eDateInp.value = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
         }
-        // Keep hidden select in sync for saveRowEdit
-        if (eCat) {
-            eCat.innerHTML = '<option value="שוטף">שוטף</option>';
-            state.budget.annual.filter(a => safeParseFloat(a.budget_amount) > 0).forEach(cat => {
-                const opt = document.createElement('option');
-                opt.value = cat.category_name;
-                opt.textContent = cat.category_name;
-                if (tx.tag && tx.tag.trim() === cat.category_name.trim()) opt.selected = true;
-                eCat.appendChild(opt);
-            });
-            if (!tx.tag) eCat.value = 'שוטף';
-        }
-        // Populate custom visual picker
-        populateAnnualCategoryPicker(tx.tag || null);
-        // Populate quick expense category section
-        populateEditRowCatSection(tx);
+
+        if (expInpEdit) expInpEdit.value = tx.expense_category_id || '';
+
+        // Determine initial type for picker
+        const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+        const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+        
+        let initialType = 'current';
+        if (isPlanned) initialType = 'planned';
+        else if (isFixed) initialType = 'fixed';
+        
+        window.setEditCategoryType(initialType);
+
+        // Populate custom visual picker - force open as requested
+        window.populateEditRowCategoryPicker(tx.tag || null, tx.expense_category_id || null, true);
+        
         const o = document.getElementById('editRowOverlay');
         if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
     };
-
-    function populateAnnualCategoryPicker(currentTag) {
-        const picker = document.getElementById('editRowCategoryPicker');
-        const eCat   = document.getElementById('editRowCategory');
-        if (!picker) return;
-
-        const activeAnnuals = state.budget.annual.filter(a => safeParseFloat(a.budget_amount) > 0);
-
-        function getSpent(cat) {
-            return state.transactions
-                .filter(t => tagMatchesCat(t.tag, cat))
-                .reduce((s, t) => s + safeParseFloat(t.amount), 0);
-        }
-
-        // Group by parent
-        const groups = {};
-        const standalone = [];
-        activeAnnuals.forEach(cat => {
-            if (cat.parent_group) {
-                groups[cat.parent_group] = groups[cat.parent_group] || [];
-                groups[cat.parent_group].push(cat);
-            } else standalone.push(cat);
-        });
-
-        picker.innerHTML = '';
-
-        // Find selected cat info
-        const selectedCat = currentTag
-            ? activeAnnuals.find(c => c.category_name.trim() === currentTag.trim())
-            : null;
-        const selectedLabel = selectedCat
-            ? (selectedCat.parent_group ? `${selectedCat.parent_group} › ${selectedCat.category_name}` : selectedCat.category_name)
-            : 'ללא (שוטף)';
-
-        // ── Collapsed view ───────────────────────────────────
-        const collapsed = document.createElement('div');
-        collapsed.id = 'annualPickerCollapsed';
-        collapsed.className = 'flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all ' +
-            (currentTag ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100');
-        collapsed.innerHTML = `
-            <span class="text-xs font-bold ${currentTag ? 'text-blue-700' : 'text-slate-500'}">${selectedLabel}</span>
-            <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>`;
-        collapsed.onclick = () => {
-            expanded.classList.toggle('hidden');
-            collapsed.classList.toggle('hidden');
-        };
-        picker.appendChild(collapsed);
-
-        // ── Expanded view ────────────────────────────────────
-        const expanded = document.createElement('div');
-        expanded.id = 'annualPickerExpanded';
-        expanded.className = 'hidden bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden';
-
-        function makeItem(cat, isChild = false) {
-            const budget = safeParseFloat(cat.budget_amount);
-            const spent  = getSpent(cat);
-            const remaining = budget - spent;
-            const isOver = remaining < 0;
-            const isSelected = currentTag && currentTag.trim() === cat.category_name.trim();
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = `w-full flex items-center justify-between px-4 py-2.5 text-right transition-colors ${isChild ? 'pr-7' : ''} ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`;
-            btn.innerHTML = `
-                <span class="text-xs font-bold ${isSelected ? 'text-blue-700' : 'text-slate-700'}">${isSelected ? '✓ ' : ''}${cat.category_name}</span>
-                <span class="text-[10px] font-bold ${isOver ? 'text-red-400' : 'text-slate-400'} ltr-num flex-shrink-0 mr-2">${isOver ? '−' : '+'}₪${Math.round(Math.abs(remaining)).toLocaleString()}</span>`;
-            btn.onclick = () => {
-                const newTag = isSelected ? null : cat.category_name;
-                if (eCat) eCat.value = newTag || 'שוטף';
-                populateAnnualCategoryPicker(newTag);
-            };
-            return btn;
-        }
-
-        // None option at top
-        const noneBtn = document.createElement('button');
-        noneBtn.type = 'button';
-        const isNone = !currentTag;
-        noneBtn.className = `w-full flex items-center px-4 py-2.5 text-right transition-colors border-b border-slate-100 ${isNone ? 'bg-blue-50' : 'hover:bg-slate-50'}`;
-        noneBtn.innerHTML = `<span class="text-xs font-bold ${isNone ? 'text-blue-700' : 'text-slate-500'}">${isNone ? '✓ ' : ''}ללא (שוטף)</span>`;
-        noneBtn.onclick = () => { if (eCat) eCat.value = 'שוטף'; populateAnnualCategoryPicker(null); };
-        expanded.appendChild(noneBtn);
-
-        if (activeAnnuals.length === 0) {
-            const p = document.createElement('p');
-            p.className = 'text-[10px] text-slate-400 text-center py-3';
-            p.textContent = 'אין קטגוריות מתוכננות';
-            expanded.appendChild(p);
-        } else {
-            // Parent groups
-            Object.entries(groups).forEach(([parentName, cats]) => {
-                const header = document.createElement('div');
-                header.className = 'px-4 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-wider bg-slate-50 border-t border-b border-slate-100';
-                header.textContent = parentName;
-                expanded.appendChild(header);
-                cats.forEach(cat => expanded.appendChild(makeItem(cat, true)));
-            });
-            // Standalone
-            if (standalone.length > 0) {
-                if (Object.keys(groups).length > 0) {
-                    const sep = document.createElement('div');
-                    sep.className = 'border-t border-slate-100';
-                    expanded.appendChild(sep);
-                }
-                standalone.forEach(cat => expanded.appendChild(makeItem(cat)));
-            }
-        }
-
-        picker.appendChild(expanded);
-    }
 
     // פיצול מתוך מודאל העריכה
     window.editRowSplit = function() {
@@ -4819,12 +5273,327 @@
         const current = filteredTxs.reduce((s, tx) => !tx.tag ? s + safeParseFloat(tx.amount) : s, 0);
         renderStatsChart(formatDisplayAmount(income), formatDisplayAmount(fixed), formatDisplayAmount(planned), formatDisplayAmount(current));
 
-        // Category pie chart
-        const currentTxs = filteredTxs.filter(tx => !tx.tag && !tx.isAdjustment);
-        renderCategoryStatsChart(currentTxs);
+        updateStatsFilterUI();
+
+        // Category pie charts
+        document.getElementById('catStatsCard').classList.add('hidden');
+        document.getElementById('plannedCatStatsCard').classList.add('hidden');
+        document.getElementById('fixedCatStatsCard').classList.add('hidden');
+        document.getElementById('catStatsCard').classList.remove('flex');
+        document.getElementById('plannedCatStatsCard').classList.remove('flex');
+        document.getElementById('fixedCatStatsCard').classList.remove('flex');
+
+        if (state.statsFilter === 'current') {
+            const currentTxs = filteredTxs.filter(tx => !tx.tag && !tx.isAdjustment);
+            renderCategoryStatsChart(currentTxs);
+        } else if (state.statsFilter === 'planned') {
+            const plannedTxs = filteredTxs.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.annual.some(a => a.category_name === tx.tag));
+            renderPlannedCategoryStatsChart(plannedTxs);
+        } else if (state.statsFilter === 'fixed') {
+            const fixedTxs = filteredTxs.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f)));
+            renderFixedCategoryStatsChart(fixedTxs);
+        }
     };
 
+    window.setStatsFilter = function(filter) {
+        state.statsFilter = filter;
+        updateStatsFilterUI();
+        window.updateStats();
+    };
+
+    function updateStatsFilterUI() {
+        const btns = {
+            current: document.getElementById('statsFilterCurrentBtn'),
+            fixed: document.getElementById('statsFilterFixedBtn'),
+            planned: document.getElementById('statsFilterPlannedBtn')
+        };
+        for (const [k, btn] of Object.entries(btns)) {
+            if (!btn) continue;
+            if (k === state.statsFilter) {
+                btn.classList.add('bg-white', 'text-slate-700', 'shadow-sm');
+                btn.classList.remove('text-slate-400');
+            } else {
+                btn.classList.remove('bg-white', 'text-slate-700', 'shadow-sm');
+                btn.classList.add('text-slate-400');
+            }
+        }
+    }
+
+    let plannedCatStatsChartInstance = null;
+    let fixedCatStatsChartInstance = null;
     let catStatsChartInstance = null;
+    let plannedTrendChartInstance = null;
+    let fixedTrendChartInstance = null;
+    let _catTrendChartInstance = null;
+
+    function renderFixedCategoryStatsChart(txs) {
+        const fixedItems = state.budget.fixed.filter(f => safeParseFloat(f.budget_amount) > 0);
+        const card = document.getElementById('fixedCatStatsCard');
+        if (!card) return;
+        
+        if (fixedItems.length === 0) { card.classList.add('hidden'); return; }
+        card.classList.remove('hidden');
+        card.classList.add('flex');
+
+        const totals = {};
+        txs.forEach(tx => {
+            if (tx.tag) {
+                const foundFixed = state.budget.fixed.find(f => tagMatchesCat(tx.tag, f));
+                if (foundFixed) {
+                    const label = foundFixed.category_name;
+                    totals[label] = (totals[label] || 0) + safeParseFloat(tx.amount);
+                }
+            }
+        });
+
+        const labels = [], data = [], colors = [];
+        fixedItems.forEach((cat, idx) => {
+            const val = totals[cat.category_name] || 0;
+            if (val > 0) {
+                labels.push(cat.category_name);
+                data.push(Math.round(val));
+                const hue = (idx * 45) % 60; // Consistent hue
+                colors.push(`hsl(${hue}, 80%, 60%)`);
+            }
+        });
+
+        const pieContainer = document.getElementById('fixedCatChartContainer');
+        const legend = document.getElementById('fixedCatChartLegend');
+        const ctx = document.getElementById('fixedCatStatsChart').getContext('2d');
+        
+        if (data.length === 0) {
+            pieContainer.classList.add('hidden');
+            legend.innerHTML = `<div class="text-slate-400 text-xs py-10 text-center w-full">אין הוצאות קבועות בחודש זה</div>`;
+            if (fixedCatStatsChartInstance) fixedCatStatsChartInstance.destroy();
+        } else {
+            pieContainer.classList.remove('hidden');
+            if (fixedCatStatsChartInstance) fixedCatStatsChartInstance.destroy();
+            fixedCatStatsChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: '#fff', borderWidth: 2 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '60%'
+                }
+            });
+
+            const total = data.reduce((s, v) => s + v, 0);
+            legend.innerHTML = `<div class="space-y-2 w-full">` +
+                labels.map((label, i) => {
+                    const pct = total > 0 ? Math.round(data[i] / total * 100) : 0;
+                    return `
+                    <div class="w-full flex justify-between items-center text-[11px] py-0.5">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${colors[i]}"></div>
+                            <span class="font-semibold text-slate-600">${label}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-400 font-bold ltr-num">${pct}%</span>
+                            <span class="font-bold text-slate-700 ltr-num">₪${data[i].toLocaleString()}</span>
+                        </div>
+                    </div>`; }).join('') + `</div>`;
+        }
+
+        renderTrendChart();
+
+        function renderTrendChart() {
+            const trendCtx = document.getElementById('fixedTrendChart');
+            if (!trendCtx) return;
+
+            const months = getTrendMonths();
+            if (months.length === 0) return;
+
+            const allTxs = state.transactions.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f)));
+            const datasets = [];
+
+            // Use all fixed items for the trend to ensure it shows even if current month is zero
+            fixedItems.forEach((cat, idx) => {
+                const label = cat.category_name;
+                const catColor = `hsl(${(idx * 45) % 60}, 80%, 60%)`;
+                
+                const monthlyTotals = months.sorted.map(m => {
+                    return allTxs.filter(tx => {
+                        const d = parseLocalDate(tx.date);
+                        const txMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                        return txMonth === m && tagMatchesCat(tx.tag, cat);
+                    }).reduce((s, tx) => s + safeParseFloat(tx.amount), 0);
+                });
+                
+                // Only add dataset if there's SOME data in the trend period
+                if (monthlyTotals.some(v => v > 0)) {
+                    datasets.push({
+                        label,
+                        data: monthlyTotals.map(v => Math.round(v)),
+                        borderColor: catColor,
+                        backgroundColor: catColor + '22',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        tension: 0.3,
+                        fill: false
+                    });
+                }
+            });
+
+            if (fixedTrendChartInstance) fixedTrendChartInstance.destroy();
+            fixedTrendChartInstance = new Chart(trendCtx, {
+                type: 'line',
+                data: { labels: months.labels, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45 } },
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 }, callback: v => '₪' + v.toLocaleString() } }
+                    }
+                }
+            });
+        }
+    }
+
+    function renderPlannedCategoryStatsChart(txs) {
+        const annuals = state.budget.annual.filter(a => safeParseFloat(a.budget_amount) > 0);
+        const card = document.getElementById('plannedCatStatsCard');
+        if (!card) return;
+        if (annuals.length === 0) { card.classList.add('hidden'); return; }
+        card.classList.remove('hidden');
+        card.classList.add('flex');
+
+        const totals = {};
+        txs.forEach(tx => {
+            if (tx.tag) totals[tx.tag] = (totals[tx.tag] || 0) + safeParseFloat(tx.amount);
+        });
+
+        const labels = [], data = [], colors = [];
+        annuals.forEach((cat, idx) => {
+            const val = totals[cat.category_name] || 0;
+            if (val > 0) {
+                labels.push(cat.category_name);
+                data.push(Math.round(val));
+                const hue = (idx * 137.5) % 360;
+                colors.push(`hsl(${hue}, 70%, 50%)`);
+            }
+        });
+
+        const pieContainer = document.getElementById('plannedCatChartContainer');
+        const legend = document.getElementById('plannedCatChartLegend');
+        const ctx = document.getElementById('plannedCatStatsChart').getContext('2d');
+
+        if (data.length === 0) {
+            pieContainer.classList.add('hidden');
+            legend.innerHTML = `<div class="text-slate-400 text-xs py-10 text-center w-full">אין הוצאות מתוכננות בחודש זה</div>`;
+            if (plannedCatStatsChartInstance) plannedCatStatsChartInstance.destroy();
+        } else {
+            pieContainer.classList.remove('hidden');
+            if (plannedCatStatsChartInstance) plannedCatStatsChartInstance.destroy();
+            plannedCatStatsChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: '#fff', borderWidth: 2 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '60%'
+                }
+            });
+
+            const total = data.reduce((s, v) => s + v, 0);
+            legend.innerHTML = `<div class="space-y-2 w-full">` +
+                labels.map((label, i) => {
+                    const pct = total > 0 ? Math.round(data[i] / total * 100) : 0;
+                    return `
+                    <div class="w-full flex justify-between items-center text-[11px] py-0.5">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${colors[i]}"></div>
+                            <span class="font-semibold text-slate-600">${label}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-400 font-bold ltr-num">${pct}%</span>
+                            <span class="font-bold text-slate-700 ltr-num">₪${data[i].toLocaleString()}</span>
+                        </div>
+                    </div>`; }).join('') + `</div>`;
+        }
+
+        renderTrendChart();
+
+        function renderTrendChart() {
+            const trendCtx = document.getElementById('plannedTrendChart');
+            if (!trendCtx) return;
+
+            const months = getTrendMonths();
+            if (months.length === 0) return;
+
+            const allTxs = state.transactions.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.annual.some(a => a.category_name === tx.tag));
+            const datasets = [];
+
+            annuals.forEach((cat, idx) => {
+                const label = cat.category_name;
+                const catColor = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
+                
+                const monthlyTotals = months.sorted.map(m => {
+                    return allTxs.filter(tx => {
+                        const d = parseLocalDate(tx.date);
+                        const txMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                        return txMonth === m && tx.tag === label;
+                    }).reduce((s, tx) => s + safeParseFloat(tx.amount), 0);
+                });
+                
+                if (monthlyTotals.some(v => v > 0)) {
+                    datasets.push({
+                        label,
+                        data: monthlyTotals.map(v => Math.round(v)),
+                        borderColor: catColor,
+                        backgroundColor: catColor + '22',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        tension: 0.3,
+                        fill: false
+                    });
+                }
+            });
+
+            if (plannedTrendChartInstance) plannedTrendChartInstance.destroy();
+            plannedTrendChartInstance = new Chart(trendCtx, {
+                type: 'line',
+                data: { labels: months.labels, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45 } },
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 }, callback: v => '₪' + v.toLocaleString() } }
+                    }
+                }
+            });
+        }
+    }
+
+    function getTrendMonths() {
+        let startDate = null;
+        if (state.transactions.length > 0) {
+            const sorted = [...state.transactions].sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
+            startDate = parseLocalDate(sorted[0].date);
+        } else if (state.budget.startDate) {
+            const parts = state.budget.startDate.split('/');
+            if (parts.length === 3) startDate = new Date(parseInt(parts[2]), parseInt(parts[1])-1, 1);
+        }
+        if (!startDate) return { sorted: [], labels: [] };
+
+        const now = new Date();
+        const sorted = [];
+        const cur = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth(), 1);
+        while (cur <= end) {
+            sorted.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`);
+            cur.setMonth(cur.getMonth() + 1);
+        }
+        const labels = sorted.map(m => {
+            const [y, mo] = m.split('-');
+            const names = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+            return names[parseInt(mo)-1] + ' ' + y.slice(2);
+        });
+        return { sorted, labels };
+    }
+
     let _catHidden = new Set(); // indices of hidden segments
     let _catTxsCache = null;   // last txs passed in
 
@@ -5238,6 +6007,7 @@
         var total = shortcutsSteps.length;
         if (dir === 1 && shortcutsCurrentStep === total - 1) {
             window.closeShortcutsModal();
+            setTimeout(function() { window.openOnboarding(); }, 400);
             return;
         }
         shortcutsCurrentStep = Math.max(0, Math.min(total - 1, shortcutsCurrentStep + dir));
@@ -5412,7 +6182,11 @@
 
     window.androidNav = function(dir) {
         var total = androidSteps.length;
-        if (dir === 1 && androidCurrentStep === total - 1) { window.closeAndroidShortcutsModal(); return; }
+        if (dir === 1 && androidCurrentStep === total - 1) { 
+            window.closeAndroidShortcutsModal(); 
+            setTimeout(function() { window.openOnboarding(); }, 400);
+            return; 
+        }
         androidCurrentStep = Math.max(0, Math.min(total - 1, androidCurrentStep + dir));
         renderAndroidStep();
     };
@@ -5461,15 +6235,88 @@
         const o = document.getElementById('onboardingOverlay');
         if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
     };
-    window.closeOnboarding = function() {
+    window.closeOnboarding = function(finished = false) {
         const o = document.getElementById('onboardingOverlay');
         if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
+        
+        if (finished) {
+            localStorage.setItem('onboarding_finished', 'true');
+            const btn = document.getElementById('onboardingBtn');
+            if (btn) btn.classList.add('hidden');
+            const mBtn = document.getElementById('menuOnboardingBtn');
+            if (mBtn) mBtn.classList.add('hidden');
+        }
+
         localStorage.setItem('onboarding_seen', '1');
-        // Open wizard for new accounts
-        if (window._isNewAccount) {
+        // Open wizard for new accounts ONLY if the user finished onboarding or didn't click "continue later"
+        // If finished is false, it means they clicked "continue later", so we don't open the wizard.
+        if (window._isNewAccount && finished) {
             window._isNewAccount = false;
             setTimeout(() => window.openWizard(), 400);
+        } else {
+            window._isNewAccount = false; 
+            // Always ensure we are on the main view after closing onboarding if not entering wizard
+            window.setNav('main');
         }
+    };
+
+    // =====================================================
+    // CAR CALCULATOR
+    // =====================================================
+    let _carCalcIdx = null;
+    let _carCalcCurrentResult = 0;
+
+    window.openCarCalc = function(idx) {
+        _carCalcIdx = idx;
+        const o = document.getElementById('carCalcOverlay');
+        if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
+        document.getElementById('carCalcValue').textContent = '0';
+    };
+    window.closeCarCalc = function() {
+        const o = document.getElementById('carCalcOverlay');
+        if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
+    };
+    window.calculateCarSavings = function() {
+        const curValue = document.getElementById('carCalcCurrent').value;
+        const trgValue = document.getElementById('carCalcTarget').value;
+        const yrsValue = document.getElementById('carCalcYears').value;
+
+        const cur = safeParseFloat(curValue);
+        const trg = safeParseFloat(trgValue);
+        const yrs = safeParseFloat(yrsValue);
+
+        if (!curValue || !trgValue || !yrsValue || !yrs) {
+            document.getElementById('carCalcValue').textContent = '0';
+            _carCalcCurrentResult = 0;
+            return;
+        }
+
+        // Depreciation: 15% per year
+        const depreciatedValue = cur * Math.pow(1 - 0.15, yrs);
+        const sumNeeded = trg - depreciatedValue;
+        const monthly = Math.max(0, Math.round(sumNeeded / (yrs * 12)));
+
+        _carCalcCurrentResult = monthly;
+        document.getElementById('carCalcValue').textContent = monthly.toLocaleString();
+    };
+    window.applyCarSavings = function() {
+        if (_carCalcIdx === null) return;
+        _wizData.savings[_carCalcIdx].amount = _carCalcCurrentResult;
+        _wizData.savings[_carCalcIdx].checked = true;
+        
+        const input = document.getElementById(`wiz_amt_savings_${_carCalcIdx}`);
+        if (input) {
+            input.value = _carCalcCurrentResult;
+            input.disabled = false;
+        }
+        const cb = document.getElementById(`wiz_savings_${_carCalcIdx}`);
+        if (cb) {
+            cb.checked = true;
+            cb.parentElement.classList.add('bg-blue-50');
+        }
+        
+        window.closeCarCalc();
+        window.showToast('התוצאה עודכנה בשורה', 'check');
     };
 
     // =====================================================
@@ -5507,7 +6354,7 @@
             subtitle: 'הוצאות יחסית גדולות שתוציאו השנה ורוצים להיערך מראש. הסכום הוא שנתי',
             type: 'annual',
             groups: [
-                { parent: 'רכב', items: ['טיפול שנתי','רישוי וטסט','החלפת הרכב'] },
+                { parent: 'רכב', items: ['טיפול שנתי','רישוי וטסט','צמיגים/מצבר/כללי'] },
                 { parent: 'חופשות', items: ['חופשה משפחתית','חופשה זוגית'] },
             ],
             standalone: ['קייטנות קיץ','מתנות לאירועים','ימי הולדת','תשלומי הורים לבית הספר']
@@ -5517,11 +6364,14 @@
             subtitle: 'סכום הפקדה חודשי לכל חיסכון — ניתן להפעיל תזכורת חודשית',
             type: 'savings',
             items: [
-                { name: 'קרן חירום', checked: false },
-                { name: 'פנסיה משלימה', checked: false },
-                { name: 'חיסכון לילדים', checked: false },
-                { name: 'חיסכון כללי', checked: false },
+                { name: 'החלפת רכב', checked: false },
+                { name: 'ילדים', checked: false }
             ]
+        },
+        {
+            title: 'סיכום התקציב',
+            subtitle: 'ככה נראה המאזן החדש שלכם',
+            type: 'summary'
         }
     ];
 
@@ -5554,12 +6404,6 @@
     };
 
     function renderWizardSavings(container) {
-        // Add note
-        const note = document.createElement('div');
-        note.className = 'bg-purple-50 border border-purple-100 rounded-xl p-3 mb-3 text-xs text-purple-700';
-        note.textContent = 'הסכום שתגדירו כאן יופחת מהתקציב הנותר לשוטף. ניתן להפעיל תזכורת חודשית בעמוד התקציב.';
-        container.appendChild(note);
-
         _wizData.savings.forEach((item, idx) => {
             container.appendChild(makeWizardRow(item, idx, 'savings'));
         });
@@ -5579,17 +6423,29 @@
         document.getElementById('wizardTitle').textContent = `שלב ${_wizStep + 1} — ${step.title}`;
         document.getElementById('wizardSubtitle').textContent = step.subtitle;
         // Progress bars
-        [0,1,2,3].forEach(i => {
+        [0,1,2,3,4].forEach(i => {
             const el = document.getElementById(`wizProg${i}`);
-            if (el) el.className = `flex-1 h-1 rounded-full ${i <= _wizStep ? (step.type === 'savings' ? 'bg-purple-500' : 'bg-blue-500') : 'bg-slate-200'}`;
+            if (el) {
+                const isActive = i <= _wizStep;
+                let color = 'bg-blue-500';
+                if (WIZARD_STEPS[i]?.type === 'savings') color = 'bg-purple-500';
+                if (WIZARD_STEPS[i]?.type === 'summary') color = 'bg-green-500';
+                el.className = `flex-1 h-1 rounded-full ${isActive ? color : 'bg-slate-200'}`;
+            }
         });
         // Prev/Next buttons
         const prevBtn = document.getElementById('wizPrevBtn');
         const nextBtn = document.getElementById('wizNextBtn');
-        prevBtn.classList.toggle('hidden', _wizStep === 0);
-        nextBtn.textContent = _wizStep === WIZARD_STEPS.length - 1 ? 'צור תקציב ✓' : 'המשך';
-        const isSavings = step.type === 'savings';
-        nextBtn.className = `flex-1 font-bold py-3 rounded-2xl text-sm ${_wizStep === WIZARD_STEPS.length - 1 ? 'bg-green-600 text-white shadow-md shadow-green-200' : (isSavings ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'bg-blue-600 text-white shadow-md shadow-blue-200')}`;
+        prevBtn.classList.toggle('hidden', _wizStep === 0 || step.type === 'summary');
+        
+        if (step.type === 'summary') {
+            nextBtn.textContent = 'המשך לשלב הבא';
+            nextBtn.className = 'flex-1 font-bold py-3 rounded-2xl text-sm bg-slate-900 text-white shadow-md shadow-slate-200';
+        } else {
+            nextBtn.textContent = _wizStep === WIZARD_STEPS.length - 2 ? 'צור תקציב ✓' : 'המשך';
+            const isSavings = step.type === 'savings';
+            nextBtn.className = `flex-1 font-bold py-3 rounded-2xl text-sm ${_wizStep === WIZARD_STEPS.length - 2 ? 'bg-green-600 text-white shadow-md shadow-green-200' : (isSavings ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'bg-blue-600 text-white shadow-md shadow-blue-200')}`;
+        }
 
         const content = document.getElementById('wizardContent');
         content.innerHTML = '';
@@ -5598,6 +6454,7 @@
         else if (step.type === 'fixed') renderWizardGrouped(content, _wizData.fixed, step.groups);
         else if (step.type === 'annual') renderWizardGrouped(content, _wizData.annual, step.groups, step.standalone);
         else if (step.type === 'savings') renderWizardSavings(content);
+        else if (step.type === 'summary') renderWizardSummary(content);
     }
 
     function renderWizardIncomes(container) {
@@ -5660,20 +6517,34 @@
         row.className = `flex items-center gap-2 py-1.5 px-2 rounded-xl transition-all ${item.checked ? 'bg-blue-50' : ''}`;
         const cbId = `wiz_${type}_${idx}`;
         const isAnnual = type === 'annual';
+        const isSavings = type === 'savings';
         const monthlyVal = isAnnual && item.amount ? Math.round(safeParseFloat(item.amount) / 12) : 0;
         const monthlyHtml = isAnnual
             ? `<span id="wiz_monthly_${type}_${idx}" class="text-[9px] font-bold text-slate-400 ltr-num whitespace-nowrap">${monthlyVal > 0 ? '≈₪' + monthlyVal.toLocaleString() + '/ח' : ''}</span>`
             : '';
+        
+        let extraBtnHtml = '';
+        if (isSavings) {
+            if (item.name === 'החלפת רכב') {
+                extraBtnHtml = `<button onclick="window.openCarCalc(${idx})" class="flex items-center gap-1 px-2 py-1 text-blue-500 hover:bg-white rounded-lg transition-all text-[9px] font-bold border border-blue-100 whitespace-nowrap" title="חישוב אוטומטי"><i class="fa-solid fa-calculator text-[10px]"></i> חישוב</button>`;
+            } else if (item.name === 'ילדים') {
+                extraBtnHtml = `<a href="family-savings.html" target="_blank" class="flex items-center gap-1 px-2 py-1 text-blue-500 hover:bg-white rounded-lg transition-all text-[9px] font-bold border border-blue-100 whitespace-nowrap" title="מחשבון חיסכון לילדים"><i class="fa-solid fa-piggy-bank text-[10px]"></i> חישוב</a>`;
+            }
+        }
+
         row.innerHTML = `
             <input type="checkbox" id="${cbId}" class="w-4 h-4 rounded text-blue-600 flex-shrink-0 cursor-pointer" ${item.checked ? 'checked' : ''}>
-            <input type="text" value="${item.name}" placeholder="שם"
-                class="flex-1 bg-transparent text-xs font-bold text-slate-700 border-b border-transparent focus:border-blue-300 outline-none min-w-0 py-0.5"
-                oninput="window._wizSetName('${type}',${idx},this.value)">
+            <div class="flex-1 flex items-center gap-1 min-w-0">
+                <input type="text" value="${item.name}" placeholder="שם"
+                    class="flex-1 bg-transparent text-xs font-bold text-slate-700 border-b border-transparent focus:border-blue-300 outline-none min-w-0 py-0.5"
+                    oninput="window._wizSetName('${type}',${idx},this.value)">
+                ${extraBtnHtml}
+            </div>
             ${monthlyHtml}
             <div class="flex items-center gap-0.5 flex-shrink-0">
                 <span class="text-[10px] text-slate-400 font-bold">₪</span>
-                <input type="number" inputmode="decimal" value="${item.amount}" placeholder="0"
-                    class="w-16 text-xs font-bold text-slate-700 text-left bg-slate-100 rounded-lg px-2 py-1 border border-transparent focus:border-blue-300 outline-none"
+                <input type="number" inputmode="decimal" id="wiz_amt_${type}_${idx}" value="${item.amount}" placeholder="0"
+                    class="no-spin w-24 text-xs font-bold text-slate-700 text-left bg-slate-100 rounded-lg px-2 py-1 border border-transparent focus:border-blue-300 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     oninput="window._wizSetAmount('${type}',${idx},this.value)${isAnnual ? `; window._wizUpdateMonthly('${type}',${idx},this.value)` : ''}"
                     ${!item.checked ? 'disabled' : ''}>
             </div>`;
@@ -5717,36 +6588,41 @@
     };
 
     window.wizardNav = function(dir) {
-        if (dir === 1 && _wizStep === WIZARD_STEPS.length - 1) {
-            window.submitWizard();
-            return;
+        const step = WIZARD_STEPS[_wizStep];
+        if (dir === 1) {
+            if (step.type === 'summary') {
+                window.closeWizard();
+                setTimeout(() => window.openOnboarding(), 400); 
+                return;
+            }
+            if (_wizStep === WIZARD_STEPS.length - 2) {
+                window.submitWizard();
+                return;
+            }
         }
         _wizStep = Math.max(0, Math.min(WIZARD_STEPS.length - 1, _wizStep + dir));
         document.getElementById('wizardContent').scrollTop = 0;
         renderWizardStep();
     };
 
+    let _wizSummaryData = null;
+
     window.submitWizard = async function() {
         if (!sbClient || !USER_TOKEN) return;
-        window.closeWizard();
-
+        
         const rows = [];
-
         // Incomes
         _wizData.incomes.filter(i => i.checked && i.name.trim()).forEach(i => {
             rows.push({ category_name: i.name.trim(), budget_amount: safeParseFloat(i.amount) || 0, type: 'income', parent_group: null, user_token: USER_TOKEN });
         });
-
         // Fixed
         _wizData.fixed.filter(i => i.checked && i.name.trim()).forEach(i => {
             rows.push({ category_name: i.name.trim(), budget_amount: safeParseFloat(i.amount) || 0, type: 'fixed', parent_group: i.parent || null, user_token: USER_TOKEN });
         });
-
         // Annual
         _wizData.annual.filter(i => i.checked && i.name.trim()).forEach(i => {
             rows.push({ category_name: i.name.trim(), budget_amount: safeParseFloat(i.amount) || 0, type: 'annual', parent_group: i.parent || null, user_token: USER_TOKEN });
         });
-
         // Savings
         (_wizData.savings || []).filter(i => i.checked && i.name.trim()).forEach(i => {
             rows.push({ category_name: i.name.trim(), budget_amount: safeParseFloat(i.amount) || 0, type: 'savings', parent_group: null, user_token: USER_TOKEN });
@@ -5760,7 +6636,7 @@
             await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN);
             await sbClient.from('budget_settings').insert(rows);
 
-            // Calculate g4: income - fixed - annual_monthly, rounded down to multiple of 5 divisible by 30
+            // Calculate summary
             const totalIncome = rows.filter(r => r.type === 'income').reduce((s, r) => s + r.budget_amount, 0);
             const totalFixed  = rows.filter(r => r.type === 'fixed').reduce((s, r) => s + r.budget_amount, 0);
             const totalAnnualMonthly = rows.filter(r => r.type === 'annual').reduce((s, r) => s + r.budget_amount / 12, 0);
@@ -5776,8 +6652,18 @@
                 await sbClient.rpc('update_daily_budget', { p_user_token: USER_TOKEN, p_daily_budget: g4 / 30, p_start_date: todayISO });
             }
 
+            _wizSummaryData = {
+                totalIncome,
+                totalFixed,
+                totalAnnualMonthly,
+                totalSavings,
+                monthlyBudget: g4,
+                dailyBudget: g4 / 30
+            };
+
             await window.fetchBudgetData();
-            window.setNav('budget');
+            _wizStep++; // Move to summary
+            renderWizardStep();
             window.showToast('התקציב נוצר בהצלחה!', 'check');
         } catch(e) {
             console.error(e);
@@ -5786,6 +6672,73 @@
             setLoading(false, true);
         }
     };
+
+    function renderWizardSummary(container) {
+        if (!_wizSummaryData) return;
+        const s = _wizSummaryData;
+        
+        container.innerHTML = `
+            <div class="space-y-4">
+                <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3">
+                    <div class="flex justify-between items-center px-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">הכנסות</span>
+                        <span class="text-sm font-bold text-green-600 ltr-num">+ ₪${s.totalIncome.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between items-center px-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">קבועות</span>
+                        <span class="text-sm font-bold text-red-500 ltr-num">- ₪${s.totalFixed.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between items-center px-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">מתוכננות (חודשי)</span>
+                        <span class="text-sm font-bold text-orange-500 ltr-num">- ₪${Math.round(s.totalAnnualMonthly).toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between items-center px-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">חסכונות</span>
+                        <span class="text-sm font-bold text-purple-600 ltr-num">- ₪${s.totalSavings.toLocaleString()}</span>
+                    </div>
+                </div>
+
+                <div class="bg-blue-600 rounded-3xl p-4 text-center shadow-xl shadow-blue-100">
+                    <p class="text-[10px] font-bold text-blue-100 uppercase mb-1">תקציב חודשי להוצאות שוטפות</p>
+                    <div class="flex items-baseline justify-center gap-1 mb-1">
+                        <span class="text-lg text-white font-bold">₪</span>
+                        <span class="text-3xl font-black text-white">${s.monthlyBudget.toLocaleString()}</span>
+                    </div>
+                    <div class="inline-flex items-center gap-1 bg-white/20 px-3 py-1 rounded-full text-white text-[10px] font-bold">
+                        <span>תקציב יומי:</span>
+                        <span>₪${Math.round(s.dailyBudget).toLocaleString()}</span>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-100 rounded-2xl p-5 space-y-4">
+                    <div class="flex gap-3 items-start">
+                        <div class="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fa-solid fa-basket-shopping text-white text-xs"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm font-bold text-slate-800 mb-1">מה הן הוצאות שוטפות?</p>
+                            <p class="text-xs text-slate-600 leading-relaxed">אלו הוצאות הלוואי היומיומיות שלכם: סופר, פארם, בילויים, קניות מזדמנות, טייק-אווי וכל מה שלא הוגדר כהוצאה קבועה.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-3 items-start">
+                        <div class="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <i class="fa-solid fa-scale-balanced text-white text-xs"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-sm font-bold text-slate-800 mb-1">איך עובד המאזן?</p>
+                            <div class="text-xs text-slate-600 space-y-1.5 leading-relaxed">
+                                <p>• בכל יום בחצות, התקציב היומי (₪${Math.round(s.dailyBudget)}) מתווסף אוטומטית למאזן שלכם.</p>
+                                <p>• כשאתם מתעדים הוצאה, המאזן יורד בהתאם לסכום שהוצאתם.</p>
+                                <p class="font-bold text-blue-600 bg-white/50 p-2 rounded-lg border border-blue-100 mt-2 italic text-center">
+                                    המטרה שלכם: לשמור על המאזן חיובי תמיד! שמירה על המאזן חיובי תבטיח שיישאר לכם מספיק כסף לשלם על ההוצאות הקבועות, המתוכננות ולחסוך כמו שרציתם.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
     window.openMainHelp = function() {
         const o = document.getElementById('mainHelpOverlay');
         if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
@@ -5804,9 +6757,12 @@
     };
     window.openAddExpenseModal = () => {
         try {
-            const eCat = document.getElementById('categorySelect');
+            const eCat = document.getElementById('categoryNameInput');
             if (eCat) eCat.value = 'שוטף';
-            populateAddExpenseCategoryPicker(null);
+            const expInp = document.getElementById('expenseCategoryIdInput');
+            if (expInp) expInp.value = '';
+            window.setTxType('expense');
+            window.setCategoryType('current'); // This will call populate and forceOpen
         } catch(e) { console.warn('picker init error:', e); }
         const o = document.getElementById('addExpenseOverlay');
         if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
