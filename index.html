@@ -4299,7 +4299,7 @@
                         <div class="flex items-center gap-1.5">
                             ${annualHtml}
                             <span class="text-xs font-bold ltr-num" style="color:${amtColor}">₪${numericVal.toLocaleString()}</span>
-                            <button onclick="window.initBudgetItemEdit('${dbName.replace(/'/g,"\\'")}')"
+                            <button onclick="window.initBudgetItemEdit('${dbName.replace(/'/g,"\\'").replace(/"/g, "&quot;")}')"
                                 class="p-1"><i class="fa-solid fa-ellipsis-vertical text-[10px] text-slate-300"></i></button>
                         </div>`;
                     return div;
@@ -4326,7 +4326,7 @@
                 header.innerHTML = `
                     <span class="font-bold text-slate-800 text-xs flex-1 text-right">${group.name}</span>
                     <div class="flex items-center gap-1 mx-2">
-                        <button onclick="event.stopPropagation(); window.initParentGroupModal('${type}', '${group.name}')" class="text-slate-300 p-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                        <button onclick="event.stopPropagation(); window.initParentGroupModal('${type}', '${group.name.replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="text-slate-300 p-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
                         <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform p-1 ${isCollapsed ? '-rotate-90' : ''}"></i>
                     </div>
                     ${annualGroupHtml}
@@ -4505,7 +4505,7 @@
                             <p class="text-[10px] text-${color}-600 font-semibold">₪${amount.toLocaleString()} לחודש</p>
                         </div>
                     </div>
-                    <button onclick="window.dismissBudgetReminder('${item._type}','${(item.id || item.category_name).toString().replace(/'/g,"\\'")}')" class="bg-${color}-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl">${btnText}</button>
+                    <button onclick="window.dismissBudgetReminder('${item._type}','${(item.id || item.category_name).toString().replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="bg-${color}-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl">${btnText}</button>
                 </div>`;
             container.appendChild(banner);
         });
@@ -4916,10 +4916,10 @@
             let headerActions = '';
             if (!isGroup) {
                 if (Math.abs(remaining) > 0.1) {
-                    headerActions += `<button onclick="event.stopPropagation(); window.initCloseCategory('${(catName||name).replace(/'/g,"\\'")}', ${spent}, ${totalBudget}, '${catName||name}')" class="btn-close-cat ml-2 text-blue-500"><i class="fa-solid fa-lock text-[10px]"></i></button>`;
+                    headerActions += `<button onclick="event.stopPropagation(); window.initCloseCategory('${(catName||name).replace(/'/g,"\\'").replace(/"/g, "&quot;")}', ${spent}, ${totalBudget}, '${(catName||name).replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="btn-close-cat ml-2 text-blue-500"><i class="fa-solid fa-lock text-[10px]"></i></button>`;
                 }
             }
-            headerActions += `<button onclick="window.toggleAnnualCategory('${toggleName.replace(/'/g,"\\'")}'); event.stopPropagation();" class="cat-expand-btn ${isExpanded ? 'expanded' : ''}"><i class="fa-solid fa-chevron-down text-[10px]"></i></button>`;
+            headerActions += `<button onclick="window.toggleAnnualCategory('${toggleName.replace(/'/g,"\\'").replace(/"/g, "&quot;")}'); event.stopPropagation();" class="cat-expand-btn ${isExpanded ? 'expanded' : ''}"><i class="fa-solid fa-chevron-down text-[10px]"></i></button>`;
             const cardHeader = document.createElement('div');
             cardHeader.className = 'p-4 cursor-pointer';
             cardHeader.onclick = () => window.toggleAnnualCategory(toggleName);
