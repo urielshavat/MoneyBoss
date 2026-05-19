@@ -282,45 +282,48 @@
             </div>
             <!-- Category breakdown pie -->
             <div id="catStatsCard" class="card p-6 mb-4 border border-slate-200 bg-white shadow-sm flex-col items-center hidden">
-                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות לפי קטגוריה</h3>
+                <h3 id="catStatsTitle" class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות לפי קטגוריה</h3>
                 <div id="catChartContainer" class="w-full aspect-square max-w-[240px] relative mb-4 mx-auto">
                     <canvas id="catStatsChart"></canvas>
                 </div>
                 <!-- Shared legend used by both charts -->
                 <div id="catChartLegend" class="w-full space-y-1 mb-4"></div>
-                <!-- Monthly trend line chart -->
+                <!-- Monthly trend stacked bar chart -->
                 <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3 self-start w-full border-t border-slate-100 pt-4">מגמה חודשית</h3>
-                <div class="w-full relative" style="height:220px">
-                    <canvas id="catTrendChart"></canvas>
+                <div class="w-full relative mb-4" style="height:240px">
+                    <canvas id="catStackedTrendChart"></canvas>
                 </div>
+                <div id="catTrendLegend" class="w-full mb-6 space-y-1"></div>
             </div>
 
             <!-- Planned Category breakdown pie -->
             <div id="plannedCatStatsCard" class="card p-6 mb-4 border border-slate-200 bg-white shadow-sm flex-col items-center hidden">
-                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות מתוכננות לפי קטגוריה</h3>
+                <h3 id="plannedCatStatsTitle" class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות מתוכננות לפי קטגוריה</h3>
                 <div id="plannedCatChartContainer" class="w-full aspect-square max-w-[240px] relative mb-4 mx-auto">
                     <canvas id="plannedCatStatsChart"></canvas>
                 </div>
                 <div id="plannedCatChartLegend" class="w-full space-y-1 mb-4"></div>
-                <!-- Monthly trend chart for planned -->
-                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3 self-start w-full border-t border-slate-100 pt-4">מגמה חודשית (מתוכננות)</h3>
-                <div class="w-full relative" style="height:220px">
-                    <canvas id="plannedTrendChart"></canvas>
+                <!-- Monthly trend stacked bar chart for planned -->
+                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3 self-start w-full border-t border-slate-100 pt-4">מגמה חודשית</h3>
+                <div class="w-full relative mb-4" style="height:240px">
+                    <canvas id="plannedStackedTrendChart"></canvas>
                 </div>
+                <div id="plannedTrendLegend" class="w-full mb-6 space-y-1"></div>
             </div>
 
             <!-- Fixed Category breakdown pie -->
             <div id="fixedCatStatsCard" class="card p-6 mb-4 border border-slate-200 bg-white shadow-sm flex-col items-center hidden">
-                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות קבועות לפי קטגוריה</h3>
+                <h3 id="fixedCatStatsTitle" class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות קבועות לפי קטגוריה</h3>
                 <div id="fixedCatChartContainer" class="w-full aspect-square max-w-[240px] relative mb-4 mx-auto">
                     <canvas id="fixedCatStatsChart"></canvas>
                 </div>
                 <div id="fixedCatChartLegend" class="w-full space-y-1 mb-4"></div>
-                <!-- Monthly trend chart for fixed -->
-                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3 self-start w-full border-t border-slate-100 pt-4">מגמה חודשית (קבועות)</h3>
-                <div class="w-full relative" style="height:220px">
-                    <canvas id="fixedTrendChart"></canvas>
+                <!-- Monthly trend stacked bar chart for fixed -->
+                <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3 self-start w-full border-t border-slate-100 pt-4">מגמה חודשית</h3>
+                <div class="w-full relative mb-4" style="height:240px">
+                    <canvas id="fixedStackedTrendChart"></canvas>
                 </div>
+                <div id="fixedTrendLegend" class="w-full mb-6 space-y-1"></div>
             </div>
             <!-- Export section -->
             <div class="card p-4 mb-4 border border-slate-200 bg-white shadow-sm">
@@ -2243,10 +2246,28 @@
                         } else {
                             created_at = new Date().toISOString();
                         }
+
+                        const tagName = (tx.tag || '').trim();
+                        let expense_category_id = null;
+                        let category = tagName || 'שוטף';
+
+                        // 1. בדוק אם זה קטגוריה תקציבית (מתוכננת או קבועה)
+                        const isBudgetItem = [...state.budget.fixed, ...state.budget.annual].some(b => tagMatchesCat(category, b));
+                        
+                        // 2. אם לא מופיע בתקציב, בדוק אם זה מופיע בקטגוריות השוטפות המוגדרות באפליקציה
+                        if (!isBudgetItem && category !== 'שוטף') {
+                            const matchedOngoing = state.expenseCategories.find(c => c.name === category);
+                            if (matchedOngoing) {
+                                expense_category_id = matchedOngoing.id;
+                                category = 'שוטף'; // "שוטף" בבסיס הנתונים מציין תנועה ללא תג תקציבי
+                            }
+                        }
+
                         return {
                             name: tx.name,
                             amount: safeParseFloat(tx.amount),
-                            category: tx.tag || 'שוטף',
+                            category: category,
+                            expense_category_id: expense_category_id,
                             created_at,
                             external_id: `gas_row_${tx.row}_${USER_TOKEN}`,
                             user_token: USER_TOKEN
@@ -4284,7 +4305,7 @@
                 if (isZero) hasZeroItems = true;
                 if (!isZero || isShowingZeros) {
                     const div = document.createElement('div');
-                    div.className = `bg-white px-3 py-2 rounded-xl flex justify-between items-center shadow-sm gap-2 animate-fade-in ${isZero ? 'opacity-60 border-dashed border border-slate-200' : ''} ${isChild ? 'ml-4 border-r-2 border-slate-100 rounded-r-none' : ''}`;
+                    div.className = `bg-white px-3 py-2 rounded-xl flex justify-between items-center shadow-sm gap-2 ${isZero ? 'opacity-60 border-dashed border border-slate-200' : ''} ${isChild ? 'ml-4 border-r-2 border-slate-100 rounded-r-none' : ''}`;
                     const numericVal = type === 'annual'
                         ? Math.round(formatDisplayAmount(val / 12))
                         : Math.round(formatDisplayAmount(val, type === 'savings' ? 'general' : type));
@@ -5147,15 +5168,44 @@
         const nameInput = document.getElementById('parentGroupName');
         nameInput.value = existingParent || '';
         container.innerHTML = '';
+
+        const unassigned = list.filter(i => !i.parent_group);
+        const grouped = {};
         list.forEach(item => {
+            if (item.parent_group) {
+                if (!grouped[item.parent_group]) grouped[item.parent_group] = [];
+                grouped[item.parent_group].push(item);
+            }
+        });
+
+        function renderItem(item) {
             const isChecked = existingParent && item.parent_group === existingParent;
             const div = document.createElement('div');
-            div.className = 'flex items-center gap-2 p-2 bg-slate-50 rounded-lg';
+            div.className = 'flex items-center gap-2 p-2 bg-white border border-slate-100 rounded-lg';
             div.innerHTML = `
-                <input type="checkbox" id="chk_${item.id}" value="${item.category_name}" class="w-4 h-4 rounded text-blue-600 border-gray-300" ${isChecked ? 'checked' : ''}>
+                <input type="checkbox" id="chk_${item.id}" value="${item.category_name.replace(/"/g, '&quot;')}" class="w-4 h-4 rounded text-blue-600 border-gray-300" ${isChecked ? 'checked' : ''}>
                 <label for="chk_${item.id}" class="text-xs text-slate-700 font-medium flex-1">${item.category_name}</label>`;
             container.appendChild(div);
+        }
+
+        function renderHeader(name) {
+            const h = document.createElement('div');
+            h.className = 'px-2 py-1 text-[10px] font-bold text-slate-400 border-b border-slate-100 mb-1 mt-3';
+            h.textContent = name;
+            container.appendChild(h);
+        }
+
+        // 1. Unassigned
+        if (unassigned.length > 0) {
+            unassigned.forEach(renderItem);
+        }
+
+        // 2. Grouped
+        Object.entries(grouped).sort().forEach(([parentName, items]) => {
+            renderHeader(parentName);
+            items.forEach(renderItem);
         });
+
         const o = document.getElementById('parentCategoryOverlay');
         o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10);
     };
@@ -5342,38 +5392,137 @@
     let plannedCatStatsChartInstance = null;
     let fixedCatStatsChartInstance = null;
     let catStatsChartInstance = null;
-    let plannedTrendChartInstance = null;
-    let fixedTrendChartInstance = null;
-    let _catTrendChartInstance = null;
+    let plannedStackedTrendChartInstance = null;
+    let fixedStackedTrendChartInstance = null;
+    let _catStackedTrendChartInstance = null;
+    const _stackedTotalPlugin = {
+        id: 'stackedTotal',
+        afterDraw: (chart) => {
+            const { ctx, data, scales: { x, y } } = chart;
+            if (!data.datasets.length) return;
+            ctx.save();
+            ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+            ctx.font = 'bold 9px Assistant, sans-serif'; ctx.fillStyle = '#64748b';
+            data.labels.forEach((label, i) => {
+                let total = 0;
+                data.datasets.forEach(ds => { total += (ds.data[i] || 0); });
+                if (total > 0) {
+                    const xPos = x.getPixelForValue(label);
+                    const yPos = y.getPixelForValue(total);
+                    const text = '₪' + Math.round(total).toLocaleString();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                    ctx.lineWidth = 3;
+                    ctx.strokeText(text, xPos, yPos - 5);
+                    ctx.fillText(text, xPos, yPos - 5);
+                }
+            });
+            ctx.restore();
+        }
+    };
+
+    const _averageLinePlugin = {
+        id: 'averageLine',
+        afterDraw: (chart) => {
+            const { ctx, data, scales: { x, y } } = chart;
+            if (!data.datasets.length) return;
+            
+            const options = chart.config.options.plugins.averageLine;
+            let avg = 0;
+            if (options && typeof options.overrideValue === 'number') {
+                avg = options.overrideValue;
+            } else {
+                const totals = data.labels.map((_, i) => {
+                    let t = 0;
+                    data.datasets.forEach(ds => { t += (ds.data[i] || 0); });
+                    return t;
+                }).filter(t => t > 0);
+                if (totals.length === 0) return;
+                avg = totals.reduce((a, b) => a + b, 0) / totals.length;
+            }
+
+            if (avg <= 0) return;
+            const yPos = y.getPixelForValue(avg);
+
+            ctx.save();
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x.left, yPos);
+            ctx.lineTo(x.right, yPos);
+            ctx.stroke();
+
+            const text = 'ממוצע: ₪' + Math.round(avg).toLocaleString();
+            ctx.font = 'bold 9px Assistant, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = 3;
+            ctx.strokeText(text, x.right - 5, yPos - 5);
+            ctx.fillStyle = '#ef4444';
+            ctx.fillText(text, x.right - 5, yPos - 5);
+            ctx.restore();
+        }
+    };
+
+    function calculateDynamicMonthlyAverage(txs) {
+        if (!txs || txs.length === 0) return 0;
+        const sorted = [...txs].sort((a,b) => parseLocalDate(a.date) - parseLocalDate(b.date));
+        const start = parseLocalDate(sorted[0].date);
+        const end = parseLocalDate(sorted[sorted.length - 1].date);
+        const diffMs = end - start;
+        const diffDays = Math.max(1, diffMs / (1000 * 60 * 60 * 24) + 1);
+        const total = sorted.reduce((sum, tx) => sum + safeParseFloat(tx.amount), 0);
+        return (total / diffDays) * 30.4375;
+    }
+
+    let _catHidden = new Set();
+    let _catTxsCache = null;
+    let _catTrendHidden = new Set();
+    let _fixedHidden = new Set();
+    let _fixedTxsCache = null;
+    let _fixedTrendHidden = new Set();
+    let _plannedHidden = new Set();
+    let _plannedTxsCache = null;
+    let _plannedTrendHidden = new Set();
 
     function renderFixedCategoryStatsChart(txs) {
-        const fixedItems = state.budget.fixed.filter(f => safeParseFloat(f.budget_amount) > 0);
+        const fixedItems = (state.budget && state.budget.fixed) ? state.budget.fixed.filter(f => safeParseFloat(f.budget_amount) > 0) : [];
         const card = document.getElementById('fixedCatStatsCard');
         if (!card) return;
         
-        if (fixedItems.length === 0) { card.classList.add('hidden'); return; }
         card.classList.remove('hidden');
         card.classList.add('flex');
+        _fixedTxsCache = txs;
+
+        // Update Title
+        const titleEl = document.getElementById('fixedCatStatsTitle');
+        if (titleEl) {
+            const sel = document.getElementById('specificMonthSelect');
+            const moName = sel ? sel.options[sel.selectedIndex].text : '';
+            titleEl.textContent = `הוצאות קבועות לפי קטגוריה עבור חודש ${moName}`;
+        }
 
         const totals = {};
         txs.forEach(tx => {
             if (tx.tag) {
                 const foundFixed = state.budget.fixed.find(f => tagMatchesCat(tx.tag, f));
                 if (foundFixed) {
-                    const label = foundFixed.category_name;
-                    totals[label] = (totals[label] || 0) + safeParseFloat(tx.amount);
+                    const key = foundFixed.parent_group || foundFixed.category_name;
+                    totals[key] = (totals[key] || 0) + safeParseFloat(tx.amount);
                 }
             }
         });
 
-        const labels = [], data = [], colors = [];
-        fixedItems.forEach((cat, idx) => {
-            const val = totals[cat.category_name] || 0;
+        const allLabels = [], allData = [], allColors = [];
+        const uniqueKeys = [...new Set(fixedItems.map(cat => cat.parent_group || cat.category_name))];
+        uniqueKeys.forEach((key) => {
+            const val = totals[key] || 0;
             if (val > 0) {
-                labels.push(cat.category_name);
-                data.push(Math.round(val));
-                const hue = (idx * 45) % 60; // Consistent hue
-                colors.push(`hsl(${hue}, 80%, 60%)`);
+                allLabels.push(key);
+                allData.push(Math.round(val));
+                const keyIdx = uniqueKeys.indexOf(key);
+                const hue = (keyIdx * 45) % 360; 
+                allColors.push(`hsl(${hue}, 80%, 60%)`);
             }
         });
 
@@ -5381,70 +5530,109 @@
         const legend = document.getElementById('fixedCatChartLegend');
         const ctx = document.getElementById('fixedCatStatsChart').getContext('2d');
         
-        if (data.length === 0) {
+        if (allData.length === 0) {
             pieContainer.classList.add('hidden');
-            legend.innerHTML = `<div class="text-slate-400 text-xs py-10 text-center w-full">אין הוצאות קבועות בחודש זה</div>`;
+            legend.innerHTML = `<div class="text-slate-400 text-xs py-10 text-center w-full">${fixedItems.length === 0 ? 'לא הוגדרו קטגוריות' : 'אין הוצאות קבועות בחודש זה'}</div>`;
             if (fixedCatStatsChartInstance) fixedCatStatsChartInstance.destroy();
-        } else {
-            pieContainer.classList.remove('hidden');
-            if (fixedCatStatsChartInstance) fixedCatStatsChartInstance.destroy();
-            fixedCatStatsChartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: '#fff', borderWidth: 2 }] },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    cutout: '60%'
-                }
-            });
-
-            const total = data.reduce((s, v) => s + v, 0);
-            legend.innerHTML = `<div class="space-y-2 w-full">` +
-                labels.map((label, i) => {
-                    const pct = total > 0 ? Math.round(data[i] / total * 100) : 0;
-                    return `
-                    <div class="w-full flex justify-between items-center text-[11px] py-0.5">
-                        <div class="flex items-center gap-2">
-                            <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${colors[i]}"></div>
-                            <span class="font-semibold text-slate-600">${label}</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-slate-400 font-bold ltr-num">${pct}%</span>
-                            <span class="font-bold text-slate-700 ltr-num">₪${data[i].toLocaleString()}</span>
-                        </div>
-                    </div>`; }).join('') + `</div>`;
+            renderTrendChart();
+            return;
         }
 
+        // Reset hidden if segments changed
+        if (_fixedHidden.size > 0) {
+            const maxIdx = allData.length - 1;
+            _fixedHidden = new Set([..._fixedHidden].filter(i => i <= maxIdx));
+        }
+
+        function buildChartData() {
+            const visData = allData.map((v, i) => _fixedHidden.has(i) ? 0 : v);
+            const visBg = allColors.map((c, i) => _fixedHidden.has(i) ? 'rgba(0,0,0,0)' : c);
+            const visBorder = allColors.map((c, i) => _fixedHidden.has(i) ? 'rgba(0,0,0,0)' : '#fff');
+            return { visData, visBg, visBorder };
+        }
+
+        pieContainer.classList.remove('hidden');
+        if (fixedCatStatsChartInstance) fixedCatStatsChartInstance.destroy();
+        const { visData, visBg, visBorder } = buildChartData();
+        fixedCatStatsChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: { labels: allLabels, datasets: [{ data: visData, backgroundColor: visBg, borderColor: visBorder, borderWidth: 2 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                cutout: '60%'
+            }
+        });
+
+        function renderPieLegend() {
+            const visTotal = allData.reduce((s, v, i) => _fixedHidden.has(i) ? s : s + v, 0);
+            legend.innerHTML = `<div class="space-y-2 w-full">` +
+                allLabels.map((label, i) => {
+                    const hidden = _fixedHidden.has(i);
+                    const pct = visTotal > 0 && !hidden ? Math.round(allData[i] / visTotal * 100) : 0;
+                    return `
+                    <button onclick="window.toggleFixedChartSlice(${i})" class="w-full flex justify-between items-center text-[11px] py-0.5 rounded-lg transition-all ${hidden ? 'opacity-35' : ''}">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all" style="background:${hidden ? '#cbd5e1' : allColors[i]}"></div>
+                            <span class="font-semibold ${hidden ? 'text-slate-400 line-through' : 'text-slate-600'}">${label}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="${hidden ? 'text-slate-300' : 'text-slate-400'} font-bold ltr-num">${hidden ? '—' : pct + '%'}</span>
+                            <span class="font-bold ${hidden ? 'text-slate-300' : 'text-slate-700'} ltr-num">₪${allData[i].toLocaleString()}</span>
+                        </div>
+                    </button>`; }).join('') + `</div>`;
+        }
+
+        window.toggleFixedChartSlice = function(idx) {
+            if (_fixedHidden.size === 0 && allData.length > 1) { /* ok */ }
+            if (_fixedHidden.has(idx)) _fixedHidden.delete(idx); else _fixedHidden.add(idx);
+            
+            const { visData, visBg, visBorder } = buildChartData();
+            fixedCatStatsChartInstance.data.datasets[0].data = visData;
+            fixedCatStatsChartInstance.data.datasets[0].backgroundColor = visBg;
+            fixedCatStatsChartInstance.data.datasets[0].borderColor = visBorder;
+            fixedCatStatsChartInstance.update();
+            renderPieLegend();
+        };
+
+        renderPieLegend();
         renderTrendChart();
 
         function renderTrendChart() {
-            const trendCtx = document.getElementById('fixedTrendChart');
+            const trendCtx = document.getElementById('fixedStackedTrendChart');
             if (!trendCtx) return;
-
             const months = getTrendMonths();
             if (months.length === 0) return;
-
             const allTxs = state.transactions.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f)));
             const datasets = [];
 
-            // Use all fixed items for the trend to ensure it shows even if current month is zero
-            fixedItems.forEach((cat, idx) => {
-                const label = cat.category_name;
-                const catColor = `hsl(${(idx * 45) % 60}, 80%, 60%)`;
-                
+            // Group fixed items by parent_group or keep as standalone
+            const groupedFixed = {};
+            fixedItems.forEach((cat) => {
+                const key = cat.parent_group || cat.category_name;
+                if (!groupedFixed[key]) {
+                    const keyIdx = uniqueKeys.indexOf(key);
+                    groupedFixed[key] = { label: key, items: [], hue: (keyIdx * 45) % 360 };
+                }
+                groupedFixed[key].items.push(cat);
+            });
+
+            Object.values(groupedFixed).forEach(group => {
+                const catColor = `hsl(${group.hue}, 80%, 60%)`;
                 const monthlyTotals = months.sorted.map(m => {
                     return allTxs.filter(tx => {
                         const d = parseLocalDate(tx.date);
                         const txMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-                        return txMonth === m && tagMatchesCat(tx.tag, cat);
+                        // Match tx.tag with any item in the group
+                        return txMonth === m && group.items.some(cat => tagMatchesCat(tx.tag, cat));
                     }).reduce((s, tx) => s + safeParseFloat(tx.amount), 0);
                 });
                 
-                // Only add dataset if there's SOME data in the trend period
                 if (monthlyTotals.some(v => v > 0)) {
                     datasets.push({
-                        label,
+                        label: group.label,
                         data: monthlyTotals.map(v => Math.round(v)),
+                        allData: monthlyTotals.map(v => Math.round(v)),
                         borderColor: catColor,
                         backgroundColor: catColor + '22',
                         borderWidth: 2,
@@ -5455,19 +5643,97 @@
                 }
             });
 
-            if (fixedTrendChartInstance) fixedTrendChartInstance.destroy();
-            fixedTrendChartInstance = new Chart(trendCtx, {
-                type: 'line',
-                data: { labels: months.labels, datasets },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45 } },
-                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 }, callback: v => '₪' + v.toLocaleString() } }
+            function updateTrendCharts() {
+                const visDatasets = datasets.map((ds, i) => {
+                    const hidden = _fixedTrendHidden.has(i);
+                    return {
+                        ...ds,
+                        data: hidden ? ds.data.map(() => null) : ds.allData,
+                        pointRadius: hidden ? 0 : 3
+                    };
+                });
+
+                const stackedCtx = document.getElementById('fixedStackedTrendChart');
+                if (stackedCtx) {
+                    if (fixedStackedTrendChartInstance) fixedStackedTrendChartInstance.destroy();
+                    const stackedDatasets = visDatasets.map((ds, i) => ({
+                        ...ds,
+                        type: 'bar',
+                        backgroundColor: ds.borderColor,
+                        borderColor: '#fff',
+                        borderWidth: 1,
+                        fill: true,
+                        data: _fixedTrendHidden.has(i) ? ds.data.map(() => 0) : ds.allData
+                    }));
+                    const dynamicAvg = calculateDynamicMonthlyAverage(allTxs);
+                    fixedStackedTrendChartInstance = new Chart(stackedCtx, {
+                        type: 'bar',
+                        plugins: [_stackedTotalPlugin, _averageLinePlugin],
+                        data: { labels: months.labels, datasets: stackedDatasets },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { 
+                                legend: { display: false },
+                                averageLine: { overrideValue: dynamicAvg }
+                            },
+                            scales: {
+                                x: { stacked: true, grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45 } },
+                                y: { stacked: true, beginAtZero: true, grace: '15%', grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 }, callback: v => '₪' + v.toLocaleString() } }
+                            }
+                        }
+                    });
+                }
+                renderTrendLegend();
+            }
+
+            function renderTrendLegend() {
+                const trendLegendEl = document.getElementById('fixedTrendLegend');
+                if (!trendLegendEl) return;
+                
+                const dsTotals = datasets.map(ds => ds.allData.reduce((a, b) => a + (b || 0), 0));
+                const grandTotal = dsTotals.reduce((a, b, i) => _fixedTrendHidden.has(i) ? a : a + b, 0);
+
+                trendLegendEl.innerHTML = datasets.map((ds, i) => {
+                    const hidden = _fixedTrendHidden.has(i);
+                    const pct = grandTotal > 0 && !hidden ? Math.round(dsTotals[i] / grandTotal * 100) : 0;
+                    return `
+                    <div class="w-full flex items-center gap-1 group">
+                        <button onclick="window.toggleFixedTrendSlice(${i})" class="p-1 hover:bg-slate-100 rounded transition-colors ${hidden ? 'text-slate-300' : 'text-slate-400 hover:text-slate-600'}" title="הסתר/הצג">
+                            ${hidden ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>'}
+                        </button>
+                        <button onclick="window.isolateFixedTrendSlice(${i})" class="flex-1 flex justify-between items-center text-[11px] py-1 px-1.5 rounded-lg transition-all hover:bg-slate-50 ${hidden ? 'opacity-35' : ''}">
+                            <div class="flex items-center gap-2">
+                                <div class="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all" style="background:${hidden ? '#cbd5e1' : ds.borderColor}"></div>
+                                <span class="font-semibold ${hidden ? 'text-slate-400 line-through' : 'text-slate-600'}">${ds.label}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="${hidden ? 'text-slate-300' : 'text-slate-400'} font-bold ltr-num">${hidden ? '—' : pct + '%'}</span>
+                                <span class="font-bold ${hidden ? 'text-slate-300' : 'text-slate-700'} ltr-num">₪${dsTotals[i].toLocaleString()}</span>
+                            </div>
+                        </button>
+                    </div>`;
+                }).join('');
+            }
+
+            window.toggleFixedTrendSlice = function(idx) {
+                if (_fixedTrendHidden.has(idx)) _fixedTrendHidden.delete(idx); else _fixedTrendHidden.add(idx);
+                updateTrendCharts();
+            };
+
+            window.isolateFixedTrendSlice = function(idx) {
+                const total = datasets.length;
+                const isOnlyOneVisible = (_fixedTrendHidden.size === total - 1) && !_fixedTrendHidden.has(idx);
+                
+                _fixedTrendHidden.clear();
+                if (!isOnlyOneVisible) {
+                    for (let i = 0; i < total; i++) {
+                        if (i !== idx) _fixedTrendHidden.add(i);
                     }
                 }
-            });
+                updateTrendCharts();
+            };
+
+            updateTrendCharts();
         }
     }
 
@@ -5478,20 +5744,37 @@
         if (annuals.length === 0) { card.classList.add('hidden'); return; }
         card.classList.remove('hidden');
         card.classList.add('flex');
+        _plannedTxsCache = txs;
+
+        // Update Title
+        const titleEl = document.getElementById('plannedCatStatsTitle');
+        if (titleEl) {
+            const sel = document.getElementById('specificMonthSelect');
+            const moName = sel ? sel.options[sel.selectedIndex].text : '';
+            titleEl.textContent = `הוצאות מתוכננות לפי קטגוריה עבור חודש ${moName}`;
+        }
 
         const totals = {};
         txs.forEach(tx => {
-            if (tx.tag) totals[tx.tag] = (totals[tx.tag] || 0) + safeParseFloat(tx.amount);
+            if (tx.tag) {
+                const cat = annuals.find(a => tagMatchesCat(tx.tag, a));
+                if (cat) {
+                    const key = cat.parent_group || cat.category_name;
+                    totals[key] = (totals[key] || 0) + safeParseFloat(tx.amount);
+                }
+            }
         });
 
-        const labels = [], data = [], colors = [];
-        annuals.forEach((cat, idx) => {
-            const val = totals[cat.category_name] || 0;
+        const allLabels = [], allData = [], allColors = [];
+        const uniqueKeys = [...new Set(annuals.map(cat => cat.parent_group || cat.category_name))];
+        uniqueKeys.forEach((key) => {
+            const val = totals[key] || 0;
             if (val > 0) {
-                labels.push(cat.category_name);
-                data.push(Math.round(val));
-                const hue = (idx * 137.5) % 360;
-                colors.push(`hsl(${hue}, 70%, 50%)`);
+                allLabels.push(key);
+                allData.push(Math.round(val));
+                const keyIdx = uniqueKeys.indexOf(key);
+                const hue = (keyIdx * 137.5) % 360;
+                allColors.push(`hsl(${hue}, 70%, 50%)`);
             }
         });
 
@@ -5499,68 +5782,107 @@
         const legend = document.getElementById('plannedCatChartLegend');
         const ctx = document.getElementById('plannedCatStatsChart').getContext('2d');
 
-        if (data.length === 0) {
+        if (allData.length === 0) {
             pieContainer.classList.add('hidden');
             legend.innerHTML = `<div class="text-slate-400 text-xs py-10 text-center w-full">אין הוצאות מתוכננות בחודש זה</div>`;
             if (plannedCatStatsChartInstance) plannedCatStatsChartInstance.destroy();
-        } else {
-            pieContainer.classList.remove('hidden');
-            if (plannedCatStatsChartInstance) plannedCatStatsChartInstance.destroy();
-            plannedCatStatsChartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: '#fff', borderWidth: 2 }] },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    cutout: '60%'
-                }
-            });
-
-            const total = data.reduce((s, v) => s + v, 0);
-            legend.innerHTML = `<div class="space-y-2 w-full">` +
-                labels.map((label, i) => {
-                    const pct = total > 0 ? Math.round(data[i] / total * 100) : 0;
-                    return `
-                    <div class="w-full flex justify-between items-center text-[11px] py-0.5">
-                        <div class="flex items-center gap-2">
-                            <div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${colors[i]}"></div>
-                            <span class="font-semibold text-slate-600">${label}</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-slate-400 font-bold ltr-num">${pct}%</span>
-                            <span class="font-bold text-slate-700 ltr-num">₪${data[i].toLocaleString()}</span>
-                        </div>
-                    </div>`; }).join('') + `</div>`;
+            renderTrendChart();
+            return;
         }
 
+        // Reset hidden if segments changed
+        if (_plannedHidden.size > 0) {
+            const maxIdx = allData.length - 1;
+            _plannedHidden = new Set([..._plannedHidden].filter(i => i <= maxIdx));
+        }
+
+        function buildChartData() {
+            const visData = allData.map((v, i) => _plannedHidden.has(i) ? 0 : v);
+            const visBg = allColors.map((c, i) => _plannedHidden.has(i) ? 'rgba(0,0,0,0)' : c);
+            const visBorder = allColors.map((c, i) => _plannedHidden.has(i) ? 'rgba(0,0,0,0)' : '#fff');
+            return { visData, visBg, visBorder };
+        }
+
+        pieContainer.classList.remove('hidden');
+        if (plannedCatStatsChartInstance) plannedCatStatsChartInstance.destroy();
+        const { visData, visBg, visBorder } = buildChartData();
+        plannedCatStatsChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: { labels: allLabels, datasets: [{ data: visData, backgroundColor: visBg, borderColor: visBorder, borderWidth: 2 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                cutout: '60%'
+            }
+        });
+
+        function renderPieLegend() {
+            const visTotal = allData.reduce((s, v, i) => _plannedHidden.has(i) ? s : s + v, 0);
+            legend.innerHTML = `<div class="space-y-2 w-full">` +
+                allLabels.map((label, i) => {
+                    const hidden = _plannedHidden.has(i);
+                    const pct = visTotal > 0 && !hidden ? Math.round(allData[i] / visTotal * 100) : 0;
+                    return `
+                    <button onclick="window.togglePlannedChartSlice(${i})" class="w-full flex justify-between items-center text-[11px] py-0.5 rounded-lg transition-all ${hidden ? 'opacity-35' : ''}">
+                        <div class="flex items-center gap-2">
+                            <div class="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all" style="background:${hidden ? '#cbd5e1' : allColors[i]}"></div>
+                            <span class="font-semibold ${hidden ? 'text-slate-400 line-through' : 'text-slate-600'}">${label}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="${hidden ? 'text-slate-300' : 'text-slate-400'} font-bold ltr-num">${hidden ? '—' : pct + '%'}</span>
+                            <span class="font-bold ${hidden ? 'text-slate-300' : 'text-slate-700'} ltr-num">₪${allData[i].toLocaleString()}</span>
+                        </div>
+                    </button>`; }).join('') + `</div>`;
+        }
+
+        window.togglePlannedChartSlice = function(idx) {
+            if (_plannedHidden.has(idx)) _plannedHidden.delete(idx); else _plannedHidden.add(idx);
+            const { visData, visBg, visBorder } = buildChartData();
+            plannedCatStatsChartInstance.data.datasets[0].data = visData;
+            plannedCatStatsChartInstance.data.datasets[0].backgroundColor = visBg;
+            plannedCatStatsChartInstance.data.datasets[0].borderColor = visBorder;
+            plannedCatStatsChartInstance.update();
+            renderPieLegend();
+        };
+
+        renderPieLegend();
         renderTrendChart();
 
         function renderTrendChart() {
-            const trendCtx = document.getElementById('plannedTrendChart');
+            const trendCtx = document.getElementById('plannedStackedTrendChart');
             if (!trendCtx) return;
-
             const months = getTrendMonths();
             if (months.length === 0) return;
-
-            const allTxs = state.transactions.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.annual.some(a => a.category_name === tx.tag));
+            const allTxs = state.transactions.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.annual.some(a => tagMatchesCat(tx.tag, a)));
             const datasets = [];
 
-            annuals.forEach((cat, idx) => {
-                const label = cat.category_name;
-                const catColor = `hsl(${(idx * 137.5) % 360}, 70%, 50%)`;
-                
+            // Group annual items by parent_group or keep as standalone
+            const groupedAnnual = {};
+            annuals.forEach((cat) => {
+                const key = cat.parent_group || cat.category_name;
+                if (!groupedAnnual[key]) {
+                    const keyIdx = uniqueKeys.indexOf(key);
+                    groupedAnnual[key] = { label: key, items: [], hue: (keyIdx * 137.5) % 360 };
+                }
+                groupedAnnual[key].items.push(cat);
+            });
+
+            Object.values(groupedAnnual).forEach(group => {
+                const catColor = `hsl(${group.hue}, 70%, 50%)`;
                 const monthlyTotals = months.sorted.map(m => {
                     return allTxs.filter(tx => {
                         const d = parseLocalDate(tx.date);
                         const txMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-                        return txMonth === m && tx.tag === label;
+                        // Match tx.tag with any item in the group
+                        return txMonth === m && group.items.some(cat => tagMatchesCat(tx.tag, cat));
                     }).reduce((s, tx) => s + safeParseFloat(tx.amount), 0);
                 });
-                
+
                 if (monthlyTotals.some(v => v > 0)) {
                     datasets.push({
-                        label,
+                        label: group.label,
                         data: monthlyTotals.map(v => Math.round(v)),
+                        allData: monthlyTotals.map(v => Math.round(v)),
                         borderColor: catColor,
                         backgroundColor: catColor + '22',
                         borderWidth: 2,
@@ -5571,19 +5893,97 @@
                 }
             });
 
-            if (plannedTrendChartInstance) plannedTrendChartInstance.destroy();
-            plannedTrendChartInstance = new Chart(trendCtx, {
-                type: 'line',
-                data: { labels: months.labels, datasets },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45 } },
-                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 }, callback: v => '₪' + v.toLocaleString() } }
+            function updateTrendCharts() {
+                const visDatasets = datasets.map((ds, i) => {
+                    const hidden = _plannedTrendHidden.has(i);
+                    return {
+                        ...ds,
+                        data: hidden ? ds.data.map(() => null) : ds.allData,
+                        pointRadius: hidden ? 0 : 3
+                    };
+                });
+
+                const stackedCtx = document.getElementById('plannedStackedTrendChart');
+                if (stackedCtx) {
+                    if (plannedStackedTrendChartInstance) plannedStackedTrendChartInstance.destroy();
+                    const stackedDatasets = visDatasets.map((ds, i) => ({
+                        ...ds,
+                        type: 'bar',
+                        backgroundColor: ds.borderColor,
+                        borderColor: '#fff',
+                        borderWidth: 1,
+                        fill: true,
+                        data: _plannedTrendHidden.has(i) ? ds.data.map(() => 0) : ds.allData
+                    }));
+                    const dynamicAvg = calculateDynamicMonthlyAverage(allTxs);
+                    plannedStackedTrendChartInstance = new Chart(stackedCtx, {
+                        type: 'bar',
+                        plugins: [_stackedTotalPlugin, _averageLinePlugin],
+                        data: { labels: months.labels, datasets: stackedDatasets },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { 
+                                legend: { display: false },
+                                averageLine: { overrideValue: dynamicAvg }
+                            },
+                            scales: {
+                                x: { stacked: true, grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45 } },
+                                y: { stacked: true, beginAtZero: true, grace: '15%', grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 }, callback: v => '₪' + v.toLocaleString() } }
+                            }
+                        }
+                    });
+                }
+                renderTrendLegend();
+            }
+
+            function renderTrendLegend() {
+                const trendLegendEl = document.getElementById('plannedTrendLegend');
+                if (!trendLegendEl) return;
+                
+                const dsTotals = datasets.map(ds => ds.allData.reduce((a, b) => a + (b || 0), 0));
+                const grandTotal = dsTotals.reduce((a, b, i) => _plannedTrendHidden.has(i) ? a : a + b, 0);
+
+                trendLegendEl.innerHTML = datasets.map((ds, i) => {
+                    const hidden = _plannedTrendHidden.has(i);
+                    const pct = grandTotal > 0 && !hidden ? Math.round(dsTotals[i] / grandTotal * 100) : 0;
+                    return `
+                    <div class="w-full flex items-center gap-1 group">
+                        <button onclick="window.togglePlannedTrendSlice(${i})" class="p-1 hover:bg-slate-100 rounded transition-colors ${hidden ? 'text-slate-300' : 'text-slate-400 hover:text-slate-600'}" title="הסתר/הצג">
+                            ${hidden ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>'}
+                        </button>
+                        <button onclick="window.isolatePlannedTrendSlice(${i})" class="flex-1 flex justify-between items-center text-[11px] py-1 px-1.5 rounded-lg transition-all hover:bg-slate-50 ${hidden ? 'opacity-35' : ''}">
+                            <div class="flex items-center gap-2">
+                                <div class="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all" style="background:${hidden ? '#cbd5e1' : ds.borderColor}"></div>
+                                <span class="font-semibold ${hidden ? 'text-slate-400 line-through' : 'text-slate-600'}">${ds.label}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="${hidden ? 'text-slate-300' : 'text-slate-400'} font-bold ltr-num">${hidden ? '—' : pct + '%'}</span>
+                                <span class="font-bold ${hidden ? 'text-slate-300' : 'text-slate-700'} ltr-num">₪${dsTotals[i].toLocaleString()}</span>
+                            </div>
+                        </button>
+                    </div>`;
+                }).join('');
+            }
+
+            window.togglePlannedTrendSlice = function(idx) {
+                if (_plannedTrendHidden.has(idx)) _plannedTrendHidden.delete(idx); else _plannedTrendHidden.add(idx);
+                updateTrendCharts();
+            };
+
+            window.isolatePlannedTrendSlice = function(idx) {
+                const total = datasets.length;
+                const isOnlyOneVisible = (_plannedTrendHidden.size === total - 1) && !_plannedTrendHidden.has(idx);
+                
+                _plannedTrendHidden.clear();
+                if (!isOnlyOneVisible) {
+                    for (let i = 0; i < total; i++) {
+                        if (i !== idx) _plannedTrendHidden.add(i);
                     }
                 }
-            });
+                updateTrendCharts();
+            };
+
+            updateTrendCharts();
         }
     }
 
@@ -5614,44 +6014,88 @@
         return { sorted, labels };
     }
 
-    let _catHidden = new Set(); // indices of hidden segments
-    let _catTxsCache = null;   // last txs passed in
-
     function renderCategoryStatsChart(txs) {
         const cats = state.expenseCategories;
         const card = document.getElementById('catStatsCard');
         if (!card) return;
-        if (cats.length === 0) { card.classList.add('hidden'); return; }
         card.classList.remove('hidden');
         card.classList.add('flex');
 
         _catTxsCache = txs;
 
-        // Compute totals
+        // Update Title
+        const titleEl = document.getElementById('catStatsTitle');
+        if (titleEl) {
+            const sel = document.getElementById('specificMonthSelect');
+            const moName = sel ? sel.options[sel.selectedIndex].text : '';
+            titleEl.textContent = `הוצאות לפי קטגוריה עבור חודש ${moName}`;
+        }
+        
+        // Build categories to groups map for all time
+        const allTxs = state.transactions.filter(tx => !tx.tag && !tx.isAdjustment);
+        const groupConfigs = {}; // key -> { label, color, colorHex }
+        
+        cats.forEach(cat => {
+            const budgetItem = [...state.budget.fixed, ...state.budget.annual].find(b => b.category_name === cat.name);
+            const key = (budgetItem && budgetItem.parent_group) ? budgetItem.parent_group : cat.name;
+            if (!groupConfigs[key]) {
+                groupConfigs[key] = { label: key, color: cat.color, colorHex: getCatColor(cat.color).hex };
+            }
+        });
+
+        // Compute current month totals per group
         const totals = {};
         let uncategorized = 0;
         txs.forEach(tx => {
             const cid = tx.expense_category_id;
-            if (cid) totals[cid] = (totals[cid] || 0) + safeParseFloat(tx.amount);
-            else uncategorized += safeParseFloat(tx.amount);
+            if (cid) {
+                const cat = cats.find(c => c.id === cid);
+                if (cat) {
+                    const budgetItem = [...state.budget.fixed, ...state.budget.annual].find(b => b.category_name === cat.name);
+                    const key = (budgetItem && budgetItem.parent_group) ? budgetItem.parent_group : cat.name;
+                    totals[key] = (totals[key] || 0) + safeParseFloat(tx.amount);
+                } else {
+                    uncategorized += safeParseFloat(tx.amount);
+                }
+            } else {
+                uncategorized += safeParseFloat(tx.amount);
+            }
         });
 
         const allLabels = [], allData = [], allColors = [];
-        cats.forEach(cat => {
-            const val = totals[cat.id] || 0;
+        Object.keys(groupConfigs).forEach(key => {
+            const val = totals[key] || 0;
             if (val > 0) {
-                allLabels.push(cat.name);
+                allLabels.push(key);
                 allData.push(Math.round(val));
-                allColors.push(getCatColor(cat.color).hex);
+                allColors.push(groupConfigs[key].colorHex);
             }
         });
-        if (uncategorized > 0.5) {
+        if (uncategorized > 0.5 || (cats.length === 0 && uncategorized > 0)) {
             allLabels.push('לא מקוטלג');
             allData.push(Math.round(uncategorized));
             allColors.push('#cbd5e1');
         }
 
-        if (allData.length === 0) { card.classList.add('hidden'); return; }
+        const totalSum = allData.reduce((a, b) => a + b, 0);
+
+        if (cats.length === 0 || totalSum === 0) {
+            const legend = document.getElementById('catChartLegend');
+            const pieContainer = document.getElementById('catChartContainer');
+            if (pieContainer) pieContainer.classList.add('hidden');
+            if (legend) {
+                if (cats.length === 0) {
+                    legend.innerHTML = `<div class="text-slate-400 text-xs py-10 text-center w-full">לא הוגדרו קטגוריות</div>`;
+                } else if (totalSum === 0) {
+                    legend.innerHTML = `<div class="text-slate-400 text-xs py-10 text-center w-full">אין נתוני הוצאות לחודש זה</div>`;
+                }
+            }
+            if (catStatsChartInstance) catStatsChartInstance.destroy();
+            
+            // Still render trend chart if there's any data in history
+            renderTrendChart();
+            return;
+        }
 
         // Reset hidden if segments changed
         if (_catHidden.size > 0) {
@@ -5709,14 +6153,13 @@
             catStatsChartInstance.data.datasets[0].borderColor = visBorder;
             catStatsChartInstance.update();
             renderLegend();
-            renderTrendChart();
         };
 
         renderLegend();
         renderTrendChart();
 
         function renderTrendChart() {
-            const trendCtx = document.getElementById('catTrendChart');
+            const trendCtx = document.getElementById('catStackedTrendChart');
             if (!trendCtx) return;
 
             // Build months from startDate to today
@@ -5747,48 +6190,139 @@
                 return names[parseInt(mo)-1] + ' ' + y.slice(2);
             });
 
-            // Build datasets — one per visible category + uncategorized
-            // Use ALL transactions (not just the selected month) for the trend
-            const allTxs = state.transactions.filter(tx => !tx.tag && !tx.isAdjustment);
             const datasets = [];
-            allLabels.forEach((label, i) => {
-                if (_catHidden.has(i)) return;
-                const cat = cats.find(c => c.name === label);
+            
+            // Build datasets for trend based on ALL categories that have data somewhere
+            const trendKeys = Object.keys(groupConfigs);
+            const hasUncategorized = allTxs.some(tx => !tx.expense_category_id);
+            if (hasUncategorized) trendKeys.push('לא מקוטלג');
+
+            trendKeys.forEach(key => {
                 const monthlyTotals = sortedMonths.map(m => {
                     return allTxs.filter(tx => {
                         const d = parseLocalDate(tx.date);
                         const txMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
                         if (txMonth !== m) return false;
-                        if (label === 'לא מקוטלג') return !tx.expense_category_id;
-                        return cat && tx.expense_category_id === cat.id;
+                        
+                        if (key === 'לא מקוטלג') return !tx.expense_category_id;
+                        
+                        const cat = cats.find(c => c.id === tx.expense_category_id);
+                        if (!cat) return false;
+                        
+                        const budgetItem = [...state.budget.fixed, ...state.budget.annual].find(b => b.category_name === cat.name);
+                        const txKey = (budgetItem && budgetItem.parent_group) ? budgetItem.parent_group : cat.name;
+                        return txKey === key;
                     }).reduce((s, tx) => s + safeParseFloat(tx.amount), 0);
                 });
-                datasets.push({
-                    label,
-                    data: monthlyTotals.map(v => Math.round(v)),
-                    borderColor: allColors[i],
-                    backgroundColor: allColors[i] + '22',
-                    borderWidth: 2,
-                    pointRadius: 3,
-                    pointHoverRadius: 5,
-                    tension: 0.3,
-                    fill: false
-                });
-            });
 
-            if (window._catTrendChartInstance) window._catTrendChartInstance.destroy();
-            window._catTrendChartInstance = new Chart(trendCtx, {
-                type: 'line',
-                data: { labels: monthLabels, datasets },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45 } },
-                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 }, callback: v => '₪' + v.toLocaleString() } }
-                    }
+                if (monthlyTotals.some(v => v > 0)) {
+                    const color = key === 'לא מקוטלג' ? '#cbd5e1' : groupConfigs[key].colorHex;
+                    datasets.push({
+                        label: key,
+                        data: monthlyTotals.map(v => Math.round(v)),
+                        allData: monthlyTotals.map(v => Math.round(v)),
+                        borderColor: color,
+                        backgroundColor: color + '22',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        tension: 0.3,
+                        fill: false
+                    });
                 }
             });
+
+            function updateTrendCharts() {
+                const visDatasets = datasets.map((ds, i) => {
+                    const hidden = _catTrendHidden.has(i);
+                    return {
+                        ...ds,
+                        data: hidden ? ds.data.map(() => null) : ds.allData,
+                        pointRadius: hidden ? 0 : 3
+                    };
+                });
+
+                const stackedCtx = document.getElementById('catStackedTrendChart');
+                if (stackedCtx) {
+                    if (window._catStackedTrendChartInstance) window._catStackedTrendChartInstance.destroy();
+                    const stackedDatasets = visDatasets.map((ds, i) => ({
+                        ...ds,
+                        type: 'bar',
+                        backgroundColor: ds.borderColor,
+                        borderColor: '#fff',
+                        borderWidth: 1,
+                        fill: true,
+                        data: _catTrendHidden.has(i) ? ds.data.map(() => 0) : ds.allData
+                    }));
+                    const dynamicAvg = calculateDynamicMonthlyAverage(allTxs);
+                    window._catStackedTrendChartInstance = new Chart(stackedCtx, {
+                        type: 'bar',
+                        plugins: [_stackedTotalPlugin, _averageLinePlugin],
+                        data: { labels: monthLabels, datasets: stackedDatasets },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { 
+                                legend: { display: false },
+                                averageLine: { overrideValue: dynamicAvg }
+                            },
+                            scales: {
+                                x: { stacked: true, grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45 } },
+                                y: { stacked: true, beginAtZero: true, grace: '15%', grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 }, callback: v => '₪' + v.toLocaleString() } }
+                            }
+                        }
+                    });
+                }
+                renderTrendLegend();
+            }
+
+            function renderTrendLegend() {
+                const trendLegendEl = document.getElementById('catTrendLegend');
+                if (!trendLegendEl) return;
+                
+                const dsTotals = datasets.map(ds => ds.allData.reduce((a, b) => a + (b || 0), 0));
+                const grandTotal = dsTotals.reduce((a, b, i) => _catTrendHidden.has(i) ? a : a + b, 0);
+
+                trendLegendEl.innerHTML = datasets.map((ds, i) => {
+                    const hidden = _catTrendHidden.has(i);
+                    const pct = grandTotal > 0 && !hidden ? Math.round(dsTotals[i] / grandTotal * 100) : 0;
+                    return `
+                    <div class="w-full flex items-center gap-1 group">
+                        <button onclick="window.toggleCatTrendSlice(${i})" class="p-1 hover:bg-slate-100 rounded transition-colors ${hidden ? 'text-slate-300' : 'text-slate-400 hover:text-slate-600'}" title="הסתר/הצג">
+                            ${hidden ? '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>'}
+                        </button>
+                        <button onclick="window.isolateCatTrendSlice(${i})" class="flex-1 flex justify-between items-center text-[11px] py-1 px-1.5 rounded-lg transition-all hover:bg-slate-50 ${hidden ? 'opacity-35' : ''}">
+                            <div class="flex items-center gap-2">
+                                <div class="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all" style="background:${hidden ? '#cbd5e1' : ds.borderColor}"></div>
+                                <span class="font-semibold ${hidden ? 'text-slate-400 line-through' : 'text-slate-600'}">${ds.label}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="${hidden ? 'text-slate-300' : 'text-slate-400'} font-bold ltr-num">${hidden ? '—' : pct + '%'}</span>
+                                <span class="font-bold ${hidden ? 'text-slate-300' : 'text-slate-700'} ltr-num">₪${dsTotals[i].toLocaleString()}</span>
+                            </div>
+                        </button>
+                    </div>`;
+                }).join('');
+            }
+
+            window.toggleCatTrendSlice = function(idx) {
+                if (_catTrendHidden.has(idx)) _catTrendHidden.delete(idx); else _catTrendHidden.add(idx);
+                updateTrendCharts();
+            };
+
+            window.isolateCatTrendSlice = function(idx) {
+                const total = datasets.length;
+                const isOnlyOneVisible = (_catTrendHidden.size === total - 1) && !_catTrendHidden.has(idx);
+                
+                _catTrendHidden.clear();
+                if (!isOnlyOneVisible) {
+                    for (let i = 0; i < total; i++) {
+                        if (i !== idx) _catTrendHidden.add(i);
+                    }
+                }
+                updateTrendCharts();
+            };
+
+            updateTrendCharts();
         }
     }
 
@@ -6555,7 +7089,7 @@
         row.innerHTML = `
             <input type="checkbox" id="${cbId}" class="w-4 h-4 rounded text-blue-600 flex-shrink-0 cursor-pointer" ${item.checked ? 'checked' : ''}>
             <div class="flex-1 flex items-center gap-1 min-w-0">
-                <input type="text" value="${item.name}" placeholder="שם"
+                <input type="text" value="${item.name.replace(/"/g, '&quot;')}" placeholder="שם"
                     class="flex-1 bg-transparent text-xs font-bold text-slate-700 border-b border-transparent focus:border-blue-300 outline-none min-w-0 py-0.5"
                     oninput="window._wizSetName('${type}',${idx},this.value)">
                 ${extraBtnHtml}
