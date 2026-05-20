@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>מחשבון השקעה</title>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f0f7f4;
+      --surface: #ffffff;
+      --surface2: #f4faf7;
+      --border: #d6ebe1;
+      --accent: #1db87a;
+      --accent2: #0e8f5f;
+      --gold: #d4930a;
+      --text: #0f2620;
+      --muted: #6a8a7a;
+      --danger: #e03355;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Heebo', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(29,184,122,0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(29,184,122,0.07) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    /* glowing orbs */
+    body::after {
+      content: '';
+      position: fixed;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(14,143,95,0.08) 0%, transparent 70%);
+      top: -200px; left: -200px;
+      pointer-events: none;
+    }
+
+    .orb2 {
+      position: fixed;
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(29,184,122,0.08) 0%, transparent 70%);
+      bottom: -150px; right: -150px;
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 3rem 3rem 2.5rem;
+      width: 100%;
+      max-width: 560px;
+      position: relative;
+      box-shadow: 0 8px 48px rgba(29,184,122,0.10), 0 1px 3px rgba(0,0,0,0.06);
+      animation: slideUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .back-btn:hover {
+      background: var(--surface);
+      color: var(--accent);
+      border-color: var(--accent);
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(29,184,122,0.08);
+    }
+
+    .back-btn svg {
+       width: 20px;
+       height: 20px;
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.8rem;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(32px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    h1 {
+      font-size: 2.1rem;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 0.4rem;
+      background: linear-gradient(135deg, var(--text) 40%, var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 2.2rem;
+    }
+
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+      margin-bottom: 2rem;
+    }
+
+    .field { margin-bottom: 1.4rem; }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 0.55rem;
+    }
+
+    label .icon { width: 18px; height: 18px; opacity: 0.7; }
+
+    .input-wrap { position: relative; }
+
+    input[type="number"] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: 'Heebo', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 500;
+      padding: 0.8rem 1rem 0.8rem 3.2rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+    input[type="number"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(29,184,122,0.15);
+    }
+
+    .suffix {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 600;
+      pointer-events: none;
+    }
+
+    .slider-wrap { margin-top: 0.6rem; }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 4px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: 2px solid var(--surface);
+      box-shadow: 0 0 8px rgba(29,184,122,0.45);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    /* results section */
+    .results {
+      margin-top: 2rem;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      pointer-events: none;
+    }
+
+    .results.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    /* total value card - full width hero */
+    .result-hero {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 18px;
+      padding: 1.6rem 1.4rem;
+      text-align: center;
+      margin-bottom: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .result-hero::before {
+      content: '';
+      position: absolute;
+      width: 180px; height: 180px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 50%;
+      top: -60px; left: -60px;
+    }
+
+    .result-hero::after {
+      content: '';
+      position: absolute;
+      width: 120px; height: 120px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 50%;
+      bottom: -40px; right: -20px;
+    }
+
+    .result-hero .rh-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 0.4rem;
+    }
+
+    .result-hero .rh-value {
+      font-size: 2.4rem;
+      font-weight: 900;
+      color: #fff;
+      line-height: 1;
+      position: relative;
+      z-index: 1;
+    }
+
+    .result-hero .rh-sub {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.65);
+      margin-top: 4px;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .result-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.2rem 1rem;
+      text-align: center;
+    }
+
+    .result-card .rc-label {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .result-card .rc-value {
+      font-size: 1.45rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .result-card .rc-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* breakdown bar */
+    .breakdown {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.2rem 1.2rem 1rem;
+    }
+
+    .breakdown-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 0.9rem;
+    }
+
+    .bar-track {
+      height: 10px;
+      border-radius: 100px;
+      overflow: hidden;
+      margin-bottom: 0.8rem;
+      display: flex;
+      background: transparent;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+      width: 0%;
+    }
+
+    .bar-fill-yield {
+      height: 100%;
+      background: var(--gold);
+      transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+      width: 0%;
+    }
+
+    .bar-legend {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .legend-dot.deposits { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+    .legend-dot.yield-dot { background: var(--gold); }
+
+    .legend-item .lval { font-weight: 700; margin-right: 2px; }
+    .legend-item .lpct { color: var(--muted); font-size: 0.72rem; }
+
+    /* error */
+    .error-msg {
+      display: none;
+      color: var(--danger);
+      font-size: 0.82rem;
+      margin-top: 0.5rem;
+      padding: 0.6rem 1rem;
+      background: rgba(224,51,85,0.07);
+      border: 1px solid rgba(224,51,85,0.2);
+      border-radius: 8px;
+    }
+
+    .error-msg.show { display: block; }
+
+    .card-footer {
+      margin-top: 1.8rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 480px) {
+      .card { padding: 2rem 1.5rem; }
+      h1 { font-size: 1.7rem; }
+      .results-grid { grid-template-columns: 1fr; }
+      .result-hero .rh-value { font-size: 1.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb2"></div>
+
+  <div class="card">
+    <div class="header-row">
+      <h1>מחשבון השקעה</h1>
+      <a href="index.html" class="back-btn" title="חזרה למסך הבית">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+    </div>
+    <p class="subtitle">גלה כמה ההשקעה החודשית שלך תצמח לאורך הזמן</p>
+    <div class="divider"></div>
+
+    <!-- הפקדה חודשית -->
+    <div class="field">
+      <label>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+        </svg>
+        הפקדה חודשית
+      </label>
+      <div class="input-wrap">
+        <input type="number" id="monthly" min="100" max="50000" step="100" value="1000" oninput="syncSlider('monthly','sM')" />
+        <span class="suffix">₪</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="sM" min="100" max="50000" step="100" value="1000"
+          oninput="document.getElementById('monthly').value=this.value; calculate();" />
+        <div class="slider-labels"><span>₪100</span><span>₪50,000</span></div>
+      </div>
+    </div>
+
+    <!-- תשואה שנתית -->
+    <div class="field">
+      <label>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+          <polyline points="17 6 23 6 23 12"/>
+        </svg>
+        תשואה שנתית
+      </label>
+      <div class="input-wrap">
+        <input type="number" id="rate" min="0.1" max="30" step="0.1" value="7" oninput="syncSlider('rate','sR')" />
+        <span class="suffix">%</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="sR" min="0.1" max="30" step="0.1" value="7"
+          oninput="document.getElementById('rate').value=this.value; calculate();" />
+        <div class="slider-labels"><span>0.1%</span><span>30%</span></div>
+      </div>
+    </div>
+
+    <!-- שנות השקעה -->
+    <div class="field">
+      <label>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        שנות השקעה
+      </label>
+      <div class="input-wrap">
+        <input type="number" id="years" min="1" max="40" step="1" value="20" oninput="syncSlider('years','sY')" />
+        <span class="suffix">שנ׳</span>
+      </div>
+      <div class="slider-wrap">
+        <input type="range" id="sY" min="1" max="40" step="1" value="20"
+          oninput="document.getElementById('years').value=this.value; calculate();" />
+        <div class="slider-labels"><span>שנה 1</span><span>40 שנה</span></div>
+      </div>
+    </div>
+
+    <div id="errorMsg" class="error-msg">אנא הזן ערכים חיוביים בכל השדות.</div>
+
+    <!-- תוצאות -->
+    <div class="results" id="results">
+
+      <!-- סך כל הצבירה -->
+      <div class="result-hero">
+        <div class="rh-label">סך צבירה סופי</div>
+        <div class="rh-value" id="rTotal">—</div>
+        <div class="rh-sub">שווי תיק ההשקעה בסוף התקופה</div>
+      </div>
+
+      <div class="results-grid">
+        <div class="result-card">
+          <div class="rc-label">סך הפקדות</div>
+          <div class="rc-value" id="rDeposits" style="color: var(--accent2);">—</div>
+          <div class="rc-sub">₪ הופקד בסה״כ</div>
+        </div>
+        <div class="result-card">
+          <div class="rc-label">סך תשואה</div>
+          <div class="rc-value" id="rYield" style="color: var(--gold);">—</div>
+          <div class="rc-sub">₪ נצבר מריבית</div>
+        </div>
+      </div>
+
+      <div class="breakdown">
+        <div class="breakdown-title">פירוט סך הצבירה</div>
+        <div class="bar-track">
+          <div class="bar-fill" id="barFill"></div>
+          <div class="bar-fill-yield" id="barFillYield"></div>
+        </div>
+        <div class="bar-legend">
+          <div class="legend-item">
+            <div class="legend-dot deposits"></div>
+            <span class="lval" id="lDeposits">—</span>
+            <span class="lpct" id="lPctD"></span>
+            <span style="color:var(--muted)">הפקדות</span>
+          </div>
+          <div class="legend-item">
+            <span style="color:var(--muted)">תשואה</span>
+            <span class="lval" id="lYield">—</span>
+            <span class="lpct" id="lPctY"></span>
+            <div class="legend-dot yield-dot"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-footer">* החישוב מבוסס על ריבית דריבית חודשית עם הפקדה קבועה בתחילת כל חודש</div>
+  </div>
+
+  <script>
+    function fmt(n) {
+      return n.toLocaleString('he-IL', { maximumFractionDigits: 0 });
+    }
+
+    function syncSlider(inputId, sliderId) {
+      const val = parseFloat(document.getElementById(inputId).value);
+      const slider = document.getElementById(sliderId);
+      if (!isNaN(val)) slider.value = val;
+      calculate();
+    }
+
+    function calculate() {
+      const monthly = parseFloat(document.getElementById('monthly').value);
+      const annualRate = parseFloat(document.getElementById('rate').value);
+      const years = parseFloat(document.getElementById('years').value);
+      const errEl = document.getElementById('errorMsg');
+
+      if (!monthly || !annualRate || !years || monthly <= 0 || annualRate <= 0 || years <= 0) {
+        errEl.classList.add('show');
+        return;
+      }
+      errEl.classList.remove('show');
+
+      // Future Value of annuity (payments at beginning of period)
+      const r = annualRate / 100 / 12;
+      const n = years * 12;
+      const totalDeposits = monthly * n;
+      // FV = PMT * ((1+r)^n - 1) / r * (1+r)
+      const totalValue = monthly * ((Math.pow(1 + r, n) - 1) / r) * (1 + r);
+      const totalYield = totalValue - totalDeposits;
+      const depositsPct = (totalDeposits / totalValue) * 100;
+      const yieldPct = 100 - depositsPct;
+
+      document.getElementById('rTotal').textContent = '₪' + fmt(totalValue);
+      document.getElementById('rDeposits').textContent = '₪' + fmt(totalDeposits);
+      document.getElementById('rYield').textContent = '₪' + fmt(totalYield);
+      document.getElementById('lDeposits').textContent = '₪' + fmt(totalDeposits);
+      document.getElementById('lYield').textContent = '₪' + fmt(totalYield);
+      document.getElementById('lPctD').textContent = '(' + depositsPct.toFixed(0) + '%)';
+      document.getElementById('lPctY').textContent = '(' + yieldPct.toFixed(0) + '%)';
+
+      setTimeout(() => {
+        document.getElementById('barFill').style.width = depositsPct + '%';
+        document.getElementById('barFillYield').style.width = yieldPct + '%';
+      }, 50);
+
+      document.getElementById('results').classList.add('visible');
+    }
+
+    window.addEventListener('load', calculate);
+  </script>
+</body>
+</html>
