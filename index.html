@@ -39,7 +39,7 @@
         .name-input { background: transparent; border: none; width: 100%; font-weight: 600; color: #334155; padding: 1px 0; }
         .btn-sync { background: #eff6ff; color: #2563eb; font-size: 0.7rem; font-weight: 700; padding: 0.4rem 0.8rem; border-radius: 9999px; display: flex; align-items: center; gap: 0.4rem; transition: all 0.2s; }
         .ltr-num { direction: ltr; display: inline-block; }
-        .compact-tx { padding: 0.4rem 0.75rem !important; margin-bottom: 0.25rem !important; overflow: hidden; position: relative; }
+        .compact-tx { padding: 0.25rem 0.6rem !important; margin-bottom: 0.15rem !important; overflow: hidden; position: relative; }
         .tx-inner { display: flex; align-items: center; width: 100%; transition: transform 0.3s ease; }
         .tx-actions-panel { position: absolute; left: 0; top: 0; bottom: 0; width: 210px; background: #ffffff; display: flex; align-items: center; justify-content: space-around; transform: translateX(-100%); transition: transform 0.3s ease; padding-left: 8px; }
         .row-active .tx-inner { transform: translateX(210px); }
@@ -89,7 +89,10 @@
         .reserve-info-btn { width: 18px; height: 18px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; }
         .btn-fab { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 8px 20px -4px rgba(37, 99, 235, 0.5); border: 4px solid #ffffff; margin-top: -38px; z-index: 60; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .btn-fab:active { transform: scale(0.9) translateY(4px); }
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-top: 1px solid #e2e8f0; padding: 0.25rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; justify-items: center; z-index: 50; box-shadow: 0 -4px 12px -4px rgba(0,0,0,0.05); }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; margin-left: auto; margin-right: auto; width: 100%; max-width: 28rem; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-top: 1px solid #e2e8f0; padding: 0.25rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; justify-items: center; z-index: 50; box-shadow: 0 -4px 12px -4px rgba(0,0,0,0.05); }
+        @media (min-width: 640px) and (orientation: landscape) { .bottom-nav { max-width: 56rem; } }
+        @media (min-width: 1024px) { .bottom-nav { max-width: 64rem; } }
+        @media (min-width: 1280px) { .bottom-nav { max-width: 80rem; } }
         .nav-icon-entity { font-size: 1.25rem; line-height: 1; transition: transform 0.2s; }
         .group-header { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; margin-bottom: 0.5rem; transition: all 0.2s; overflow: hidden; }
         .group-header.collapsed { margin-bottom: 0.5rem; }
@@ -166,7 +169,7 @@
     </div>
     <!-- ====================================================== -->
 
-    <div class="w-full max-w-md bg-transparent flex flex-col min-h-screen pb-32" id="appRoot">
+    <div class="w-full max-w-md landscape:max-w-4xl lg:max-w-5xl xl:max-w-7xl bg-transparent flex flex-col min-h-screen pb-32" id="appRoot">
         <div class="flex justify-between items-center mb-4 px-1">
             <div class="flex items-center gap-2">
                 <button onclick="window.toggleHamburgerMenu()" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
@@ -195,44 +198,33 @@
         </div>
 
         <div id="mainView" class="view-content">
-            <header class="mb-2">
-                <div class="bg-white px-4 py-4 rounded-3xl shadow-sm border border-slate-100 flex items-center">
-                    <!-- מאזן נוכחי — חצי ימין -->
-                    <div class="flex-1 flex flex-col items-center border-l border-slate-100">
-                        <p class="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-1">מאזן נוכחי</p>
-                        <div class="flex items-baseline gap-0.5">
-                            <span id="balanceValue" class="text-2xl font-black text-slate-900 ltr-num">0</span>
-                            <span class="text-sm text-slate-400 font-bold">₪</span>
-                        </div>
-                    </div>
-                    <!-- תקציב יומי — חצי שמאל -->
-                    <div class="flex-1 flex flex-col items-center">
-                        <p class="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-1">תקציב יומי</p>
-                        <div class="flex items-baseline gap-0.5">
-                            <span id="dailyBudgetValue" class="text-2xl font-black text-blue-600 ltr-num">0</span>
-                            <span class="text-sm text-blue-400 font-bold">₪</span>
-                        </div>
-                    </div>
+            <!-- View Switcher -->
+            <div class="mb-3 px-1">
+                <div class="flex bg-slate-100 p-1 rounded-xl">
+                    <button onclick="window.setMainViewFilter('current')" id="filterCurrentBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
+                    <button onclick="window.setMainViewFilter('planned')" id="filterPlannedBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all text-slate-400">מתוכנן</button>
+                    <button onclick="window.setMainViewFilter('fixed')" id="filterFixedBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
+                    <button onclick="window.setMainViewFilter('all')" id="filterAllBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all text-slate-400">הכל</button>
                 </div>
-            </header>
+            </div>
+
+            <!-- Unified Stats & Categories Card -->
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-4">
+                <header>
+                    <div id="statsHeaderRow" class="px-2 py-3 flex items-center transition-all min-h-[85px]">
+                        <!-- Content populated by renderCategorySummary() -->
+                    </div>
+                </header>
+
+                <!-- Category summary list -->
+                <div id="categorySummarySection" class="hidden">
+                    <div class="border-t border-slate-300"></div>
+                    <div id="categorySummaryStrip" class="flex flex-col"></div>
+                </div>
+            </div>
 
             <!-- Savings reminders -->
             <div id="savingsRemindersContainer"></div>
-
-            <!-- View Switcher -->
-            <div class="mb-1.5 px-1">
-                <div class="flex bg-slate-100 p-1 rounded-xl">
-                    <button onclick="window.setMainViewFilter('current')" id="filterCurrentBtn" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
-                    <button onclick="window.setMainViewFilter('planned')" id="filterPlannedBtn" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">מתוכנן</button>
-                    <button onclick="window.setMainViewFilter('fixed')" id="filterFixedBtn" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
-                    <button onclick="window.setMainViewFilter('all')" id="filterAllBtn" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">הכל</button>
-                </div>
-            </div>
-
-            <!-- Category summary strip -->
-            <div id="categorySummarySection" class="mb-1.5 hidden">
-                <div id="categorySummaryStrip" class="flex gap-2 overflow-x-auto pb-1 no-scrollbar"></div>
-            </div>
 
             <section class="flex flex-col pb-6">
                 <div class="flex justify-between items-center mb-1 px-1">
@@ -243,7 +235,7 @@
                     </div>
                 </div>
                 <div id="transactionContainer" class="relative">
-                    <div id="transactionList" class="space-y-1"></div>
+                    <div id="transactionList" class="space-y-0.5"></div>
                     <button id="loadMoreBtn" onclick="window.loadMoreTransactions()" class="w-full py-3 mt-2 text-blue-600 font-bold text-xs bg-white rounded-xl shadow-sm border border-slate-100 hidden">
                         <span id="loadMoreText">טען הכל</span>
                     </button>
@@ -268,7 +260,7 @@
             
             <div class="card p-6 mb-4 border border-slate-200 bg-white shadow-sm flex flex-col items-center">
                 <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-6 self-start">התפלגות הוצאות</h3>
-                <div id="chartContainer" class="w-full aspect-square max-w-[240px] relative mb-6">
+                <div id="chartContainer" class="w-full aspect-square max-w-[240px] landscape:max-w-[320px] md:max-w-[400px] lg:max-w-[500px] relative mb-6 mx-auto">
                     <canvas id="statsChart"></canvas>
                 </div>
                 <div id="chartLegend" class="w-full space-y-2"></div>
@@ -283,7 +275,7 @@
             <!-- Category breakdown pie -->
             <div id="catStatsCard" class="card p-6 mb-4 border border-slate-200 bg-white shadow-sm flex-col items-center hidden">
                 <h3 id="catStatsTitle" class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות לפי קטגוריה</h3>
-                <div id="catChartContainer" class="w-full aspect-square max-w-[240px] relative mb-4 mx-auto">
+                <div id="catChartContainer" class="w-full aspect-square max-w-[240px] landscape:max-w-[320px] md:max-w-[400px] lg:max-w-[500px] relative mb-4 mx-auto">
                     <canvas id="catStatsChart"></canvas>
                 </div>
                 <!-- Shared legend used by both charts -->
@@ -299,7 +291,7 @@
             <!-- Planned Category breakdown pie -->
             <div id="plannedCatStatsCard" class="card p-6 mb-4 border border-slate-200 bg-white shadow-sm flex-col items-center hidden">
                 <h3 id="plannedCatStatsTitle" class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות מתוכננות לפי קטגוריה</h3>
-                <div id="plannedCatChartContainer" class="w-full aspect-square max-w-[240px] relative mb-4 mx-auto">
+                <div id="plannedCatChartContainer" class="w-full aspect-square max-w-[240px] landscape:max-w-[320px] md:max-w-[400px] lg:max-w-[500px] relative mb-4 mx-auto">
                     <canvas id="plannedCatStatsChart"></canvas>
                 </div>
                 <div id="plannedCatChartLegend" class="w-full space-y-1 mb-4"></div>
@@ -314,7 +306,7 @@
             <!-- Fixed Category breakdown pie -->
             <div id="fixedCatStatsCard" class="card p-6 mb-4 border border-slate-200 bg-white shadow-sm flex-col items-center hidden">
                 <h3 id="fixedCatStatsTitle" class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-4 self-start w-full">הוצאות קבועות לפי קטגוריה</h3>
-                <div id="fixedCatChartContainer" class="w-full aspect-square max-w-[240px] relative mb-4 mx-auto">
+                <div id="fixedCatChartContainer" class="w-full aspect-square max-w-[240px] landscape:max-w-[320px] md:max-w-[400px] lg:max-w-[500px] relative mb-4 mx-auto">
                     <canvas id="fixedCatStatsChart"></canvas>
                 </div>
                 <div id="fixedCatChartLegend" class="w-full space-y-1 mb-4"></div>
@@ -1872,6 +1864,7 @@
         pendingActionRow: null,
         pendingAddType: null,
         expandedAnnualCategories: new Set(),
+        expandedPlannedGroups: new Set(),
         dirtyBudgetItems: {},
         isDirty: true,
         showAnnualInMain: false,
@@ -2021,14 +2014,21 @@
         if (bySep !== -1) {
             const parent = t.slice(0, bySep).trim();
             const child  = t.slice(bySep + 3).trim();
-            const found = state.budget.annual.find(a =>
+            const foundAnnual = state.budget.annual.find(a =>
                 (a.category_name||'').trim() === child &&
                 (a.parent_group||'').trim() === parent
             );
-            if (found) return found;
+            if (foundAnnual) return foundAnnual;
+            
+            const foundFixed = state.budget.fixed.find(f =>
+                (f.category_name||'').trim() === child &&
+                (f.parent_group||'').trim() === parent
+            );
+            if (foundFixed) return foundFixed;
         }
         // חיפוש לפי שם קצר בלבד
-        return state.budget.annual.find(a => (a.category_name||'').trim() === t) || null;
+        return state.budget.annual.find(a => (a.category_name||'').trim() === t) || 
+               state.budget.fixed.find(f => (f.category_name||'').trim() === t) || null;
     }
 
     // מחזיר את ה-category_name המפורסר (השם הקצר) שמשמש להשוואה
@@ -3195,9 +3195,23 @@
         { id: 'yellow',  hex: '#eab308', bg: '#fefce8' },
         { id: 'lime',    hex: '#84cc16', bg: '#f7fee7' },
         { id: 'green',   hex: '#22c55e', bg: '#f0fdf4' },
+        { id: 'emerald', hex: '#10b981', bg: '#ecfdf5' },
         { id: 'teal',    hex: '#14b8a6', bg: '#f0fdfa' },
         { id: 'cyan',    hex: '#06b6d4', bg: '#ecfeff' },
-        { id: 'slate',   hex: '#64748b', bg: '#f8fafc' },
+        { id: 'sky',     hex: '#0ea5e9', bg: '#f0f9ff' },
+        { id: 'slate',   hex: '#64748b', bg: '#f1f5f9' },
+        { id: 'rose',    hex: '#f43f5e', bg: '#fff1f2' }
+    ];
+
+    const BUDGET_COLORS = [
+        { hex: '#3b82f6', bg: '#eff6ff' }, // כחול (Blue)
+        { hex: '#f97316', bg: '#fff7ed' }, // כתום (Orange)
+        { hex: '#22c55e', bg: '#f0fdf4' }, // ירוק (Green)
+        { hex: '#ec4899', bg: '#fdf2f8' }, // ורוד (Pink)
+        { hex: '#06b6d4', bg: '#ecfeff' }, // תכלת (Cyan)
+        { hex: '#eab308', bg: '#fefce8' }, // צהוב (Yellow)
+        { hex: '#a855f7', bg: '#faf5ff' }, // סגול (Purple)
+        { hex: '#92400e', bg: '#fffbeb' }  // חום (Brown)
     ];
 
     const CAT_ICONS = [
@@ -3210,7 +3224,7 @@
         { id: 'bolt',             fa: 'fa-bolt',                label: 'חשמל' },
         { id: 'droplet',          fa: 'fa-droplet',             label: 'מים' },
         { id: 'wifi',             fa: 'fa-wifi',                label: 'תקשורת' },
-        { id: 'mobile-screen',    fa: 'fa-mobile-screen',       label: 'סלולר' },
+        { id: 'box',              fa: 'fa-box',                 label: 'חבילות' },
         { id: 'pills',            fa: 'fa-pills',               label: 'תרופות' },
         { id: 'heart-pulse',      fa: 'fa-heart-pulse',         label: 'בריאות' },
         { id: 'face-smile',       fa: 'fa-face-smile',          label: 'קוסמטיקה' },
@@ -3279,174 +3293,402 @@
         return new Date(now.getFullYear(), 0, 1);
     }
 
-    // Render category summary strip
+    // Render category summary list (Single-line redesign)
     function renderCategorySummary() {
         const summarySection = document.getElementById('categorySummarySection');
         const strip = document.getElementById('categorySummaryStrip');
         if (!summarySection || !strip) return;
+        strip.innerHTML = '';
 
         const filter = state.mainViewFilter;
+
+        // Requirement: Categories should not appear when the selector is on "All"
+        if (filter === 'all') {
+            summarySection.classList.add('hidden');
+            return;
+        }
+
         let catsShown = [];
-        let txsToShow = [];
         const monthStart = currentMonthStart();
+        const yearStart = currentYearStart();
 
-        const isBudgetFilter = filter === 'fixed' || filter === 'planned';
-
-        if (filter === 'fixed') {
-             catsShown = state.budget.fixed;
-             txsToShow = state.transactions.filter(tx => {
-                if (!tx.tag || tx.isAdjustment) return false;
-                const d = parseLocalDate(tx.date);
-                return d >= monthStart && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
-             });
+        // 1. Collect and filter categories based on state.mainViewFilter
+        if (filter === 'current') {
+            catsShown.push(...state.expenseCategories.map(c => ({ ...c, $type: 'current' })));
+        } else if (filter === 'fixed') {
+            catsShown.push(...state.budget.fixed.map(c => ({ ...c, $type: 'fixed' })));
         } else if (filter === 'planned') {
-             catsShown = state.budget.annual;
-             const yearStart = currentYearStart();
-             txsToShow = state.transactions.filter(tx => {
-                if (!tx.tag || tx.isAdjustment) return false;
-                const d = parseLocalDate(tx.date);
-                return d >= yearStart && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-             });
-        } else {
-             // current or all - show expenseCategories (original behavior)
-             catsShown = state.expenseCategories;
-             txsToShow = state.transactions.filter(tx => {
-                const d = parseLocalDate(tx.date);
-                return d >= monthStart && !tx.tag && !tx.isAdjustment;
-             });
+            catsShown.push(...state.budget.annual.map(c => ({ ...c, $type: 'planned' })));
         }
 
         if (catsShown.length === 0) {
             summarySection.classList.add('hidden');
             const nudge = document.getElementById('noCategoriesNudge');
-            if (nudge && (filter === 'current' || filter === 'all')) nudge.classList.remove('hidden');
+            if (nudge) nudge.classList.remove('hidden');
             return;
         }
+
         summarySection.classList.remove('hidden');
         const nudge = document.getElementById('noCategoriesNudge');
         if (nudge) nudge.classList.add('hidden');
 
-        // Compute totals per category
+        // 2. Update View Switcher Button Appearances
+        ['current', 'planned', 'fixed', 'all'].forEach(f => {
+            const btn = document.getElementById(`filter${f.charAt(0).toUpperCase() + f.slice(1)}Btn`);
+            if (btn) {
+                if (filter === f) {
+                    btn.classList.add('bg-white', 'text-slate-700', 'shadow-sm');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    btn.classList.remove('bg-white', 'text-slate-700', 'shadow-sm');
+                    btn.classList.add('text-slate-400');
+                }
+            }
+        });
+
+        // 3. Prepare totals for categorization
         const totals = {};
-        txsToShow.forEach(tx => {
-            if (isBudgetFilter) {
-                // Group by the actual budget category name
-                const cat = catsShown.find(c => tagMatchesCat(tx.tag, c));
-                if (cat) {
-                    const key = cat.id || cat.category_name;
-                    totals[key] = (totals[key] || 0) + safeParseFloat(tx.amount);
+        state.transactions.forEach(tx => {
+            if (tx.isAdjustment) return;
+            const d = parseLocalDate(tx.date);
+            const amt = safeParseFloat(tx.amount);
+            
+            if (!tx.tag) {
+                if (d >= monthStart) {
+                    const cid = tx.expense_category_id || '__none__';
+                    totals['current:' + cid] = (totals['current:' + cid] || 0) + amt;
                 }
             } else {
-                const cid = tx.expense_category_id || null;
-                if (cid) totals[cid] = (totals[cid] || 0) + safeParseFloat(tx.amount);
-                else totals['__none__'] = (totals['__none__'] || 0) + safeParseFloat(tx.amount);
+                // Check if it's fixed
+                const fixed = state.budget.fixed.find(f => tagMatchesCat(tx.tag, f));
+                if (fixed && d >= monthStart) {
+                    const key = 'fixed:' + (fixed.id || fixed.category_name);
+                    totals[key] = (totals[key] || 0) + amt;
+                } else {
+                    // Check if it's planned
+                    const planned = state.budget.annual.find(a => tagMatchesCat(tx.tag, a));
+                    if (planned && d >= yearStart) {
+                        const key = 'planned:' + (planned.id || planned.category_name);
+                        totals[key] = (totals[key] || 0) + amt;
+                    }
+                }
             }
         });
+        // 4. Render category rows
+        state.viewCategoryColors = {}; 
+        let visibleIdx = 0;
 
-        strip.innerHTML = '';
-
-        const budgetDefaultColors = [
-            { hex: '#3b82f6', bg: '#eff6ff' }, // Blue
-            { hex: '#8b5cf6', bg: '#f5f3ff' }, // Violet
-            { hex: '#ec4899', bg: '#fdf2f8' }, // Pink
-            { hex: '#f59e0b', bg: '#fffbeb' }, // Amber
-            { hex: '#ef4444', bg: '#fef2f2' }, // Red
-            { hex: '#10b981', bg: '#ecfdf5' }, // Emerald
-        ];
-
-        // Category cards
-        catsShown.forEach((cat, idx) => {
-            const catId = cat.id || cat.category_name;
-            const spent = Math.round(totals[catId] || 0);
-
-            // User requirement: Do not show categories with 0 spent in "Fixed" view
-            if (isBudgetFilter && spent === 0) return;
-
-            let color, icon;
-            if (isBudgetFilter) {
-                color = budgetDefaultColors[idx % budgetDefaultColors.length];
-                icon = { fa: filter === 'fixed' ? 'fa-lock' : 'fa-calendar-check' };
-            } else {
-                color = getCatColor(cat.color);
-                icon = getCatIcon(cat.icon);
-            }
-
-            const budget = isBudgetFilter 
-                ? (filter === 'planned' ? safeParseFloat(cat.budget_amount) : safeParseFloat(cat.budget_amount))
-                : safeParseFloat(cat.monthly_budget || 0);
+        if (filter === 'planned') {
+            const groups = {};
+            const ungrouped = [];
             
-            const hasBudget = budget > 0;
-            const remaining = budget - spent;
-            const pct = hasBudget ? Math.round((spent / budget) * 100) : 0;
-            const barPct = Math.min(100, pct);
-            const isOver = hasBudget && spent > budget;
-            
-            const filterId = isBudgetFilter ? 'budget:' + catId : catId;
-            const isActive = state.activeCategoryFilter === filterId;
+            state.budget.annual.forEach(cat => {
+                if (cat.parent_group) {
+                    const pid = cat.parent_group;
+                    if (!groups[pid]) groups[pid] = { name: pid, children: [], spent: 0, budget: 0 };
+                    const catId = cat.id || cat.category_name;
+                    const spent = Math.round(totals['planned:' + catId] || 0);
+                    const budget = safeParseFloat(cat.budget_amount || 0);
+                    groups[pid].children.push({ ...cat, spent, budget });
+                    groups[pid].spent += spent;
+                    groups[pid].budget += budget;
+                } else {
+                    ungrouped.push(cat);
+                }
+            });
 
-            const card = document.createElement('button');
-            card.type = 'button';
-            card.className = `flex-shrink-0 flex flex-col gap-1.5 p-3 rounded-2xl border transition-all text-right ${isActive ? 'shadow-md' : 'bg-white border-slate-100'}`;
-            card.style.borderColor = isActive ? color.hex : '';
-            card.style.background = isActive ? color.bg : '';
-            card.style.minWidth = '130px';
+            // Render Groups
+            Object.keys(groups).sort().forEach((pid, gIdx) => {
+                const group = groups[pid];
+                const colorIdx = gIdx % BUDGET_COLORS.length;
+                const color = BUDGET_COLORS[colorIdx];
+                const isExpanded = state.expandedPlannedGroups.has(pid);
+                const filterId = 'group:' + pid;
+                const isActive = state.activeCategoryFilter === filterId;
 
-            const barHtml = hasBudget ? `
-                <div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
-                </div>
-                <div class="flex justify-between items-center w-full">
-                    <span class="text-[9px] font-bold ${isOver ? 'text-red-500' : 'text-slate-500'}">${isOver ? 'חריגה ₪' + Math.abs(Math.round(remaining)).toLocaleString() : 'נותר ₪' + Math.round(remaining).toLocaleString()}</span>
-                    <span class="text-[9px] font-bold ${isOver ? 'text-red-500' : 'text-slate-500'} ltr-num">${pct}%</span>
-                </div>` : '';
+                // Map each child for consistent tag coloring
+                group.children.forEach(c => {
+                    const catId = c.id || c.category_name;
+                    state.viewCategoryColors['planned:' + catId] = colorIdx;
+                });
 
-            const displayName = cat.parent_group ? `${cat.parent_group} > ${cat.category_name}` : (cat.name || cat.category_name);
-            card.innerHTML = `
-                <div class="flex items-center gap-1.5 w-full">
-                    <div class="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style="background:${color.hex}">
-                        <i class="fa-solid ${icon.fa} text-white text-[9px]"></i>
+                const hasBudget = group.budget > 0;
+                const remaining = group.budget - group.spent;
+                const isOver = hasBudget && group.spent > group.budget;
+                const progressPct = hasBudget ? Math.min(100, Math.round((group.spent / group.budget) * 100)) : 0;
+
+                const pRow = document.createElement('div');
+                pRow.className = `flex flex-col border-b border-slate-50 transition-colors ${isActive ? 'bg-blue-50/50' : ''}`;
+                
+                pRow.innerHTML = `
+                    <div class="flex items-center gap-3 py-1 px-3 cursor-pointer hover:bg-slate-50" onclick="window.toggleCategoryFilter('${filterId}')">
+                        <div class="flex items-center gap-2 min-w-[30%] max-w-[40%]">
+                            <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                <i class="fa-solid fa-calendar-check text-[11px]" style="color:${color.hex}"></i>
+                            </div>
+                            <span class="text-[10px] sm:text-xs font-bold text-slate-700 truncate">${pid}</span>
+                            <button class="w-5 h-5 flex items-center justify-center flex-shrink-0 hover:bg-slate-200 rounded-full transition-colors" onclick="window.togglePlannedGroup('${pid}', event)">
+                                <i class="fa-solid fa-chevron-${isExpanded ? 'down' : 'left'} text-[8px] text-slate-400"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="flex flex-col items-center justify-center px-1">
+                            <div class="flex items-baseline gap-0.5" dir="ltr">
+                                <span class="text-[10px] sm:text-xs font-black ltr-num" style="color:${color.hex}">₪${group.spent.toLocaleString()}</span>
+                                ${hasBudget ? `<span class="text-[8px] font-bold text-slate-400">/₪${Math.round(group.budget).toLocaleString()}</span>` : ''}
+                            </div>
+                            ${hasBudget ? `
+                            <span class="text-[8px] font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap mt-0.5">
+                                ${isOver ? 'חריגה ₪' + Math.abs(Math.round(remaining)).toLocaleString() : 'נותר ₪' + Math.round(remaining).toLocaleString()}
+                            </span>
+                            ` : ''}
+                        </div>
+                        
+                        <div class="flex-1 px-1">
+                            ${hasBudget ? `
+                            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full rounded-full transition-all duration-500" style="width:${progressPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
+                            </div>
+                            ` : ''}
+                        </div>
                     </div>
-                    <span class="text-[10px] font-bold text-slate-700 truncate flex-1">${displayName}</span>
-                </div>
-                <div class="flex items-baseline gap-1 w-full justify-end" dir="ltr">
-                    <span class="text-sm font-black ltr-num" style="color:${color.hex}">₪${spent.toLocaleString()}</span>
-                    ${hasBudget ? `<span class="text-[9px] font-bold text-slate-500">/ ₪${Math.round(budget).toLocaleString()}</span>` : ''}
-                </div>
-                ${barHtml}`;
-            card.onclick = () => window.toggleCategoryFilter(filterId);
-            strip.appendChild(card);
-        });
+                `;
+                strip.appendChild(pRow);
 
-        // Uncategorized chip
-        if (!isBudgetFilter) {
-            const noneTotal = Math.round(totals['__none__'] || 0);
+                if (isExpanded) {
+                    group.children.forEach(c => {
+                        const catId = c.id || c.category_name;
+                        const cFilterId = 'budget:' + catId;
+                        const isCActive = state.activeCategoryFilter === cFilterId;
+                        const cPct = c.budget > 0 ? Math.round((c.spent / c.budget) * 100) : 0;
+                        const cBarPct = Math.min(100, cPct);
+                        const cRemaining = c.budget - c.spent;
+                        const cIsOver = c.budget > 0 && c.spent > c.budget;
+
+                        const cRow = document.createElement('div');
+                        cRow.className = `flex items-center gap-3 py-1 px-3 border-b border-slate-50 transition-colors cursor-pointer ${isCActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+                        cRow.innerHTML = `
+                            <div class="flex items-center gap-2 min-w-[30%] max-w-[40%]">
+                                <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                                    <div class="w-1.5 h-1.5 rounded-full" style="background:${color.hex}"></div>
+                                </div>
+                                <div class="flex items-center gap-1 min-w-0">
+                                    <span class="text-[10px] sm:text-xs font-medium text-slate-500 truncate">${c.category_name}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-col items-center justify-center px-1">
+                                <div class="flex items-baseline gap-0.5" dir="ltr">
+                                    <span class="text-[10px] sm:text-xs font-black ltr-num text-slate-400">₪${c.spent.toLocaleString()}</span>
+                                    ${c.budget > 0 ? `<span class="text-[8px] font-bold text-slate-300">/₪${Math.round(c.budget).toLocaleString()}</span>` : ''}
+                                </div>
+                                ${c.budget > 0 ? `
+                                <span class="text-[8px] font-bold ${cIsOver ? 'text-red-400' : 'text-slate-400'} whitespace-nowrap mt-0.5">
+                                    ${cIsOver ? 'חריגה ₪' + Math.abs(Math.round(cRemaining)).toLocaleString() : 'נותר ₪' + Math.round(cRemaining).toLocaleString()}
+                                </span>
+                                ` : ''}
+                            </div>
+                            
+                            <div class="flex-1 px-1 flex items-center gap-1.5">
+                                <div class="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full transition-all duration-500" style="width:${cBarPct}%; background:${cIsOver ? '#ef4444' : color.hex}"></div>
+                                </div>
+                                ${Math.abs(c.budget - c.spent) > 0.1 ? `
+                                    <button onclick="event.stopPropagation(); window.initCloseCategory('${c.category_name.replace(/'/g,"\\'").replace(/"/g, "&quot;")}', ${c.spent}, ${c.budget}, '${c.category_name.replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="text-blue-500 hover:text-blue-700 transition-colors flex-shrink-0">
+                                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"></path>
+                                        </svg>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        `;
+                        cRow.onclick = (e) => {
+                            e.stopPropagation();
+                            window.toggleCategoryFilter(cFilterId);
+                        };
+                        strip.appendChild(cRow);
+                    });
+                }
+            });
+
+            // Render Ungrouped
+            ungrouped.forEach((cat, uIdx) => {
+                const catId = cat.id || cat.category_name;
+                const key = 'planned:' + catId;
+                const spent = Math.round(totals[key] || 0);
+
+                const colorIdx = (Object.keys(groups).length + uIdx) % BUDGET_COLORS.length;
+                const color = BUDGET_COLORS[colorIdx];
+                state.viewCategoryColors[key] = colorIdx;
+
+                const budget = safeParseFloat(cat.budget_amount || 0);
+                const hasBudget = budget > 0;
+                const remaining = budget - spent;
+                const pct = hasBudget ? Math.round((spent / budget) * 100) : 0;
+                const barPct = Math.min(100, pct);
+                const isOver = hasBudget && spent > budget;
+                
+                const filterId = 'budget:' + catId;
+                const isActive = state.activeCategoryFilter === filterId;
+
+                const row = document.createElement('div');
+                row.className = `flex items-center gap-3 py-1 px-3 border-b border-slate-50 last:border-0 transition-colors cursor-pointer ${isActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+                
+                row.innerHTML = `
+                    <div class="flex items-center gap-2 min-w-[30%] max-w-[40%]">
+                        <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid fa-calendar-check text-[11px]" style="color:${color.hex}"></i>
+                        </div>
+                        <div class="flex items-center gap-1 min-w-0">
+                            <span class="text-[10px] sm:text-xs font-bold text-slate-700 truncate">${cat.category_name}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col items-center justify-center px-1">
+                        <div class="flex items-baseline gap-0.5" dir="ltr">
+                            <span class="text-[10px] sm:text-xs font-black ltr-num" style="color:${color.hex}">₪${spent.toLocaleString()}</span>
+                            ${hasBudget ? `<span class="text-[8px] font-bold text-slate-400">/₪${Math.round(budget).toLocaleString()}</span>` : ''}
+                        </div>
+                        ${hasBudget ? `
+                        <span class="text-[8px] font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap mt-0.5">
+                            ${isOver ? 'חריגה ₪' + Math.abs(Math.round(remaining)).toLocaleString() : 'נותר ₪' + Math.round(remaining).toLocaleString()}
+                        </span>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="flex-1 px-1 flex items-center gap-1.5">
+                        <div class="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
+                        </div>
+                        ${Math.abs(budget - spent) > 0.1 ? `
+                            <button onclick="event.stopPropagation(); window.initCloseCategory('${cat.category_name.replace(/'/g,"\\'").replace(/"/g, "&quot;")}', ${spent}, ${budget}, '${cat.category_name.replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="text-blue-500 hover:text-blue-700 transition-colors flex-shrink-0">
+                                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"></path>
+                                </svg>
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                
+                row.onclick = () => window.toggleCategoryFilter(filterId);
+                strip.appendChild(row);
+            });
+        } else {
+            catsShown.forEach((cat) => {
+                const type = cat.$type;
+                const catId = cat.id || cat.category_name;
+                const key = type + ':' + catId;
+                const spent = Math.round(totals[key] || 0);
+
+                // Hide 0-spent categories (Planned should always show, Fixed and Current hide if 0)
+                if ((type === 'current' || type === 'fixed') && spent === 0) return;
+
+                let color, icon;
+                if (type === 'current') {
+                    color = getCatColor(cat.color);
+                    icon = getCatIcon(cat.icon);
+                } else {
+                    // Color distribution based on visible index as requested (cycling among shown items)
+                    const colorIdx = visibleIdx % BUDGET_COLORS.length;
+                    color = BUDGET_COLORS[colorIdx];
+                    icon = { fa: type === 'fixed' ? 'fa-circle-arrow-down' : 'fa-calendar-check' };
+                    state.viewCategoryColors[key] = colorIdx;
+                    visibleIdx++;
+                }
+
+                const budget = type === 'current' 
+                    ? safeParseFloat(cat.monthly_budget || 0)
+                    : safeParseFloat(cat.budget_amount || 0);
+                
+                const hasBudget = budget > 0;
+                const remaining = budget - spent;
+                const pct = hasBudget ? Math.round((spent / budget) * 100) : 0;
+                const barPct = Math.min(100, pct);
+                const isOver = hasBudget && spent > budget;
+                
+                const filterId = type === 'current' ? catId : 'budget:' + catId;
+                const isActive = state.activeCategoryFilter === filterId;
+
+                const row = document.createElement('div');
+                row.className = `flex items-center gap-3 py-1 px-3 border-b border-slate-50 last:border-0 transition-colors cursor-pointer ${isActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+                
+                // Show only child category for fixed
+                const displayName = (type === 'fixed') 
+                    ? cat.category_name 
+                    : (cat.parent_group ? `${cat.parent_group} > ${cat.category_name}` : (cat.name || cat.category_name));
+                
+                const iconHtml = (type === 'current')
+                    ? `<div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid ${icon.fa} text-[11px]" style="color:${color.hex}"></i>
+                       </div>`
+                    : `<div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid ${icon.fa} text-[11px]" style="color:${color.hex}"></i>
+                       </div>`;
+
+                const showBarAndRemaining = type !== 'current' || hasBudget;
+
+                // Layout (Single Line): Icon+Name (35%) | Spent/Budget (20%) | Bar (25%) | Remaining/Over (20%)
+                row.innerHTML = `
+                    <div class="flex items-center gap-2 min-w-[30%] max-w-[40%]">
+                        ${iconHtml}
+                        <span class="text-[10px] sm:text-xs font-bold text-slate-700 truncate">${displayName}</span>
+                    </div>
+                    
+                    <div class="flex flex-col items-center justify-center px-1">
+                        <div class="flex items-baseline gap-0.5" dir="ltr">
+                            <span class="text-[10px] sm:text-xs font-black ltr-num" style="color:${color.hex}">₪${spent.toLocaleString()}</span>
+                            ${hasBudget ? `<span class="text-[8px] font-bold text-slate-400">/₪${Math.round(budget).toLocaleString()}</span>` : ''}
+                        </div>
+                        ${showBarAndRemaining ? `
+                        <span class="text-[8px] font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap mt-0.5">
+                            ${isOver ? 'חריגה ₪' + Math.abs(Math.round(remaining)).toLocaleString() : 'נותר ₪' + Math.round(remaining).toLocaleString()}
+                        </span>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="flex-1 px-1">
+                        ${showBarAndRemaining ? `
+                        <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                row.onclick = () => window.toggleCategoryFilter(filterId);
+                strip.appendChild(row);
+            });
+        }
+
+        // 5. Uncategorized and Management items
+        if (filter === 'current') {
+            const noneTotal = Math.round(totals['current:__none__'] || 0);
             const isNoneActive = state.activeCategoryFilter === '__none__';
-            const noneChip = document.createElement('button');
-            noneChip.className = `flex-shrink-0 flex flex-col gap-1.5 p-3 rounded-2xl border transition-all text-right ${isNoneActive ? 'border-slate-400 bg-slate-50 shadow-md' : 'bg-white border-slate-100'}`;
-            noneChip.style.minWidth = '110px';
-            noneChip.innerHTML = `
-                <div class="flex items-center gap-1.5 w-full">
-                    <div class="w-6 h-6 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0">
-                        <i class="fa-solid fa-tag text-slate-400 text-[9px]"></i>
+            const noneRow = document.createElement('div');
+            noneRow.className = `flex items-center gap-3 py-1 px-3 transition-colors ${isNoneActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+            
+            noneRow.innerHTML = `
+                <div class="flex items-center gap-2 min-w-[30%] max-w-[40%] cursor-pointer" onclick="window.toggleCategoryFilter('__none__')">
+                    <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid fa-tag text-[11px] text-slate-400"></i>
                     </div>
-                    <span class="text-[10px] font-bold text-slate-400 flex-1">${isNoneActive ? 'לחץ לסימון' : 'לא מקוטלג'}</span>
+                    <span class="text-[10px] sm:text-xs font-bold text-slate-400 truncate">לא מקוטלג</span>
                 </div>
-                <span class="text-sm font-black text-slate-400 ltr-num">₪${noneTotal.toLocaleString()}</span>`;
-            noneChip.onclick = () => window.toggleCategoryFilter('__none__');
-            strip.appendChild(noneChip);
-
-            // Manage categories chip
-            const manageChip = document.createElement('button');
-            manageChip.type = 'button';
-            manageChip.className = "flex-shrink-0 flex flex-col gap-1.5 p-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 transition-all text-right items-center justify-center";
-            manageChip.style.minWidth = '110px';
-            manageChip.innerHTML = `
-                <div class="w-7 h-7 rounded-lg bg-white border border-slate-100 flex items-center justify-center mb-1 shadow-sm">
-                    <i class="fa-solid fa-sliders text-blue-500 text-[11px]"></i>
+                
+                <div class="flex flex-col items-center justify-center px-1 cursor-pointer" onclick="window.toggleCategoryFilter('__none__')">
+                    <div class="flex items-baseline gap-0.5" dir="ltr">
+                        <span class="text-[10px] sm:text-xs font-black text-slate-400 ltr-num">₪${noneTotal.toLocaleString()}</span>
+                    </div>
                 </div>
-                <span class="text-[10px] font-bold text-blue-600">נהל קטגוריות</span>`;
-            manageChip.onclick = () => window.openManageCategoriesModal();
-            strip.appendChild(manageChip);
+                
+                <div class="flex-1 flex justify-center">
+                    <button onclick="event.stopPropagation(); window.openManageCategoriesModal()" class="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 transition-colors">
+                        <i class="fa-solid fa-sliders text-[10px]"></i>
+                        <span class="text-[10px] font-bold">ניהול קטגוריות</span>
+                    </button>
+                </div>
+            `;
+            strip.appendChild(noneRow);
         }
     }
 
@@ -3458,6 +3700,16 @@
         state.activeCategoryFilter = state.activeCategoryFilter === catId ? null : catId;
         if (state.activeCategoryFilter !== '__none__') state.selectedTxIds.clear();
         render();
+    };
+
+    window.togglePlannedGroup = function(pid, e) {
+        if (e) e.stopPropagation();
+        if (state.expandedPlannedGroups.has(pid)) {
+            state.expandedPlannedGroups.delete(pid);
+        } else {
+            state.expandedPlannedGroups.add(pid);
+        }
+        renderCategorySummary();
     };
 
     window.toggleTxSelectionFast = function(rowId, el) {
@@ -4085,11 +4337,130 @@
         if (state.currentView === 'budget') return;
         if (state.currentView !== 'main') return;
 
-        const balEl = document.getElementById('balanceValue');
-        const dailyEl = document.getElementById('dailyBudgetValue');
-        const dailyVal = safeParseFloat(state.budget.g4) / 30;
-        if (balEl) balEl.innerText = Math.round(formatDisplayAmount(state.balance)).toLocaleString();
-        if (dailyEl) dailyEl.innerText = Math.round(formatDisplayAmount(dailyVal)).toLocaleString();
+        // --- Summary Stats Preparation ---
+        const filter = state.mainViewFilter;
+        const balVal = formatDisplayAmount(state.balance);
+        const dailyVal = (safeParseFloat(state.budget.g4) || 0) / 30;
+        
+        // Month total for current (flexible) spending
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const currentSpent = state.transactions.reduce((acc, tx) => {
+            if (tx.isAdjustment) return acc;
+            if (parseLocalDate(tx.date) < monthStart) return acc;
+            const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+            const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+            if (!isPlanned && !isFixed) return acc + safeParseFloat(tx.amount);
+            return acc;
+        }, 0);
+        
+        const monthlyBudget = safeParseFloat(state.budget.g4) || 0;
+        const monthlyUtil = monthlyBudget > 0 ? (currentSpent / monthlyBudget) * 100 : 0;
+        
+        // Annual reservation details
+        const reserveDetails = calculateAnnualReserveDetails();
+        const annualUtil = (reserveDetails && reserveDetails.annualTotal > 0) 
+            ? (reserveDetails.actualSpent / reserveDetails.annualTotal) * 100 
+            : 0;
+
+        // UI Elements
+        const headerRow = document.getElementById('statsHeaderRow');
+        const summarySection = document.getElementById('categorySummarySection');
+        const sep = summarySection ? summarySection.querySelector('.border-t') : null;
+
+        if (headerRow) {
+            if (filter === 'planned') {
+                headerRow.classList.remove('hidden');
+                if (sep) sep.classList.remove('hidden');
+                const spending = reserveDetails ? reserveDetails.actualSpent : 0;
+                const budget = reserveDetails ? reserveDetails.annualTotal : 0;
+                const remaining = budget - spending;
+                const barPct = budget > 0 ? Math.min(100, (spending / budget) * 100) : 0;
+                const over = spending > budget;
+
+                headerRow.innerHTML = `
+                    <!-- Reserve (Left in Planned) -->
+                    <div class="flex-1 flex flex-col items-center px-2 border-l border-slate-50">
+                        <div class="flex items-center gap-1 mb-1">
+                            <p class="text-slate-400 text-[8px] font-bold uppercase tracking-widest">שיריון בצד</p>
+                            <button onclick="window.showReserveExplain()" class="w-3.5 h-3.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-bold flex items-center justify-center hover:bg-blue-500 hover:text-white transition-colors">
+                                ?
+                            </button>
+                        </div>
+                        <div class="flex items-baseline gap-0.5">
+                            <span class="text-xl font-black ${reserveDetails && reserveDetails.reserve < 0 ? 'text-red-500' : 'text-slate-900'} ltr-num">
+                                ${reserveDetails ? Math.round(formatDisplayAmount(reserveDetails.reserve)).toLocaleString() : '0'}
+                            </span>
+                            <span class="text-xs text-slate-400 font-bold">₪</span>
+                        </div>
+                    </div>
+                    <!-- Annual Utilization (Right in Planned) -->
+                    <div class="flex-1 flex flex-col items-center px-2">
+                        <p class="text-slate-400 text-[8px] font-bold uppercase tracking-widest mb-1">ניצול שנתי</p>
+                        <div class="w-full flex flex-col items-center max-w-[140px]">
+                            <div class="flex items-baseline gap-1 mb-0.5" dir="ltr">
+                                <span class="text-[11px] font-black text-slate-900 ltr-num">₪${Math.round(spending).toLocaleString()}</span>
+                                <span class="text-[11px] font-bold text-slate-400">/ ₪${Math.round(budget).toLocaleString()}</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1">
+                                <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${over ? '#ef4444' : '#3b82f6'}"></div>
+                            </div>
+                            <span class="text-[11px] font-bold ${over ? 'text-red-500' : 'text-slate-500'}">
+                                ${over ? 'חריגה ₪' + Math.abs(Math.round(remaining)).toLocaleString() : 'נותר ₪' + Math.round(remaining).toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            } else if (filter === 'current') {
+                headerRow.classList.remove('hidden');
+                if (sep) sep.classList.remove('hidden');
+                const spending = currentSpent;
+                const budget = monthlyBudget;
+                const remaining = budget - spending;
+                const barPct = budget > 0 ? Math.min(100, (spending / budget) * 100) : 0;
+                const over = spending > budget;
+
+                headerRow.innerHTML = `
+                    <!-- Daily Budget (Left in Current) -->
+                    <div class="flex-1 flex flex-col items-center px-1 border-l border-slate-50">
+                        <p class="text-slate-400 text-[8px] font-bold uppercase tracking-widest mb-1">תקציב יומי</p>
+                        <div class="flex items-baseline gap-0.5">
+                            <span class="text-xl font-black text-blue-600 ltr-num">${Math.round(formatDisplayAmount(dailyVal)).toLocaleString()}</span>
+                            <span class="text-xs text-blue-400 font-bold">₪</span>
+                        </div>
+                    </div>
+                    <!-- Balance (Center in Current) -->
+                    <div class="flex-1 flex flex-col items-center border-l border-slate-50 px-1">
+                        <p class="text-slate-400 text-[8px] font-bold uppercase tracking-widest mb-1">מאזן נוכחי</p>
+                        <div class="flex items-baseline gap-0.5">
+                            <span class="text-xl font-black text-slate-900 ltr-num">${Math.round(balVal).toLocaleString()}</span>
+                            <span class="text-xs text-slate-400 font-bold">₪</span>
+                        </div>
+                    </div>
+                    <!-- Monthly Utilization (Right in Current) -->
+                    <div class="flex-1 flex flex-col items-center px-1 overflow-hidden min-w-[30%]">
+                        <p class="text-slate-400 text-[8px] font-bold uppercase tracking-widest mb-1">ניצול חודשי</p>
+                        <div class="w-full flex flex-col items-center">
+                             <div class="flex items-baseline gap-0.5 mb-0.5" dir="ltr">
+                                <span class="text-[11px] font-black text-slate-900 ltr-num">₪${Math.round(spending).toLocaleString()}</span>
+                                <span class="text-[11px] font-bold text-slate-400">/ ₪${Math.round(budget).toLocaleString()}</span>
+                            </div>
+                            <div class="w-full h-1 bg-slate-100 rounded-full overflow-hidden mb-1">
+                                <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${over ? '#ef4444' : '#3b82f6'}"></div>
+                            </div>
+                            <span class="text-[11px] font-bold ${over ? 'text-red-500' : 'text-slate-500'} whitespace-nowrap">
+                                ${over ? 'חריגה ₪' + Math.abs(Math.round(remaining)).toLocaleString() : 'נותר ₪' + Math.round(remaining).toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // fixed or all
+                headerRow.innerHTML = '';
+                headerRow.classList.add('hidden');
+                if (sep) sep.classList.add('hidden');
+            }
+        }
 
         const aiBtn = document.getElementById('budgetAiBtn');
         if (aiBtn) {
@@ -4124,6 +4495,14 @@
             // Apply expense category filter (the pill strip filter)
             if (state.activeCategoryFilter) {
                 if (state.activeCategoryFilter === '__none__') return !tx.expense_category_id && !tx.tag;
+                
+                if (state.activeCategoryFilter.startsWith('group:')) {
+                    const groupName = state.activeCategoryFilter.slice(6);
+                    const allBudget = [...state.budget.fixed, ...state.budget.annual];
+                    const catsInGroup = allBudget.filter(b => b.parent_group === groupName);
+                    return catsInGroup.some(cat => tagMatchesCat(tx.tag, cat));
+                }
+
                 if (state.activeCategoryFilter.startsWith('budget:')) {
                     const catId = state.activeCategoryFilter.slice(7);
                     const allBudget = [...state.budget.fixed, ...state.budget.annual];
@@ -4153,7 +4532,7 @@
             Object.keys(grouped).sort((a,b) => parseLocalDate(b) - parseLocalDate(a)).forEach(date => {
                 const g = grouped[date];
                 const h = document.createElement('div');
-                h.className = 'sticky-header py-1 px-1 text-[9px] font-bold text-slate-400 flex justify-between tracking-wider';
+                h.className = 'sticky-header py-0.5 px-1 text-[9px] font-bold text-slate-400 flex justify-between tracking-wider border-b border-slate-100';
                 h.innerHTML = `<span>${date}</span><span>₪${Math.round(formatDisplayAmount(g.total)).toLocaleString()}</span>`;
                 fragment.appendChild(h);
                 g.items.forEach((tx, idx) => {
@@ -4182,7 +4561,7 @@
             if (cat) {
                 const color = getCatColor(cat.color);
                 const icon  = getCatIcon(cat.icon);
-                catBadgeHtml = `<div class="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ml-1" style="background:${color.hex}" title="${cat.name}"><i class="fa-solid ${icon.fa} text-white text-[9px]"></i></div>`;
+                catBadgeHtml = `<div class="w-4 h-4 flex items-center justify-center flex-shrink-0 ml-1" title="${cat.name}"><i class="fa-solid ${icon.fa} text-[9px]" style="color:${color.hex}"></i></div>`;
             }
         }
 
@@ -4190,13 +4569,50 @@
         const isNegative = amountValue < 0;
         const colorClass = isNegative ? 'text-green-500' : 'text-red-500';
 
+        let tagHtml = '';
+        if (tx.tag && !hideTag) {
+            const cat = findCatByTag(tx.tag);
+            const filter = state.mainViewFilter;
+            
+            let displayName = tx.tag;
+            if (cat) {
+                const isFixed = state.budget.fixed.some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name);
+                displayName = (isFixed) ? cat.category_name : (cat.parent_group ? cat.parent_group + ' : ' + cat.category_name : cat.category_name);
+            }
+
+            let style = '';
+            if (filter === 'all') {
+                // All view: dark gray tags
+                style = `style="background:#f1f5f9; color:#475569; border: 1px solid #e2e8f0"`;
+            } else if (cat) {
+                 // Use mapping from summary rendering for consistent coloring based on visible order
+                 const categoryType = state.budget.fixed.some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name) ? 'fixed' : 'planned';
+                 const key = categoryType + ':' + (cat.id || cat.category_name);
+                 const idx = state.viewCategoryColors ? state.viewCategoryColors[key] : undefined;
+                 
+                 if (idx !== undefined) {
+                     const c = BUDGET_COLORS[idx % BUDGET_COLORS.length];
+                     style = `style="background:${c.bg}; color:${c.hex}; border: 1px solid ${c.hex}20"`;
+                 } else {
+                     // Fallback to static index if not found in current visible summary
+                     let listToSearch = (categoryType === 'fixed') ? state.budget.fixed : state.budget.annual;
+                     let fallbackIdx = listToSearch.findIndex(item => (item.id && item.id === cat.id) || item.category_name === cat.category_name);
+                     if (fallbackIdx !== -1) {
+                         const c = BUDGET_COLORS[fallbackIdx % BUDGET_COLORS.length];
+                         style = `style="background:${c.bg}; color:${c.hex}; border: 1px solid ${c.hex}20"`;
+                     }
+                 }
+            }
+            tagHtml = `<span class="tag-badge" ${style}>${displayName}</span>`;
+        }
+
         d.innerHTML = `
             <div class="tx-inner">
                 ${catBadgeHtml}
                 <div class="flex-1 flex flex-col">
                     <div class="flex items-center">
                         <span class="font-bold text-slate-800 text-xs">${tx.name}</span>
-                        ${tx.tag && !hideTag ? `<span class="tag-badge">${(() => { const cat = findCatByTag(tx.tag); return cat && cat.parent_group ? cat.parent_group + ' > ' + cat.category_name : tx.tag; })()}</span>` : ''}
+                        ${tagHtml}
                     </div>
                     ${!hideDate ? `<span class="text-[8px] text-slate-400 font-bold">${tx.date}</span>` : ''}
                 </div>
@@ -4204,7 +4620,7 @@
                     <div class="${colorClass} font-bold text-xs ltr-num">₪${Math.round(Math.abs(formatDisplayAmount(amountValue))).toLocaleString()}</div>
                     ${isSelectMode
                         ? ''
-                        : `<button onclick="window.initEditRow('${tx.row}')" class="p-1.5"><i class="fa-solid fa-ellipsis-vertical text-[10px] text-slate-300"></i></button>`
+                        : `<button onclick="window.initEditRow('${tx.row}')" class="p-1"><i class="fa-solid fa-ellipsis-vertical text-[10px] text-slate-300"></i></button>`
                     }
                 </div>
             </div>`;
@@ -4934,13 +5350,17 @@
             const safeId = getSafeId(toggleName);
             const card = document.createElement('div');
             card.className = isGroup ? 'card transition-all mb-3' : 'card border border-slate-100 shadow-none mb-2 bg-slate-50';
-            let headerActions = '';
-            if (!isGroup) {
-                if (Math.abs(remaining) > 0.1) {
-                    headerActions += `<button onclick="event.stopPropagation(); window.initCloseCategory('${(catName||name).replace(/'/g,"\\'").replace(/"/g, "&quot;")}', ${spent}, ${totalBudget}, '${(catName||name).replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="btn-close-cat ml-2 text-blue-500"><i class="fa-solid fa-lock text-[10px]"></i></button>`;
-                }
+            
+            let lockAction = '';
+            if (!isGroup && Math.abs(remaining) > 0.1) {
+                lockAction = `<button onclick="event.stopPropagation(); window.initCloseCategory('${(catName||name).replace(/'/g,"\\'").replace(/"/g, "&quot;")}', ${spent}, ${totalBudget}, '${(catName||name).replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="btn-close-cat ml-2 text-blue-500 flex items-center justify-center">
+                    <svg class="w-[10px] h-[10px]" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"></path>
+                    </svg>
+                </button>`;
             }
-            headerActions += `<button onclick="window.toggleAnnualCategory('${toggleName.replace(/'/g,"\\'").replace(/"/g, "&quot;")}'); event.stopPropagation();" class="cat-expand-btn ${isExpanded ? 'expanded' : ''}"><i class="fa-solid fa-chevron-down text-[10px]"></i></button>`;
+            const expandAction = `<button onclick="window.toggleAnnualCategory('${toggleName.replace(/'/g,"\\'").replace(/"/g, "&quot;")}'); event.stopPropagation();" class="cat-expand-btn ${isExpanded ? 'expanded' : ''}"><i class="fa-solid fa-chevron-down text-[10px]"></i></button>`;
+
             const cardHeader = document.createElement('div');
             cardHeader.className = 'p-4 cursor-pointer';
             cardHeader.onclick = () => window.toggleAnnualCategory(toggleName);
@@ -4949,7 +5369,7 @@
                     <div class="flex-1">
                         <div class="flex items-center gap-2">
                             <h4 class="font-bold text-slate-800 text-sm">${name}</h4>
-                            <div class="flex" onclick="event.stopPropagation()">${headerActions}</div>
+                            <div class="flex" onclick="event.stopPropagation()">${expandAction}</div>
                         </div>
                         <div class="text-[10px] font-bold text-slate-400">₪<span class="ltr-num">${Math.round(formatDisplayAmount(spent)).toLocaleString()}</span> מתוך ₪<span class="ltr-num">${Math.round(formatDisplayAmount(totalBudget)).toLocaleString()}</span></div>
                     </div>
@@ -4958,7 +5378,10 @@
                         <p class="text-[8px] text-slate-300 font-bold uppercase">נותר</p>
                     </div>
                 </div>
-                <div class="progress-bar"><div class="progress-fill ${spent > totalBudget ? 'bg-red-500' : 'bg-blue-500'}" style="width: ${percent}%"></div></div>`;
+                <div class="flex items-center gap-2">
+                    <div class="flex-1 progress-bar h-1.5"><div class="progress-fill ${spent > totalBudget ? 'bg-red-500' : 'bg-blue-500'}" style="width: ${percent}%"></div></div>
+                    <div class="flex items-center" onclick="event.stopPropagation()">${lockAction}</div>
+                </div>`;
             const cardDetails = document.createElement('div');
             cardDetails.id = `annual-details-${safeId}`;
             cardDetails.className = `bg-slate-50 border-t border-slate-100 p-2 space-y-1 ${isExpanded ? '' : 'hidden'}`;
@@ -6198,20 +6621,20 @@
             if (hasUncategorized) trendKeys.push('לא מקוטלג');
 
             trendKeys.forEach(key => {
+                const groupTxs = allTxs.filter(tx => {
+                    if (key === 'לא מקוטלג') return !tx.expense_category_id;
+                    const cat = cats.find(c => c.id === tx.expense_category_id);
+                    if (!cat) return false;
+                    const budgetItem = [...state.budget.fixed, ...state.budget.annual].find(b => b.category_name === cat.name);
+                    const txKey = (budgetItem && budgetItem.parent_group) ? budgetItem.parent_group : cat.name;
+                    return txKey === key;
+                });
+
                 const monthlyTotals = sortedMonths.map(m => {
-                    return allTxs.filter(tx => {
+                    return groupTxs.filter(tx => {
                         const d = parseLocalDate(tx.date);
                         const txMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-                        if (txMonth !== m) return false;
-                        
-                        if (key === 'לא מקוטלג') return !tx.expense_category_id;
-                        
-                        const cat = cats.find(c => c.id === tx.expense_category_id);
-                        if (!cat) return false;
-                        
-                        const budgetItem = [...state.budget.fixed, ...state.budget.annual].find(b => b.category_name === cat.name);
-                        const txKey = (budgetItem && budgetItem.parent_group) ? budgetItem.parent_group : cat.name;
-                        return txKey === key;
+                        return txMonth === m;
                     }).reduce((s, tx) => s + safeParseFloat(tx.amount), 0);
                 });
 
@@ -6227,7 +6650,8 @@
                         pointRadius: 3,
                         pointHoverRadius: 5,
                         tension: 0.3,
-                        fill: false
+                        fill: false,
+                        avg: calculateDynamicMonthlyAverage(groupTxs)
                     });
                 }
             });
@@ -6297,7 +6721,10 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <span class="${hidden ? 'text-slate-300' : 'text-slate-400'} font-bold ltr-num">${hidden ? '—' : pct + '%'}</span>
-                                <span class="font-bold ${hidden ? 'text-slate-300' : 'text-slate-700'} ltr-num">₪${dsTotals[i].toLocaleString()}</span>
+                                <div class="flex items-baseline gap-1.5">
+                                    <span class="font-bold ${hidden ? 'text-slate-300' : 'text-slate-700'} ltr-num">₪${dsTotals[i].toLocaleString()}</span>
+                                    <span class="${hidden ? 'text-slate-200' : 'text-slate-400'} text-[8px] font-bold ltr-num whitespace-nowrap">ממוצע ₪${Math.round(ds.avg).toLocaleString()}</span>
+                                </div>
                             </div>
                         </button>
                     </div>`;
