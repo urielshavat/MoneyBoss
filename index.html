@@ -209,7 +209,7 @@
             </div>
 
             <!-- Unified Stats & Categories Card -->
-            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-4">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-4">
                 <header>
                     <div id="statsHeaderRow" class="px-2 py-3 flex items-center transition-all min-h-[85px]">
                         <!-- Content populated by renderCategorySummary() -->
@@ -1366,7 +1366,7 @@
             </div>
             <div id="categoriesList" class="overflow-y-auto flex-1 p-4 space-y-2"></div>
             <div class="p-4 border-t border-slate-100">
-                <button onclick="window.openEditCategoryModal(null)" class="w-full bg-blue-600 text-white font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-2">
+                <button onclick="window.startInlineAdd()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-2xl text-sm flex items-center justify-center gap-2">
                     <i class="fa-solid fa-plus"></i>קטגוריה חדשה
                 </button>
             </div>
@@ -1476,11 +1476,11 @@
                     </div>
                     <span id="catPreviewName" class="text-sm font-bold text-slate-700">תצוגה מקדימה</span>
                 </div>
-                <div class="flex gap-2 pt-1">
-                    <button onclick="window.saveCategory()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl">שמור</button>
-                    <button onclick="window.closeEditCategoryModal()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl">ביטול</button>
-                </div>
-                <button id="deleteCategoryBtn" onclick="window.deleteCategory()" class="w-full bg-red-50 border border-red-100 text-red-500 font-bold py-2.5 rounded-xl text-xs hidden">מחק קטגוריה</button>
+                    <div class="flex gap-2 pt-1">
+                        <button type="button" onclick="window.saveCategory()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl">שמור</button>
+                        <button type="button" onclick="window.closeEditCategoryModal()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl">ביטול</button>
+                    </div>
+                    <button type="button" id="deleteCategoryBtn" onclick="window.handleMainDeleteClick()" class="w-full bg-red-50 border border-red-100 text-red-500 font-bold py-2.5 rounded-xl text-xs hidden transition-all">מחק קטגוריה</button>
             </div>
         </div>
     </div>
@@ -3248,6 +3248,12 @@
     ];
 
     let _editingCatId = null;
+    let _inlineEditingId = null;
+    let _isInlineAdding = false;
+    let _selectedManagePresets = []; // New state for manage modal presets
+    let _isConfirmingDeleteId = null; // New state for custom delete confirmation
+    let _tempInlineName = '';
+    let _tempInlineBudget = null;
     let _editingCatColor = CAT_COLORS[0].id;
     let _editingCatIcon  = CAT_ICONS[0].id;
     let _selectedPresets = [];
@@ -3305,6 +3311,8 @@
         // Requirement: Categories should not appear when the selector is on "All"
         if (filter === 'all') {
             summarySection.classList.add('hidden');
+            const nudge = document.getElementById('noCategoriesNudge');
+            if (nudge) nudge.classList.add('hidden');
             return;
         }
 
@@ -3324,7 +3332,10 @@
         if (catsShown.length === 0) {
             summarySection.classList.add('hidden');
             const nudge = document.getElementById('noCategoriesNudge');
-            if (nudge) nudge.classList.remove('hidden');
+            if (nudge) {
+                if (filter === 'current') nudge.classList.remove('hidden');
+                else nudge.classList.add('hidden');
+            }
             return;
         }
 
@@ -3376,6 +3387,49 @@
         });
         // 4. Render category rows
         state.viewCategoryColors = {}; 
+        
+        // Sort catsShown by spent amount descending
+        if (filter !== 'all') {
+            catsShown.sort((a, b) => {
+                const keyA = a.$type + ':' + (a.id || a.category_name);
+                const keyB = b.$type + ':' + (b.id || b.category_name);
+                return (totals[keyB] || 0) - (totals[keyA] || 0);
+            });
+        }
+        
+        // Calculate max label width for the current view to align bars
+        let maxChars = 15;
+        if (filter === 'planned') {
+            state.budget.annual.forEach(cat => {
+                const nameLen = (cat.parent_group ? cat.parent_group.length + 3 : 0) + cat.category_name.length;
+                const budget = safeParseFloat(cat.budget_amount || 0);
+                const budgetLen = budget > 0 ? String(Math.round(budget)).length + 5 : 0;
+                maxChars = Math.max(maxChars, nameLen + budgetLen);
+            });
+        } else {
+            const visibleCats = catsShown.filter(cat => {
+                if (filter === 'planned') return true;
+                const catId = cat.id || cat.category_name;
+                const spent = Math.round(totals[cat.$type + ':' + catId] || 0);
+                return spent > 0;
+            });
+            visibleCats.forEach(cat => {
+                const displayName = (cat.$type === 'fixed') 
+                    ? cat.category_name 
+                    : (cat.parent_group ? `${cat.parent_group} > ${cat.category_name}` : (cat.name || cat.category_name));
+                const budget = cat.$type === 'current' 
+                    ? safeParseFloat(cat.monthly_budget || 0)
+                    : safeParseFloat(cat.budget_amount || 0);
+                const budgetLen = budget > 0 ? String(Math.round(budget)).length + 5 : 0;
+                maxChars = Math.max(maxChars, displayName.length + budgetLen);
+            });
+        }
+        let labelsWidth = Math.max(100, Math.min(180, maxChars * 5.0 + 16));
+        if (filter === 'fixed') {
+            // Apply slightly more width for the 'Fixed' tab to prevent name/bar overlap
+            labelsWidth = Math.max(110, Math.min(200, maxChars * 5.8 + 24));
+        }
+
         let visibleIdx = 0;
 
         if (filter === 'planned') {
@@ -3397,8 +3451,18 @@
                 }
             });
 
+            // Sort children within groups and ungrouped by spent descending
+            Object.values(groups).forEach(g => {
+                g.children.sort((a, b) => b.spent - a.spent);
+            });
+            ungrouped.sort((a, b) => {
+                const sA = totals['planned:' + (a.id || a.category_name)] || 0;
+                const sB = totals['planned:' + (b.id || b.category_name)] || 0;
+                return sB - sA;
+            });
+
             // Render Groups
-            Object.keys(groups).sort().forEach((pid, gIdx) => {
+            Object.keys(groups).sort((a, b) => groups[b].spent - groups[a].spent).forEach((pid, gIdx) => {
                 const group = groups[pid];
                 const colorIdx = gIdx % BUDGET_COLORS.length;
                 const color = BUDGET_COLORS[colorIdx];
@@ -3421,34 +3485,32 @@
                 pRow.className = `flex flex-col border-b border-slate-50 transition-colors ${isActive ? 'bg-blue-50/50' : ''}`;
                 
                 pRow.innerHTML = `
-                    <div class="flex items-center gap-3 py-1 px-3 cursor-pointer hover:bg-slate-50" onclick="window.toggleCategoryFilter('${filterId}')">
-                        <div class="flex items-center gap-2 min-w-[30%] max-w-[40%]">
+                    <div class="flex items-center gap-1 py-1 px-0 w-full cursor-pointer hover:bg-slate-50 transition-all font-hebrew" dir="rtl" onclick="window.toggleCategoryFilter('${filterId}')">
+                        <!-- Right Part: Icon/Name (Order: Icon, then Name, then Chevron) -->
+                        <div class="flex items-center gap-1 flex-shrink-0" style="width: ${labelsWidth}px">
                             <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
                                 <i class="fa-solid fa-calendar-check text-[11px]" style="color:${color.hex}"></i>
                             </div>
-                            <span class="text-[10px] sm:text-xs font-bold text-slate-700 truncate">${pid}</span>
+                            <span class="text-[10px] sm:text-xs text-slate-700 whitespace-nowrap">${pid}${hasBudget ? ` (₪${Math.round(group.budget).toLocaleString()})` : ''}</span>
                             <button class="w-5 h-5 flex items-center justify-center flex-shrink-0 hover:bg-slate-200 rounded-full transition-colors" onclick="window.togglePlannedGroup('${pid}', event)">
                                 <i class="fa-solid fa-chevron-${isExpanded ? 'down' : 'left'} text-[8px] text-slate-400"></i>
                             </button>
                         </div>
-                        
-                        <div class="flex flex-col items-center justify-center px-1">
-                            <div class="flex items-baseline gap-0.5" dir="ltr">
-                                <span class="text-[10px] sm:text-xs font-black ltr-num" style="color:${color.hex}">₪${group.spent.toLocaleString()}</span>
-                                ${hasBudget ? `<span class="text-[8px] font-bold text-slate-400">/₪${Math.round(group.budget).toLocaleString()}</span>` : ''}
+
+                        <!-- Left Part: Data/Bar -->
+                        <div class="flex-1 min-w-0 flex flex-col justify-center px-1">
+                            <div class="flex items-center justify-between text-[9px] sm:text-[10px] ${hasBudget ? 'mb-0.5' : ''}">
+                                <span class="font-black ltr-num" style="color:${color.hex}">₪${group.spent.toLocaleString()}</span>
+                                ${hasBudget ? `
+                                    <span class="font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} ltr-num">
+                                        ${isOver ? 'חריגה ' : 'נותר '}₪${Math.round(Math.abs(remaining)).toLocaleString()}
+                                    </span>
+                                ` : ''}
                             </div>
                             ${hasBudget ? `
-                            <span class="text-[8px] font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap mt-0.5">
-                                ${isOver ? 'חריגה ₪' + Math.abs(Math.round(remaining)).toLocaleString() : 'נותר ₪' + Math.round(remaining).toLocaleString()}
-                            </span>
-                            ` : ''}
-                        </div>
-                        
-                        <div class="flex-1 px-1">
-                            ${hasBudget ? `
-                            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div class="h-full rounded-full transition-all duration-500" style="width:${progressPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
-                            </div>
+                                <div class="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full transition-all duration-500" style="width:${progressPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
+                                </div>
                             ` : ''}
                         </div>
                     </div>
@@ -3466,39 +3528,38 @@
                         const cIsOver = c.budget > 0 && c.spent > c.budget;
 
                         const cRow = document.createElement('div');
-                        cRow.className = `flex items-center gap-3 py-1 px-3 border-b border-slate-50 transition-colors cursor-pointer ${isCActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+                        cRow.className = `flex items-center gap-1 py-1 px-0 border-b border-slate-50 transition-colors cursor-pointer font-hebrew w-full ${isCActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+                        cRow.dir = "rtl";
                         cRow.innerHTML = `
-                            <div class="flex items-center gap-2 min-w-[30%] max-w-[40%]">
+                            <!-- Right Part: Icon/Name/Actions -->
+                            <div class="flex items-center gap-1 flex-shrink-0" style="width: ${labelsWidth}px">
                                 <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
                                     <div class="w-1.5 h-1.5 rounded-full" style="background:${color.hex}"></div>
                                 </div>
-                                <div class="flex items-center gap-1 min-w-0">
-                                    <span class="text-[10px] sm:text-xs font-medium text-slate-500 truncate">${c.category_name}</span>
-                                </div>
-                            </div>
-                            
-                            <div class="flex flex-col items-center justify-center px-1">
-                                <div class="flex items-baseline gap-0.5" dir="ltr">
-                                    <span class="text-[10px] sm:text-xs font-black ltr-num text-slate-400">₪${c.spent.toLocaleString()}</span>
-                                    ${c.budget > 0 ? `<span class="text-[8px] font-bold text-slate-300">/₪${Math.round(c.budget).toLocaleString()}</span>` : ''}
-                                </div>
-                                ${c.budget > 0 ? `
-                                <span class="text-[8px] font-bold ${cIsOver ? 'text-red-400' : 'text-slate-400'} whitespace-nowrap mt-0.5">
-                                    ${cIsOver ? 'חריגה ₪' + Math.abs(Math.round(cRemaining)).toLocaleString() : 'נותר ₪' + Math.round(cRemaining).toLocaleString()}
-                                </span>
-                                ` : ''}
-                            </div>
-                            
-                            <div class="flex-1 px-1 flex items-center gap-1.5">
-                                <div class="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                    <div class="h-full rounded-full transition-all duration-500" style="width:${cBarPct}%; background:${cIsOver ? '#ef4444' : color.hex}"></div>
-                                </div>
+                                <span class="text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">${c.category_name}${c.budget > 0 ? ` (₪${Math.round(c.budget).toLocaleString()})` : ''}</span>
                                 ${Math.abs(c.budget - c.spent) > 0.1 ? `
                                     <button onclick="event.stopPropagation(); window.initCloseCategory('${c.category_name.replace(/'/g,"\\'").replace(/"/g, "&quot;")}', ${c.spent}, ${c.budget}, '${c.category_name.replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="text-blue-500 hover:text-blue-700 transition-colors flex-shrink-0">
                                         <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"></path>
                                         </svg>
                                     </button>
+                                ` : ''}
+                            </div>
+
+                            <!-- Left Part: Data/Bar -->
+                            <div class="flex-1 min-w-0 flex flex-col justify-center px-1">
+                                <div class="flex items-center justify-between text-[9px] sm:text-[10px] ${c.budget > 0 ? 'mb-0.5' : ''}">
+                                    <span class="font-black ltr-num text-slate-400">₪${c.spent.toLocaleString()}</span>
+                                    ${c.budget > 0 ? `
+                                        <span class="font-bold ${cIsOver ? 'text-red-400' : 'text-slate-300'} ltr-num">
+                                            ${cIsOver ? 'חריגה ' : 'נותר '}₪${Math.round(Math.abs(cRemaining)).toLocaleString()}
+                                        </span>
+                                    ` : ''}
+                                </div>
+                                ${c.budget > 0 ? `
+                                    <div class="w-full h-0.5 bg-slate-100 rounded-full overflow-hidden">
+                                        <div class="h-full rounded-full transition-all duration-500" style="width:${cBarPct}%; background:${cIsOver ? '#ef4444' : color.hex}"></div>
+                                    </div>
                                 ` : ''}
                             </div>
                         `;
@@ -3532,40 +3593,39 @@
                 const isActive = state.activeCategoryFilter === filterId;
 
                 const row = document.createElement('div');
-                row.className = `flex items-center gap-3 py-1 px-3 border-b border-slate-50 last:border-0 transition-colors cursor-pointer ${isActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+                row.className = `flex items-center gap-1 py-1 px-0 border-b border-slate-50 last:border-0 transition-colors cursor-pointer font-hebrew w-full ${isActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+                row.dir = "rtl";
+                row.onclick = () => window.toggleCategoryFilter(filterId);
                 
                 row.innerHTML = `
-                    <div class="flex items-center gap-2 min-w-[30%] max-w-[40%]">
+                    <!-- Right Part: Icon/Name/Actions -->
+                    <div class="flex items-center gap-1 flex-shrink-0" style="width: ${labelsWidth}px">
                         <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
                             <i class="fa-solid fa-calendar-check text-[11px]" style="color:${color.hex}"></i>
                         </div>
-                        <div class="flex items-center gap-1 min-w-0">
-                            <span class="text-[10px] sm:text-xs font-bold text-slate-700 truncate">${cat.category_name}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="flex flex-col items-center justify-center px-1">
-                        <div class="flex items-baseline gap-0.5" dir="ltr">
-                            <span class="text-[10px] sm:text-xs font-black ltr-num" style="color:${color.hex}">₪${spent.toLocaleString()}</span>
-                            ${hasBudget ? `<span class="text-[8px] font-bold text-slate-400">/₪${Math.round(budget).toLocaleString()}</span>` : ''}
-                        </div>
-                        ${hasBudget ? `
-                        <span class="text-[8px] font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap mt-0.5">
-                            ${isOver ? 'חריגה ₪' + Math.abs(Math.round(remaining)).toLocaleString() : 'נותר ₪' + Math.round(remaining).toLocaleString()}
-                        </span>
-                        ` : ''}
-                    </div>
-                    
-                    <div class="flex-1 px-1 flex items-center gap-1.5">
-                        <div class="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
-                        </div>
+                        <span class="text-[10px] sm:text-xs text-slate-700 whitespace-nowrap">${cat.category_name}${hasBudget ? ` (₪${Math.round(budget).toLocaleString()})` : ''}</span>
                         ${Math.abs(budget - spent) > 0.1 ? `
                             <button onclick="event.stopPropagation(); window.initCloseCategory('${cat.category_name.replace(/'/g,"\\'").replace(/"/g, "&quot;")}', ${spent}, ${budget}, '${cat.category_name.replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="text-blue-500 hover:text-blue-700 transition-colors flex-shrink-0">
                                 <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"></path>
                                 </svg>
                             </button>
+                        ` : ''}
+                    </div>
+                    <!-- Left Part: Data/Bar -->
+                    <div class="flex-1 min-w-0 flex flex-col justify-center px-1">
+                        <div class="flex items-center justify-between text-[9px] sm:text-[10px] ${hasBudget ? 'mb-0.5' : ''}">
+                            <span class="font-black ltr-num" style="color:${color.hex}">₪${spent.toLocaleString()}</span>
+                            ${hasBudget ? `
+                                <span class="font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} ltr-num">
+                                    ${isOver ? 'חריגה ' : 'נותר '}₪${Math.round(Math.abs(remaining)).toLocaleString()}
+                                </span>
+                            ` : ''}
+                        </div>
+                        ${hasBudget ? `
+                            <div class="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
+                            </div>
                         ` : ''}
                     </div>
                 `;
@@ -3609,9 +3669,6 @@
                 const filterId = type === 'current' ? catId : 'budget:' + catId;
                 const isActive = state.activeCategoryFilter === filterId;
 
-                const row = document.createElement('div');
-                row.className = `flex items-center gap-3 py-1 px-3 border-b border-slate-50 last:border-0 transition-colors cursor-pointer ${isActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
-                
                 // Show only child category for fixed
                 const displayName = (type === 'fixed') 
                     ? cat.category_name 
@@ -3627,35 +3684,37 @@
 
                 const showBarAndRemaining = type !== 'current' || hasBudget;
 
-                // Layout (Single Line): Icon+Name (35%) | Spent/Budget (20%) | Bar (25%) | Remaining/Over (20%)
+                // Layout (Single Line): Icon+Name (Right) | Data/Bar (Left)
+                const row = document.createElement('div');
+                row.className = `flex items-center gap-1 py-1 px-0 border-b border-slate-50 last:border-0 transition-colors cursor-pointer font-hebrew w-full ${isActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+                row.dir = "rtl";
+                row.onclick = () => window.toggleCategoryFilter(filterId);
+
                 row.innerHTML = `
-                    <div class="flex items-center gap-2 min-w-[30%] max-w-[40%]">
+                    <!-- Right Part: Icon/Name -->
+                    <div class="flex items-center gap-1 flex-shrink-0" style="width: ${labelsWidth}px">
                         ${iconHtml}
-                        <span class="text-[10px] sm:text-xs font-bold text-slate-700 truncate">${displayName}</span>
+                        <span class="text-[10px] sm:text-xs text-slate-700 whitespace-nowrap">${displayName}${hasBudget ? ` (₪${Math.round(budget).toLocaleString()})` : ''}</span>
                     </div>
-                    
-                    <div class="flex flex-col items-center justify-center px-1">
-                        <div class="flex items-baseline gap-0.5" dir="ltr">
-                            <span class="text-[10px] sm:text-xs font-black ltr-num" style="color:${color.hex}">₪${spent.toLocaleString()}</span>
-                            ${hasBudget ? `<span class="text-[8px] font-bold text-slate-400">/₪${Math.round(budget).toLocaleString()}</span>` : ''}
+
+                    <!-- Left Part: Data/Bar -->
+                    <div class="flex-1 min-w-0 flex flex-col justify-center px-1">
+                        <div class="flex items-center justify-between text-[9px] sm:text-[10px] ${showBarAndRemaining && hasBudget ? 'mb-0.5' : ''}">
+                            <span class="font-black ltr-num" style="color:${color.hex}">₪${spent.toLocaleString()}</span>
+                            ${showBarAndRemaining && hasBudget ? `
+                                <span class="font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} ltr-num">
+                                    ${isOver ? 'חריגה ' : 'נותר '}₪${Math.round(Math.abs(remaining)).toLocaleString()}
+                                </span>
+                            ` : ''}
                         </div>
-                        ${showBarAndRemaining ? `
-                        <span class="text-[8px] font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap mt-0.5">
-                            ${isOver ? 'חריגה ₪' + Math.abs(Math.round(remaining)).toLocaleString() : 'נותר ₪' + Math.round(remaining).toLocaleString()}
-                        </span>
-                        ` : ''}
-                    </div>
-                    
-                    <div class="flex-1 px-1">
-                        ${showBarAndRemaining ? `
-                        <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
-                        </div>
+                        ${showBarAndRemaining && hasBudget ? `
+                            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
+                            </div>
                         ` : ''}
                     </div>
                 `;
                 
-                row.onclick = () => window.toggleCategoryFilter(filterId);
                 strip.appendChild(row);
             });
         }
@@ -3665,27 +3724,29 @@
             const noneTotal = Math.round(totals['current:__none__'] || 0);
             const isNoneActive = state.activeCategoryFilter === '__none__';
             const noneRow = document.createElement('div');
-            noneRow.className = `flex items-center gap-3 py-1 px-3 transition-colors ${isNoneActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+            noneRow.className = `flex items-center gap-1 py-1 px-1 transition-colors font-hebrew w-full ${isNoneActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+            noneRow.dir = "rtl";
             
             noneRow.innerHTML = `
-                <div class="flex items-center gap-2 min-w-[30%] max-w-[40%] cursor-pointer" onclick="window.toggleCategoryFilter('__none__')">
-                    <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
-                        <i class="fa-solid fa-tag text-[11px] text-slate-400"></i>
+                <div class="flex items-center gap-1 w-full">
+                    <!-- Right: Icon/Name -->
+                    <div class="flex items-center gap-1 flex-shrink-0 cursor-pointer" onclick="window.toggleCategoryFilter('__none__')" style="width: ${labelsWidth}px">
+                        <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid fa-tag text-[11px] text-slate-400"></i>
+                        </div>
+                        <span class="text-[10px] sm:text-xs text-slate-400 whitespace-nowrap">לא מקוטלג</span>
                     </div>
-                    <span class="text-[10px] sm:text-xs font-bold text-slate-400 truncate">לא מקוטלג</span>
-                </div>
-                
-                <div class="flex flex-col items-center justify-center px-1 cursor-pointer" onclick="window.toggleCategoryFilter('__none__')">
-                    <div class="flex items-baseline gap-0.5" dir="ltr">
-                        <span class="text-[10px] sm:text-xs font-black text-slate-400 ltr-num">₪${noneTotal.toLocaleString()}</span>
+
+                    <!-- Left: Total and Management -->
+                    <div class="flex-1 min-w-0 flex flex-col justify-center px-1 cursor-pointer" onclick="window.toggleCategoryFilter('__none__')">
+                        <div class="flex items-center justify-between w-full">
+                            <span class="text-[9px] sm:text-[10px] font-black text-slate-400 ltr-num">₪${noneTotal.toLocaleString()}</span>
+                            <button onclick="event.stopPropagation(); window.openManageCategoriesModal()" class="flex items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors flex-shrink-0">
+                                <i class="fa-solid fa-sliders text-[10px]"></i>
+                                <span class="text-[10px] whitespace-nowrap">ניהול קטגוריות</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="flex-1 flex justify-center">
-                    <button onclick="event.stopPropagation(); window.openManageCategoriesModal()" class="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 transition-colors">
-                        <i class="fa-solid fa-sliders text-[10px]"></i>
-                        <span class="text-[10px] font-bold">ניהול קטגוריות</span>
-                    </button>
                 </div>
             `;
             strip.appendChild(noneRow);
@@ -3792,6 +3853,14 @@
     };
 
     // Open manage categories modal
+    const PRESETS = [
+        { name: 'מזון', color: 'green', icon: 'utensils', id: 'p1' },
+        { name: 'ביגוד', color: 'blue', icon: 'shirt', id: 'p2' },
+        { name: 'בילוי', color: 'purple', icon: 'mug-hot', id: 'p3' },
+        { name: 'טיפוח', color: 'pink', icon: 'droplet', id: 'p4' },
+        { name: 'שונות', color: 'slate', icon: 'box', id: 'p5' }
+    ];
+
     window.openManageCategoriesModal = function() {
         renderCategoriesListModal();
         const o = document.getElementById('manageCategoriesOverlay');
@@ -3807,7 +3876,7 @@
         if (!list) return;
         list.innerHTML = '';
 
-        const cats = state.expenseCategories;
+        const cats = state.expenseCategories || [];
 
         // Render budget summary bar
         const summaryBar = document.getElementById('catBudgetSummaryBar');
@@ -3836,31 +3905,350 @@
             }
         }
 
-        if (cats.length === 0) {
-            list.innerHTML = '<p class="text-center text-slate-400 text-xs py-6">אין קטגוריות עדיין</p>';
+        // --- Render Inline Adding Row ---
+        if (_isInlineAdding) {
+            const addDiv = document.createElement('div');
+            addDiv.className = 'p-3 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3';
+            
+            // Mini color picker
+            let colorHtml = '<div class="flex flex-wrap gap-1 mb-2">';
+            CAT_COLORS.forEach(c => {
+                colorHtml += `
+                    <button onclick="_editingCatColor='${c.id}'; renderCategoriesListModal()" class="w-5 h-5 rounded-full transition-transform active:scale-90 ${c.id === _editingCatColor ? 'ring-2 ring-offset-1 ring-blue-500 scale-110' : ''}" style="background:${c.hex}"></button>
+                `;
+            });
+            colorHtml += '</div>';
+
+            // Mini icon picker (full list)
+            let iconHtml = '<div class="flex flex-wrap gap-1">';
+            CAT_ICONS.forEach(ic => {
+                iconHtml += `
+                    <button onclick="_editingCatIcon='${ic.id}'; renderCategoriesListModal()" class="w-7 h-7 rounded-lg flex items-center justify-center transition-all ${ic.id === _editingCatIcon ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-100' : 'text-slate-400 hover:bg-slate-50'}">
+                        <i class="fa-solid ${ic.fa} text-sm"></i>
+                    </button>
+                `;
+            });
+            iconHtml += '</div>';
+
+            addDiv.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <div class="w-9 h-9 flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid ${getCatIcon(_editingCatIcon).fa} text-xl" style="color:${getCatColor(_editingCatColor).hex}"></i>
+                    </div>
+                    <input type="text" id="inlineAddName" value="${_tempInlineName}" oninput="_tempInlineName=this.value" placeholder="שם הקטגוריה..." class="flex-1 bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-blue-500">
+                </div>
+                <div class="space-y-2 px-1 border-y border-slate-100 py-2">
+                    <div class="text-[10px] font-bold text-slate-400 mb-1">צבע</div>
+                    ${colorHtml}
+                    <div class="text-[10px] font-bold text-slate-400 mb-1">אייקון</div>
+                    ${iconHtml}
+                </div>
+                <div class="flex items-center justify-between gap-2 pt-1 px-1">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[10px] font-bold text-slate-400">תקציב:</span>
+                        <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 w-20">
+                            <span class="text-slate-400 text-[10px]">₪</span>
+                            <input type="number" id="inlineAddBudget" value="${_tempInlineBudget}" oninput="_tempInlineBudget=this.value" placeholder="חודשי" class="w-full bg-transparent border-none outline-none text-xs text-slate-700">
+                        </div>
+                    </div>
+                    <div class="flex gap-1 flex-shrink-0">
+                        <button onclick="window.saveInline(null)" class="w-7 h-7 bg-blue-600 text-white rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors">
+                            <i class="fa-solid fa-check text-xs"></i>
+                        </button>
+                        <button onclick="window.cancelInline()" class="w-7 h-7 bg-slate-200 text-slate-600 rounded-lg flex items-center justify-center hover:bg-slate-300 transition-colors">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            list.appendChild(addDiv);
+            // Auto focus if name is empty
+            if (!document.getElementById('inlineAddName')?.value) {
+                setTimeout(() => document.getElementById('inlineAddName')?.focus(), 50);
+            }
+        }
+
+        if (cats.length === 0 && !_isInlineAdding) {
+            let presetsHtml = `
+                <div class="py-2 space-y-4">
+                    <p class="text-xs text-slate-400 font-bold text-center">בחר קטגוריות להוספה:</p>
+                    <div class="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto px-1">
+            `;
+            PRESETS.forEach(p => {
+                const color = getCatColor(p.color);
+                const icon = getCatIcon(p.icon);
+                const isSelected = _selectedManagePresets.includes(p.id);
+                presetsHtml += `
+                    <button onclick="window.toggleManagePreset('${p.id}')" class="flex items-center gap-3 p-2.5 bg-slate-50 border ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-slate-100'} rounded-xl transition-all text-right group">
+                        <div class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0" style="background:${isSelected ? color.hex : 'white'}; border: 1px solid ${isSelected ? color.hex : '#e2e8f0'}">
+                            ${isSelected ? '<i class="fa-solid fa-check text-white text-[10px]"></i>' : ''}
+                        </div>
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:${color.hex}10">
+                            <i class="fa-solid ${icon.fa}" style="color:${color.hex}; font-size: 14px"></i>
+                        </div>
+                        <span class="text-xs font-bold text-slate-700 flex-grow">${p.name}</span>
+                    </button>
+                `;
+            });
+            presetsHtml += `
+                    </div>
+                    <button onclick="window.addSelectedManagePresets()" class="w-full py-3 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors shadow-sm ${_selectedManagePresets.length === 0 ? 'opacity-50 pointer-events-none' : ''}">
+                        הוסף קטגוריות
+                    </button>
+                </div>
+            `;
+            list.innerHTML = presetsHtml;
             return;
         }
 
         cats.forEach(cat => {
-            const color = getCatColor(cat.color);
-            const icon = getCatIcon(cat.icon);
+            const isEditing = _inlineEditingId === cat.id;
+            const color = isEditing ? getCatColor(_editingCatColor) : getCatColor(cat.color);
+            const icon = isEditing ? getCatIcon(_editingCatIcon) : getCatIcon(cat.icon);
             const budget = safeParseFloat(cat.monthly_budget || 0);
+
             const div = document.createElement('div');
-            div.className = 'flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100';
-            div.innerHTML = `
-                <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background:${color.hex}">
-                    <i class="fa-solid ${icon.fa} text-white text-sm"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <span class="text-sm font-bold text-slate-700 block">${cat.name}</span>
-                    ${budget > 0 ? `<span class="text-[10px] font-bold ltr-num" style="color:${color.hex}">₪${Math.round(budget).toLocaleString()} / חודש</span>` : '<span class="text-[10px] text-slate-300 font-bold">ללא תקציב</span>'}
-                </div>
-                <button onclick="window.openEditCategoryModal('${cat.id}')" class="p-1.5 text-slate-400 hover:text-blue-600 transition-colors">
-                    <i class="fa-solid fa-pen text-xs"></i>
-                </button>`;
+            if (isEditing) {
+                // Mini color picker for editing
+                let colorHtml = '<div class="flex flex-wrap gap-1 mb-2">';
+                CAT_COLORS.forEach(c => {
+                    colorHtml += `
+                        <button onclick="_editingCatColor='${c.id}'; renderCategoriesListModal()" class="w-5 h-5 rounded-full transition-transform active:scale-90 ${c.id === _editingCatColor ? 'ring-2 ring-offset-1 ring-blue-500 scale-110' : ''}" style="background:${c.hex}"></button>
+                    `;
+                });
+                colorHtml += '</div>';
+
+                // Mini icon picker for editing (full list)
+                let iconHtml = '<div class="flex flex-wrap gap-1">';
+                CAT_ICONS.forEach(ic => {
+                    iconHtml += `
+                        <button onclick="_editingCatIcon='${ic.id}'; renderCategoriesListModal()" class="w-7 h-7 rounded-lg flex items-center justify-center transition-all ${ic.id === _editingCatIcon ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-100' : 'text-slate-400 hover:bg-slate-50'}">
+                            <i class="fa-solid ${ic.fa} text-sm"></i>
+                        </button>
+                    `;
+                });
+                iconHtml += '</div>';
+
+                div.className = 'p-3 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3';
+                div.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <div class="w-9 h-9 flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid ${icon.fa} text-xl" style="color:${color.hex}"></i>
+                        </div>
+                        <input type="text" id="inlineEditName" value="${_tempInlineName || cat.name}" oninput="_tempInlineName=this.value" class="flex-1 bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-sm outline-none focus:border-blue-500">
+                    </div>
+                    <div class="space-y-2 px-1 border-y border-slate-100 py-2">
+                        <div class="text-[10px] font-bold text-slate-400 mb-1">צבע</div>
+                        ${colorHtml}
+                        <div class="text-[10px] font-bold text-slate-400 mb-1">אייקון</div>
+                        ${iconHtml}
+                    </div>
+                    <div class="flex items-center justify-between gap-2 pt-1 px-1">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] font-bold text-slate-400">תקציב:</span>
+                            <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 w-20">
+                                <span class="text-slate-400 text-[10px]">₪</span>
+                                <input type="number" id="inlineEditBudget" value="${_tempInlineBudget !== null ? _tempInlineBudget : (budget > 0 ? Math.round(budget) : '')}" oninput="_tempInlineBudget=this.value" placeholder="חודשי" class="w-full bg-transparent border-none outline-none text-xs text-slate-700">
+                            </div>
+                        </div>
+                        <div class="flex gap-1 flex-shrink-0">
+                            <button type="button" onclick="window.saveInline('${cat.id}')" class="w-7 h-7 bg-blue-600 text-white rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors">
+                                <i class="fa-solid fa-check text-xs"></i>
+                            </button>
+                            ${_isConfirmingDeleteId === cat.id ? `
+                                <button type="button" onclick="window.deleteCategory('${cat.id}')" class="px-2 h-7 bg-red-600 text-white rounded-lg flex items-center justify-center hover:bg-red-700 transition-all text-[9px] font-bold animate-pulse">
+                                    בטוח? מחק
+                                </button>
+                            ` : `
+                                <button type="button" onclick="window.armDelete('${cat.id}')" class="w-7 h-7 bg-red-50 text-red-500 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </button>
+                            `}
+                            <button type="button" onclick="window.cancelInline()" class="w-7 h-7 bg-slate-200 text-slate-600 rounded-lg flex items-center justify-center hover:bg-slate-300 transition-colors">
+                                <i class="fa-solid fa-xmark text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                div.className = 'flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-100';
+                div.innerHTML = `
+                    <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid ${icon.fa} text-base" style="color:${color.hex}"></i>
+                    </div>
+                    <div class="flex-1 min-w-0 flex items-center gap-2">
+                        <span class="text-xs font-medium text-slate-700 truncate">${cat.name}</span>
+                        ${budget > 0 ? `<span class="text-[9px] font-bold ltr-num text-slate-400">₪${Math.round(budget).toLocaleString()}</span>` : ''}
+                    </div>
+                    <button onclick="window.startInlineEdit('${cat.id}')" class="p-1 text-slate-300 hover:text-blue-600 transition-colors">
+                        <i class="fa-solid fa-pen text-[10px]"></i>
+                    </button>`;
+            }
             list.appendChild(div);
         });
     }
+
+    window.startInlineEdit = function(id) {
+        const cat = getExpCatById(id);
+        if (!cat) return;
+        _inlineEditingId = id;
+        _isInlineAdding = false;
+        _tempInlineName = cat.name;
+        _tempInlineBudget = cat.monthly_budget > 0 ? Math.round(cat.monthly_budget) : '';
+        _editingCatColor = cat.color;
+        _editingCatIcon = cat.icon;
+        renderCategoriesListModal();
+    };
+
+    window.startInlineAdd = function() {
+        _isInlineAdding = true;
+        _inlineEditingId = null;
+        _tempInlineName = '';
+        _tempInlineBudget = '';
+        // Defaults for new category
+        _editingCatColor = CAT_COLORS[0].id;
+        _editingCatIcon = CAT_ICONS[0].id;
+        renderCategoriesListModal();
+    };
+
+    window.cancelInline = function() {
+        _inlineEditingId = null;
+        _isInlineAdding = false;
+        _isConfirmingDeleteId = null;
+        _tempInlineName = '';
+        _tempInlineBudget = null;
+        renderCategoriesListModal();
+    };
+
+    window.quickAddPreset = async function(name, colorId, iconId) {
+        if (!sbClient || !USER_TOKEN) return;
+        try {
+            setLoading(true);
+            const { error } = await sbClient.from('expense_categories')
+                .insert({ 
+                    name, 
+                    color: colorId, 
+                    icon: iconId, 
+                    monthly_budget: 0, 
+                    user_token: USER_TOKEN 
+                });
+            if (error) throw error;
+            
+            await window.fetchExpenseCategories();
+            renderCategoriesListModal();
+            render();
+            window.showToast('נוסף בהצלחה', 'check');
+        } catch (e) {
+            console.error("Error quick adding preset:", e);
+            window.showToast('שגיאה בהוספה', 'circle-xmark');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    window.toggleManagePreset = function(id) {
+        const idx = _selectedManagePresets.indexOf(id);
+        if (idx > -1) {
+            _selectedManagePresets.splice(idx, 1);
+        } else {
+            _selectedManagePresets.push(id);
+        }
+        renderCategoriesListModal();
+    };
+
+    window.addSelectedManagePresets = async function() {
+        if (_selectedManagePresets.length === 0 || !sbClient || !USER_TOKEN) return;
+        try {
+            setLoading(true);
+            const toInsert = _selectedManagePresets.map(pid => {
+                const p = PRESETS.find(pr => pr.id === pid);
+                return {
+                    name: p.name,
+                    color: p.color,
+                    icon: p.icon,
+                    monthly_budget: 0,
+                    user_token: USER_TOKEN
+                };
+            });
+            const { error } = await sbClient.from('expense_categories').insert(toInsert);
+            if (error) throw error;
+            
+            _selectedManagePresets = [];
+            await window.fetchExpenseCategories();
+            renderCategoriesListModal();
+            render();
+            window.showToast('הקטגוריות נוספו', 'check');
+        } catch (e) {
+            console.error("Error adding manage presets:", e);
+            window.showToast('שגיאה בהוספה', 'circle-xmark');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    window.saveInline = async function(catId) {
+        if (!sbClient || !USER_TOKEN) return;
+        
+        const name = (_tempInlineName || '').trim();
+        if (!name) return window.showToast('נא להזין שם', 'circle-xmark');
+        
+        const monthly_budget = safeParseFloat(_tempInlineBudget || '0');
+        
+        try {
+            setLoading(true);
+            if (catId) {
+                // Update
+                const { error } = await sbClient.from('expense_categories')
+                    .update({ 
+                        name, 
+                        monthly_budget,
+                        color: _editingCatColor,
+                        icon: _editingCatIcon
+                    })
+                    .eq('id', catId).eq('user_token', USER_TOKEN);
+                if (error) throw error;
+            } else {
+                // Insert
+                const { error } = await sbClient.from('expense_categories')
+                    .insert({ 
+                        name, 
+                        monthly_budget, 
+                        color: _editingCatColor, 
+                        icon: _editingCatIcon,
+                        user_token: USER_TOKEN 
+                    });
+                if (error) throw error;
+            }
+            
+            window.showToast('נשמר', 'check');
+            _inlineEditingId = null;
+            _isInlineAdding = false;
+            await window.fetchExpenseCategories();
+            renderCategoriesListModal();
+            render();
+        } catch (e) {
+            console.error("Error saving inline category:", e);
+            window.showToast('שגיאה בשמירה', 'circle-xmark');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    window.armDelete = function(id) {
+        _isConfirmingDeleteId = id;
+        renderCategoriesListModal();
+        // Clear confirmation after 3 seconds if not clicked
+        setTimeout(() => {
+            if (_isConfirmingDeleteId === id) {
+                _isConfirmingDeleteId = null;
+                renderCategoriesListModal();
+            }
+        }, 3000);
+    };
+
+    window.confirmDeleteInline = function(id) {
+        window.armDelete(id);
+    };
 
     // Open create/edit category modal
     window.openEditCategoryModal = function(catId) {
@@ -4005,6 +4393,37 @@
     window.closeEditCategoryModal = function() {
         const o = document.getElementById('editCategoryOverlay');
         if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
+        _isConfirmingDeleteId = null;
+        const delBtn = document.getElementById('deleteCategoryBtn');
+        if (delBtn) {
+            delBtn.textContent = 'מחק קטגוריה';
+            delBtn.classList.remove('bg-red-600', 'text-white');
+            delBtn.classList.add('bg-red-50', 'text-red-500');
+        }
+    };
+
+    window.handleMainDeleteClick = function() {
+        if (!_editingCatId) return;
+        const btn = document.getElementById('deleteCategoryBtn');
+        if (!btn) return;
+
+        if (_isConfirmingDeleteId === _editingCatId) {
+            window.deleteCategory(_editingCatId);
+        } else {
+            _isConfirmingDeleteId = _editingCatId;
+            btn.textContent = 'בטוח? לחץ שוב למחיקה';
+            btn.classList.remove('bg-red-50', 'text-red-500');
+            btn.classList.add('bg-red-600', 'text-white', 'animate-pulse');
+            
+            setTimeout(() => {
+                if (_isConfirmingDeleteId === _editingCatId) {
+                    _isConfirmingDeleteId = null;
+                    btn.textContent = 'מחק קטגוריה';
+                    btn.classList.remove('bg-red-600', 'text-white', 'animate-pulse');
+                    btn.classList.add('bg-red-50', 'text-red-500');
+                }
+            }, 3000);
+        }
     };
 
     function renderColorPicker() {
@@ -4084,26 +4503,67 @@
         }
     };
 
-    window.deleteCategory = async function() {
-        if (!_editingCatId || !sbClient) return;
+    window.deleteCategory = async function(id) {
+        const targetId = id || _editingCatId;
+        console.log("deleteCategory execution started for ID:", targetId);
+        
+        if (!targetId) {
+            window.showToast('שגיאה: חסר מזהה קטגוריה', 'circle-xmark');
+            return;
+        }
+        if (!sbClient) {
+            window.showToast('שגיאה: חסר חיבור לשרת', 'circle-xmark');
+            return;
+        }
+        if (!USER_TOKEN) {
+            window.showToast('שגיאה: משתמש לא מחובר', 'circle-xmark');
+            return;
+        }
+
         try {
-            // Clear category from transactions
-            await sbClient.from('transactions')
+            setLoading(true);
+            window.showToast('מוחק קטגוריה...', 'info');
+            
+            // 1. Clear the category from all transactions
+            const { error: txErr } = await sbClient.from('transactions')
                 .update({ expense_category_id: null })
-                .eq('expense_category_id', _editingCatId)
+                .eq('expense_category_id', targetId)
                 .eq('user_token', USER_TOKEN);
-            await sbClient.from('expense_categories')
-                .delete().eq('id', _editingCatId).eq('user_token', USER_TOKEN);
-            // Remove from state transactions too
-            state.transactions.forEach(t => { if (t.expense_category_id === _editingCatId) t.expense_category_id = null; });
-            window.closeEditCategoryModal();
+            
+            if (txErr) {
+                console.warn("Transactions update error:", txErr);
+            }
+
+            // 2. Delete the category itself
+            const { error: catErr } = await sbClient.from('expense_categories')
+                .delete()
+                .eq('id', targetId)
+                .eq('user_token', USER_TOKEN);
+            
+            if (catErr) throw catErr;
+
+            // 3. Update local state
+            if (state.transactions) {
+                state.transactions.forEach(t => { 
+                    if (t.expense_category_id === targetId) t.expense_category_id = null; 
+                });
+            }
+            
+            // 4. Close UI elements and refresh
+            if (typeof window.closeEditCategoryModal === 'function') window.closeEditCategoryModal();
+            _inlineEditingId = null;
+            _editingCatId = null;
+            _isConfirmingDeleteId = null;
+            
             await window.fetchExpenseCategories();
-            renderCategoriesListModal();
+            if (typeof renderCategoriesListModal === 'function') renderCategoriesListModal();
             render();
-            window.showToast('נמחק', 'check');
+            window.showToast('הקטגוריה נמחקה בהצלחה', 'check');
         } catch(e) {
-            console.error(e);
-            window.showToast('שגיאה', 'circle-xmark');
+            console.error("Critical error in deleteCategory:", e);
+            window.showToast('שגיאה במחיקה: ' + (e.message || 'נסה שוב'), 'circle-xmark');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -4611,13 +5071,13 @@
                 ${catBadgeHtml}
                 <div class="flex-1 flex flex-col">
                     <div class="flex items-center">
-                        <span class="font-bold text-slate-800 text-xs">${tx.name}</span>
+                        <span class="text-slate-800 text-xs">${tx.name}</span>
                         ${tagHtml}
                     </div>
                     ${!hideDate ? `<span class="text-[8px] text-slate-400 font-bold">${tx.date}</span>` : ''}
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="${colorClass} font-bold text-xs ltr-num">₪${Math.round(Math.abs(formatDisplayAmount(amountValue))).toLocaleString()}</div>
+                    <div class="${colorClass} text-xs ltr-num">₪${Math.round(Math.abs(formatDisplayAmount(amountValue))).toLocaleString()}</div>
                     ${isSelectMode
                         ? ''
                         : `<button onclick="window.initEditRow('${tx.row}')" class="p-1"><i class="fa-solid fa-ellipsis-vertical text-[10px] text-slate-300"></i></button>`
