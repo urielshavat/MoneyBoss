@@ -1823,6 +1823,18 @@
     // =====================================================
     function safeParseFloat(val) { if (!val) return 0; const c = val.toString().replace(/[^\d.-]/g, ''); return parseFloat(c) || 0; }
     function parseLocalDate(s) { if (!s) return new Date(); const p = s.split('/'); return new Date(p[2], p[1]-1, p[0]); }
+    function getBudgetStartDate() {
+        let displayStartDate = state.budget.startDate || '';
+        if (state.transactions.length > 0) {
+            const sorted = [...state.transactions].sort((a, b) => {
+                const da = parseLocalDate(a.date);
+                const db = parseLocalDate(b.date);
+                return da - db;
+            });
+            displayStartDate = sorted[0].date;
+        }
+        return parseLocalDate(displayStartDate);
+    }
     function getSafeId(name) { return 'cat_' + name.replace(/[^a-z0-9א-ת]/gi, '_'); }
 
     function formatDateForSupabase(dateStr) {
@@ -3376,7 +3388,7 @@
                 } else {
                     // Check if it's planned
                     const planned = state.budget.annual.find(a => tagMatchesCat(tx.tag, a));
-                    if (planned && d >= yearStart) {
+                    if (planned && d >= getBudgetStartDate()) {
                         const key = 'planned:' + (planned.id || planned.category_name);
                         totals[key] = (totals[key] || 0) + amt;
                     }
@@ -5741,8 +5753,14 @@
             annualCatNames.add(short);
             if (a.parent_group) annualCatNames.add((a.parent_group + ' > ' + short).trim());
         });
+        const budgetStartDate = getBudgetStartDate();
         const actualSpent = state.transactions.reduce((s, tx) => {
-            if (tx.tag && annualCatNames.has(tagToShortName(tx.tag))) return s + safeParseFloat(tx.amount);
+            if (tx.tag && annualCatNames.has(tagToShortName(tx.tag))) {
+                const d = parseLocalDate(tx.date);
+                if (d >= budgetStartDate) {
+                    return s + safeParseFloat(tx.amount);
+                }
+            }
             return s;
         }, 0);
         return { monthsPassed, annualTotal, monthlySetAside, totalAccruedBudget, actualSpent, reserve: totalAccruedBudget - actualSpent };
@@ -5846,31 +5864,32 @@
             return { card, details: cardDetails };
         };
 
+        const budgetStartDate = getBudgetStartDate();
         Object.values(groups).forEach(group => {
             let groupSpent = 0;
             group.items.forEach(item => {
-                groupSpent += state.transactions.filter(t => tagMatchesCat(t.tag, item)).reduce((s, t) => s + safeParseFloat(t.amount), 0);
+                groupSpent += state.transactions.filter(t => tagMatchesCat(t.tag, item) && parseLocalDate(t.date) >= budgetStartDate).reduce((s, t) => s + safeParseFloat(t.amount), 0);
             });
             const groupObj = createCard(group.name, group.totalValue, groupSpent, true);
             container.appendChild(groupObj.card);
             if (state.expandedAnnualCategories.has(group.name)) {
                 group.items.forEach(item => {
-                    const itemSpent = state.transactions.filter(t => tagMatchesCat(t.tag, item)).reduce((s, t) => s + safeParseFloat(t.amount), 0);
+                    const itemSpent = state.transactions.filter(t => tagMatchesCat(t.tag, item) && parseLocalDate(t.date) >= budgetStartDate).reduce((s, t) => s + safeParseFloat(t.amount), 0);
                     const childObj = createCard(item.category_name, safeParseFloat(item.budget_amount), itemSpent, false, item.category_name);
                     groupObj.details.appendChild(childObj.card);
                     if (state.expandedAnnualCategories.has(item.category_name)) {
-                        state.transactions.filter(t => tagMatchesCat(t.tag, item)).forEach(tx => childObj.details.appendChild(createTransactionEl(tx, false, true)));
+                        state.transactions.filter(t => tagMatchesCat(t.tag, item) && parseLocalDate(t.date) >= budgetStartDate).forEach(tx => childObj.details.appendChild(createTransactionEl(tx, false, true)));
                     }
                 });
             }
         });
 
         standalone.forEach(item => {
-            const spent = state.transactions.filter(t => tagMatchesCat(t.tag, item)).reduce((s, t) => s + safeParseFloat(t.amount), 0);
+            const spent = state.transactions.filter(t => tagMatchesCat(t.tag, item) && parseLocalDate(t.date) >= budgetStartDate).reduce((s, t) => s + safeParseFloat(t.amount), 0);
             const standObj = createCard(item.category_name, safeParseFloat(item.budget_amount), spent, false);
             container.appendChild(standObj.card);
             if (state.expandedAnnualCategories.has(item.category_name)) {
-                state.transactions.filter(t => tagMatchesCat(t.tag, item)).forEach(tx => standObj.details.appendChild(createTransactionEl(tx, false, true)));
+                state.transactions.filter(t => tagMatchesCat(t.tag, item) && parseLocalDate(t.date) >= budgetStartDate).forEach(tx => standObj.details.appendChild(createTransactionEl(tx, false, true)));
             }
         });
     }
