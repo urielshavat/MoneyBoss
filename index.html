@@ -10,6 +10,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/he.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap');
         body { font-family: 'Assistant', sans-serif; background-color: #f3f4f6; -webkit-tap-highlight-color: transparent; position: relative; min-height: 100vh; overflow-x: hidden; transition: font-size 0.2s; }
@@ -892,7 +895,7 @@
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תאריך</label>
-                        <input type="date" id="editRowDate" class="appearance-none bg-white border border-slate-200 w-full px-2 py-0 rounded-xl text-[11px] font-bold text-slate-700 h-[48px] leading-[48px] [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:p-0">
+                        <input type="text" id="editRowDate" placeholder="dd/mm/yyyy" class="appearance-none bg-white border border-slate-200 w-full px-2 py-0 rounded-xl text-[11px] font-bold text-slate-700 h-[48px] leading-[48px] text-center">
                     </div>
                 </div>
                 <div>
@@ -2522,7 +2525,16 @@
         setLoading(true, true);
         try {
             const updateData = { name, amount, category, expense_category_id };
+            let isoDateVal = '';
             if (dateVal) {
+                const parts = dateVal.split('/');
+                if (parts.length === 3) {
+                    isoDateVal = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+                } else {
+                    isoDateVal = dateVal;
+                }
+            }
+            if (isoDateVal) {
                 const origTx = state.transactions.find(t => t.row === state.pendingActionRow.row);
                 let timeStr = '12:00:00';
                 if (origTx) {
@@ -2534,7 +2546,7 @@
                         timeStr = `${String(h).padStart(2,'0')}:${timeParts[2]}:00`;
                     }
                 }
-                updateData.created_at = `${dateVal}T${timeStr}`;
+                updateData.created_at = `${isoDateVal}T${timeStr}`;
             }
 
             const { error } = await sbClient
@@ -4887,8 +4899,38 @@
                 const spending = currentSpent;
                 const budget = monthlyBudget;
                 const remaining = budget - spending;
-                const barPct = budget > 0 ? Math.min(100, (spending / budget) * 100) : 0;
                 const over = spending > budget;
+
+                // Dynamic daily budget and pacing calculation
+                const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                const currentDayOfMonth = now.getDate();
+                const dynamicDailyBudget = budget / totalDaysInMonth;
+                const currentBudget = dynamicDailyBudget * currentDayOfMonth;
+
+                const spendingPct = budget > 0 ? (spending / budget) * 100 : 0;
+                const currentBudgetPct = budget > 0 ? (currentBudget / budget) * 100 : 0;
+
+                const safeSpendingPct = Math.min(100, Math.max(0, spendingPct));
+                const safeCurrentBudgetPct = Math.min(100, Math.max(0, currentBudgetPct));
+
+                let innerBarHtml = '';
+                if (spending <= currentBudget) {
+                    // Under budget pace: Blue up to spending, Green up to currentBudget pace
+                    const blueWidth = safeSpendingPct;
+                    const greenWidth = Math.max(0, safeCurrentBudgetPct - safeSpendingPct);
+                    innerBarHtml = `
+                        <div class="h-full bg-blue-500 transition-all duration-500" style="width: ${blueWidth}%" title="הוצאה בפועל"></div>
+                        <div class="h-full bg-green-500 transition-all duration-500" style="width: ${greenWidth}%" title="תקציב יחסי להיום"></div>
+                    `;
+                } else {
+                    // Over budget pace: Blue up to currentBudget pace, Red up to current spending
+                    const blueWidth = safeCurrentBudgetPct;
+                    const redWidth = Math.min(100 - safeCurrentBudgetPct, Math.max(0, safeSpendingPct - safeCurrentBudgetPct));
+                    innerBarHtml = `
+                        <div class="h-full bg-blue-500 transition-all duration-500" style="width: ${blueWidth}%" title="תקציב יחסי להיום"></div>
+                        <div class="h-full bg-red-500 transition-all duration-500" style="width: ${redWidth}%" title="חריגה מהקצב"></div>
+                    `;
+                }
 
                 headerRow.innerHTML = `
                     <!-- Daily Budget (Left in Current) -->
@@ -4915,8 +4957,8 @@
                                 <span class="text-[12px] font-black text-slate-900 ltr-num">₪${Math.round(spending).toLocaleString()}</span>
                                 <span class="text-[12px] font-bold text-slate-400">/ ₪${Math.round(budget).toLocaleString()}</span>
                             </div>
-                            <div class="w-full h-1 bg-slate-100 rounded-full overflow-hidden mb-1">
-                                <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${over ? '#ef4444' : '#3b82f6'}"></div>
+                            <div class="w-full h-1.5 bg-slate-100 rounded-full flex overflow-hidden mb-1">
+                                ${innerBarHtml}
                             </div>
                             <span class="text-[12px] font-bold ${over ? 'text-red-500' : 'text-slate-500'} whitespace-nowrap">
                                 ${over ? 'חריגה ₪' + Math.abs(Math.round(remaining)).toLocaleString() : 'נותר ₪' + Math.round(remaining).toLocaleString()}
@@ -4996,6 +5038,53 @@
             grouped[tx.date].items.push(tx);
             grouped[tx.date].total += safeParseFloat(tx.amount);
         });
+
+        const dailyBalanceMap = {};
+        if (state.mainViewFilter === 'current') {
+            const allTxsSorted = [...state.transactions]
+                .filter(tx => {
+                    const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+                    const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+                    return !isPlanned && !isFixed;
+                })
+                .sort((a, b) => {
+                    const da = parseLocalDate(a.date);
+                    const db = parseLocalDate(b.date);
+                    if (da.getTime() !== db.getTime()) {
+                        return db - da;
+                    }
+                    return (b.row || 0) - (a.row || 0);
+                });
+            const dailyVal = (safeParseFloat(state.budget.g4) || 0) / 30;
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            let currentDateLocal = new Date(today);
+            if (allTxsSorted.length > 0) {
+                const newestTxDate = parseLocalDate(allTxsSorted[0].date);
+                if (newestTxDate > currentDateLocal) {
+                    currentDateLocal = new Date(newestTxDate);
+                }
+            }
+            
+            let running = state.balance;
+            allTxsSorted.forEach(tx => {
+                const txDate = parseLocalDate(tx.date);
+                const diffMs = currentDateLocal - txDate;
+                const daysDiff = Math.floor(diffMs / (1000 * 3600 * 24));
+                
+                if (daysDiff > 0) {
+                    running -= daysDiff * dailyVal;
+                    currentDateLocal = new Date(txDate);
+                }
+                
+                if (dailyBalanceMap[tx.date] === undefined) {
+                    dailyBalanceMap[tx.date] = running;
+                }
+                running += safeParseFloat(tx.amount);
+            });
+        }
+
         const listEl = document.getElementById('transactionList');
         if (listEl) {
             const fragment = document.createDocumentFragment();
@@ -5003,7 +5092,14 @@
                 const g = grouped[date];
                 const h = document.createElement('div');
                 h.className = 'sticky-header py-0.5 px-1 text-[9px] font-bold text-slate-400 flex justify-between tracking-wider border-b border-slate-100';
-                h.innerHTML = `<span>${date}</span><span>₪${Math.round(formatDisplayAmount(g.total)).toLocaleString()}</span>`;
+                
+                let textContent = `₪${Math.round(formatDisplayAmount(g.total)).toLocaleString()}`;
+                if (state.mainViewFilter === 'current') {
+                    const dailyBal = dailyBalanceMap[date] !== undefined ? dailyBalanceMap[date] : state.balance;
+                    textContent = `₪${Math.round(formatDisplayAmount(g.total)).toLocaleString()} | ₪${Math.round(formatDisplayAmount(dailyBal)).toLocaleString()}`;
+                }
+                
+                h.innerHTML = `<span>${date}</span><span class="ltr-num">${textContent}</span>`;
                 fragment.appendChild(h);
                 g.items.forEach((tx, idx) => {
                     const el = createTransactionEl(tx);
@@ -5552,6 +5648,22 @@
         const typeInp = document.getElementById(config.typeInputId);
         const type = typeInp ? typeInp.value : 'current';
         
+        if (config.currentTag) {
+            if (eCat) eCat.value = config.currentTag;
+            if (expInp) expInp.value = '';
+        } else if (config.currentCatId) {
+            if (eCat) eCat.value = 'שוטף';
+            if (expInp) expInp.value = config.currentCatId;
+        } else {
+            if (type === 'current') {
+                if (eCat) eCat.value = 'שוטף';
+                if (expInp) expInp.value = '';
+            } else {
+                if (eCat) eCat.value = '';
+                if (expInp) expInp.value = '';
+            }
+        }
+        
         if (!picker) return;
 
         const activeAnnuals = state.budget.annual.filter(a => safeParseFloat(a.budget_amount) > 0);
@@ -5921,8 +6033,11 @@
         }
         window.setEditTxType(safeParseFloat(tx.amount) < 0 ? 'income' : 'expense');
         if (eDateInp && tx.date) {
-            const parts = tx.date.split('/');
-            if (parts.length === 3) eDateInp.value = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+            if (eDateInp._flatpickr) {
+                eDateInp._flatpickr.setDate(tx.date, true, "d/m/Y");
+            } else {
+                eDateInp.value = tx.date;
+            }
         }
 
         if (expInpEdit) expInpEdit.value = tx.expense_category_id || '';
@@ -8279,6 +8394,15 @@
     // INIT
     // =====================================================
     document.addEventListener('DOMContentLoaded', () => {
+        // Initialize flatpickr on transaction edit date input
+        if (typeof flatpickr !== 'undefined') {
+            flatpickr("#editRowDate", {
+                dateFormat: "d/m/Y",
+                locale: "he",
+                disableMobile: true
+            });
+        }
+
         // Populate month start day select
         const msdSelect = document.getElementById('monthStartDay');
         if (msdSelect) {
