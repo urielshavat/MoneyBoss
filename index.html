@@ -805,7 +805,7 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">כמה?</label>
-                        <input type="text" id="amountInput" step="any" inputmode="decimal" pattern="-?[0-9]*" placeholder="0" required class="input-field w-full px-4 py-3 rounded-xl font-bold text-lg">
+                        <input type="text" id="amountInput" step="any" inputmode="decimal" pattern="-?[0-9]*([.,][0-9]*)?" placeholder="0" required class="input-field w-full px-4 py-3 rounded-xl font-bold text-lg">
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סוג</label>
@@ -877,7 +877,7 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סכום</label>
-                        <input type="text" id="editRowAmount" step="any" inputmode="decimal" pattern="-?[0-9]*" class="input-field w-full px-4 py-0 rounded-xl font-bold text-lg h-[48px] flex items-center">
+                        <input type="text" id="editRowAmount" step="any" inputmode="decimal" pattern="-?[0-9]*([.,][0-9]*)?" class="input-field w-full px-4 py-0 rounded-xl font-bold text-lg h-[48px] flex items-center">
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סוג</label>
@@ -1826,7 +1826,18 @@
     // =====================================================
     // HELPERS
     // =====================================================
-    function safeParseFloat(val) { if (!val) return 0; const c = val.toString().replace(/[^\d.-]/g, ''); return parseFloat(c) || 0; }
+    function safeParseFloat(val) {
+        if (!val) return 0;
+        let s = val.toString().trim();
+        if (s.indexOf('.') === -1 && s.indexOf(',') !== -1) {
+            const commaIdx = s.lastIndexOf(',');
+            if (s.length - commaIdx <= 3) {
+                s = s.replace(/,/g, '.');
+            }
+        }
+        const c = s.replace(/[^\d.-]/g, '');
+        return parseFloat(c) || 0;
+    }
     function parseLocalDate(s) { if (!s) return new Date(); const p = s.split('/'); return new Date(p[2], p[1]-1, p[0]); }
     function getBudgetStartDate() {
         let displayStartDate = state.budget.startDate || '';
@@ -1898,7 +1909,8 @@
         },
         expenseCategories: JSON.parse(localStorage.getItem('expense_categories') || '[]'),
         activeCategoryFilter: null,  // null = show all
-        selectedTxIds: new Set()     // for bulk categorization
+        selectedTxIds: new Set(),     // for bulk categorization
+        categoriesCollapsed: localStorage.getItem('categoriesCollapsed') === 'true'
     };
 
     // =====================================================
@@ -3350,7 +3362,7 @@
         } else if (filter === 'fixed') {
             catsShown.push(...state.budget.fixed.map(c => ({ ...c, $type: 'fixed' })));
         } else if (filter === 'planned') {
-            catsShown.push(...state.budget.annual.map(c => ({ ...c, $type: 'planned' })));
+            catsShown.push(...state.budget.annual.filter(c => safeParseFloat(c.budget_amount || 0) > 0).map(c => ({ ...c, $type: 'planned' })));
         }
 
         if (catsShown.length === 0) {
@@ -3423,13 +3435,50 @@
         
         // Calculate max label width for the current view to align bars
         let maxChars = 15;
+        let labelsWidth = 120;
         if (filter === 'planned') {
-            state.budget.annual.forEach(cat => {
-                const nameLen = (cat.parent_group ? cat.parent_group.length + 3 : 0) + cat.category_name.length;
-                const budget = safeParseFloat(cat.budget_amount || 0);
-                const budgetLen = budget > 0 ? String(Math.round(budget)).length + 5 : 0;
-                maxChars = Math.max(maxChars, nameLen + budgetLen);
+            // Find all active planned categories (budgeted > 0)
+            const annualCats = state.budget.annual.filter(c => safeParseFloat(c.budget_amount || 0) > 0);
+            
+            // Collect groups and group budgets
+            const groupBudgets = {};
+            const groupNames = new Set();
+            annualCats.forEach(cat => {
+                if (cat.parent_group) {
+                    groupNames.add(cat.parent_group);
+                    groupBudgets[cat.parent_group] = (groupBudgets[cat.parent_group] || 0) + safeParseFloat(cat.budget_amount);
+                }
             });
+
+            let maxCalcWidth = 100;
+
+            // Group: icon (24px) + group name + budget text (if budgeted) + chevron button (20px) + 6px (one space buffer)
+            groupNames.forEach(gName => {
+                const budgetVal = groupBudgets[gName] || 0;
+                const text = gName + (budgetVal > 0 ? ` (₪${Math.round(budgetVal).toLocaleString()})` : '');
+                // 5.8px per character is highly accurate for Hebrew text at 10px-12px size.
+                const width = 24 + (text.length * 5.8) + 20 + 6;
+                if (width > maxCalcWidth) {
+                    maxCalcWidth = width;
+                }
+            });
+
+            // Child categories / Ungrouped categories: bullet block (24px) + cat name + budget text + lock button (12px) + 6px (one space buffer)
+            annualCats.forEach(cat => {
+                const budgetVal = safeParseFloat(cat.budget_amount || 0);
+                const text = cat.category_name + (budgetVal > 0 ? ` (₪${Math.round(budgetVal).toLocaleString()})` : '');
+                
+                const spent = Math.round(totals['planned:' + (cat.id || cat.category_name)] || 0);
+                const hasLock = Math.abs(budgetVal - spent) > 0.1;
+                
+                const width = 24 + (text.length * 5.8) + (hasLock ? 12 : 0) + 6;
+                if (width > maxCalcWidth) {
+                    maxCalcWidth = width;
+                }
+            });
+
+            // Clean, tightly fitting width
+            labelsWidth = Math.ceil(maxCalcWidth);
         } else {
             const visibleCats = catsShown.filter(cat => {
                 if (filter === 'planned' || cat.$type === 'current') return true;
@@ -3447,11 +3496,11 @@
                 const budgetLen = budget > 0 ? String(Math.round(budget)).length + 5 : 0;
                 maxChars = Math.max(maxChars, displayName.length + budgetLen);
             });
-        }
-        let labelsWidth = Math.max(100, Math.min(180, maxChars * 5.0 + 16));
-        if (filter === 'fixed') {
-            // Apply slightly more width for the 'Fixed' tab to prevent name/bar overlap
-            labelsWidth = Math.max(110, Math.min(200, maxChars * 5.8 + 24));
+            labelsWidth = Math.max(100, Math.min(180, maxChars * 5.0 + 16));
+            if (filter === 'fixed') {
+                // Apply slightly more width for the 'Fixed' tab to prevent name/bar overlap
+                labelsWidth = Math.max(110, Math.min(200, maxChars * 5.8 + 24));
+            }
         }
 
         let visibleIdx = 0;
@@ -3461,12 +3510,13 @@
             const ungrouped = [];
             
             state.budget.annual.forEach(cat => {
+                const budget = safeParseFloat(cat.budget_amount || 0);
+                if (budget <= 0) return; // Hide categories budgeted 0
                 if (cat.parent_group) {
                     const pid = cat.parent_group;
                     if (!groups[pid]) groups[pid] = { name: pid, children: [], spent: 0, budget: 0 };
                     const catId = cat.id || cat.category_name;
                     const spent = Math.round(totals['planned:' + catId] || 0);
-                    const budget = safeParseFloat(cat.budget_amount || 0);
                     groups[pid].children.push({ ...cat, spent, budget });
                     groups[pid].spent += spent;
                     groups[pid].budget += budget;
@@ -3710,7 +3760,7 @@
 
                 // Layout (Single Line): Icon+Name (Right) | Data/Bar (Left)
                 const row = document.createElement('div');
-                row.className = `flex items-center gap-1 py-1 px-0 border-b border-slate-50 last:border-0 transition-colors cursor-pointer font-hebrew w-full ${isActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`;
+                row.className = `flex items-center gap-1 py-1 px-0 border-b border-slate-50 last:border-0 transition-colors cursor-pointer font-hebrew w-full ${isActive ? 'bg-blue-50/50' : 'hover:bg-slate-50'}${state.categoriesCollapsed && type === 'current' ? ' hidden' : ''}`;
                 row.dir = "rtl";
                 row.onclick = () => window.toggleCategoryFilter(filterId);
 
@@ -3764,16 +3814,27 @@
                 <div class="flex-1 min-w-0 flex flex-col justify-center px-1 cursor-pointer" onclick="window.toggleCategoryFilter('__none__')">
                     <div class="flex items-center justify-between text-[11px] sm:text-xs">
                         <span class="font-black text-slate-400 ltr-num">₪${noneTotal.toLocaleString()}</span>
-                        <button onclick="event.stopPropagation(); window.openManageCategoriesModal()" class="flex items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors flex-shrink-0">
-                            <i class="fa-solid fa-sliders text-[10px]"></i>
-                            <span class="text-[10px] whitespace-nowrap">ניהול קטגוריות</span>
-                        </button>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            <button onclick="event.stopPropagation(); window.openManageCategoriesModal()" class="flex items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors">
+                                <i class="fa-solid fa-sliders text-[10px]"></i>
+                                <span class="text-[10px] whitespace-nowrap">ניהול קטגוריות</span>
+                            </button>
+                            <button onclick="event.stopPropagation(); window.toggleCategoriesCollapse()" class="w-5 h-5 flex items-center justify-center rounded-full bg-slate-50 hover:bg-slate-200 text-slate-500 transition-all border border-slate-100" title="${state.categoriesCollapsed ? 'פתח' : 'קפל'}">
+                                <i class="fa-solid ${state.categoriesCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'} text-[9px]"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
             strip.appendChild(noneRow);
         }
     }
+
+    window.toggleCategoriesCollapse = function() {
+        state.categoriesCollapsed = !state.categoriesCollapsed;
+        localStorage.setItem('categoriesCollapsed', state.categoriesCollapsed ? 'true' : 'false');
+        renderCategorySummary();
+    };
 
     window.toggleCategoryFilter = function(catId) {
         // When switching away from __none__, clear selection
