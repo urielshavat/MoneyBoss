@@ -407,6 +407,44 @@
                                 <button id="g4UpdateBtn" onclick="window.initG4Update()" disabled class="bg-blue-600 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed">עדכן</button>
                             </div>
                         </div>
+                        <div class="flex justify-between items-center px-1">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">יום תחילת חודש תקציבי</span>
+                            <div class="flex gap-2 items-center">
+                                <div class="bg-slate-50 rounded-lg border border-slate-200 flex items-center px-2 py-1.5">
+                                    <select id="cycleStartDaySelect" onchange="window.checkCycleStartDayChange()" class="bg-transparent border-none text-slate-800 font-bold text-xs text-right outline-none p-0 cursor-pointer">
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6">6</option>
+                                        <option value="7">7</option>
+                                        <option value="8">8</option>
+                                        <option value="9">9</option>
+                                        <option value="10">10</option>
+                                        <option value="11">11</option>
+                                        <option value="12">12</option>
+                                        <option value="13">13</option>
+                                        <option value="14">14</option>
+                                        <option value="15">15</option>
+                                        <option value="16">16</option>
+                                        <option value="17">17</option>
+                                        <option value="18">18</option>
+                                        <option value="19">19</option>
+                                        <option value="20">20</option>
+                                        <option value="21">21</option>
+                                        <option value="22">22</option>
+                                        <option value="23">23</option>
+                                        <option value="24">24</option>
+                                        <option value="25">25</option>
+                                        <option value="26">26</option>
+                                        <option value="27">27</option>
+                                        <option value="28">28</option>
+                                    </select>
+                                </div>
+                                <button id="cycleStartDayUpdateBtn" onclick="window.updateCycleStartDay()" disabled class="bg-blue-600 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed">עדכן</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1883,7 +1921,8 @@
             annual: [],
             savings: [],
             g4: safeParseFloat(localStorage.getItem('cached_g4')),
-            startDate: localStorage.getItem('cached_start_date') || ''
+            startDate: localStorage.getItem('cached_start_date') || '',
+            cycleStartDay: parseInt(localStorage.getItem('cycle_start_day')) || 1
         },
         currentView: 'main',
         isLoading: false,
@@ -1904,7 +1943,7 @@
         editingParentName: null,
         pendingG4: null,
         stats: {
-            startDay: parseInt(localStorage.getItem('stats_start_day')) || 1,
+            startDay: parseInt(localStorage.getItem('cycle_start_day')) || parseInt(localStorage.getItem('stats_start_day')) || 1,
             specificMonth: ''
         },
         expenseCategories: JSON.parse(localStorage.getItem('expense_categories') || '[]'),
@@ -2106,8 +2145,14 @@
             const startRow = rows.find(r => r.category_name === '__start_date__' || r.category_name.endsWith('__start_date__'));
             state.budget.startDate = startRow ? (startRow.parent_group || '') : state.budget.startDate;
 
+            // __month_start_day__ stored as a special budget_setting row
+            const cycleStartRow = rows.find(r => r.category_name === '__month_start_day__' || r.category_name.endsWith('__month_start_day__'));
+            state.budget.cycleStartDay = cycleStartRow ? parseInt(cycleStartRow.budget_amount) : (parseInt(localStorage.getItem('cycle_start_day')) || 1);
+            state.stats.startDay = state.budget.cycleStartDay;
+
             localStorage.setItem('cached_g4', state.budget.g4.toString());
             localStorage.setItem('cached_start_date', state.budget.startDate);
+            localStorage.setItem('cycle_start_day', state.budget.cycleStartDay.toString());
 
             // Keep user_tokens.daily_budget in sync so get_balance is accurate
             if (state.budget.g4 > 0) {
@@ -3324,10 +3369,56 @@
         return CAT_ICONS.find(c => c.id === iconId) || CAT_ICONS[0];
     }
 
-    // Get current month start
+    // Helper to get safe start and end dates for a custom cycle day of the month
+    function getCurrentCycleDates(baseDate, startDay) {
+        const now = new Date(baseDate);
+        let startYear, startMonth, endYear, endMonth;
+        if (now.getDate() >= startDay) {
+            startYear = now.getFullYear();
+            startMonth = now.getMonth();
+            if (startMonth === 11) {
+                endYear = startYear + 1;
+                endMonth = 0;
+            } else {
+                endYear = startYear;
+                endMonth = startMonth + 1;
+            }
+        } else {
+            if (now.getMonth() === 0) {
+                startYear = now.getFullYear() - 1;
+                startMonth = 11;
+            } else {
+                startYear = now.getFullYear();
+                startMonth = now.getMonth() - 1;
+            }
+            endYear = now.getFullYear();
+            endMonth = now.getMonth();
+        }
+        
+        // Get safe start date
+        const startDaysInMonth = new Date(startYear, startMonth + 1, 0).getDate();
+        const startDate = new Date(startYear, startMonth, Math.min(startDay, startDaysInMonth), 0, 0, 0, 0);
+        
+        // Get safe end date (the day before the next cycle starts)
+        const nextCycleStart = new Date(endYear, endMonth, Math.min(startDay, new Date(endYear, endMonth + 1, 0).getDate()), 0, 0, 0, 0);
+        const endDate = new Date(nextCycleStart.getTime() - 1);
+        
+        return { startDate, endDate };
+    }
+
+    // Get current month start according to dynamic cycle start day
+    window.getCurrentCycleDates = getCurrentCycleDates; // export just in case
+
     function currentMonthStart() {
         const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth(), 1);
+        const cycle = getCurrentCycleDates(now, state.budget.cycleStartDay || 1);
+        return cycle.startDate;
+    }
+
+    function currentMonthEnd() {
+        const now = new Date();
+        const cycle = getCurrentCycleDates(now, state.budget.cycleStartDay || 1);
+        return cycle.endDate;
     }
 
     function currentYearStart() {
@@ -3354,6 +3445,7 @@
 
         let catsShown = [];
         const monthStart = currentMonthStart();
+        const monthEnd = currentMonthEnd();
         const yearStart = currentYearStart();
 
         // 1. Collect and filter categories based on state.mainViewFilter
@@ -3401,14 +3493,14 @@
             const amt = safeParseFloat(tx.amount);
             
             if (!tx.tag) {
-                if (d >= monthStart) {
+                if (d >= monthStart && d <= monthEnd) {
                     const cid = tx.expense_category_id || '__none__';
                     totals['current:' + cid] = (totals['current:' + cid] || 0) + amt;
                 }
             } else {
                 // Check if it's fixed
                 const fixed = state.budget.fixed.find(f => tagMatchesCat(tx.tag, f));
-                if (fixed && d >= monthStart) {
+                if (fixed && d >= monthStart && d <= monthEnd) {
                     const key = 'fixed:' + (fixed.id || fixed.category_name);
                     totals[key] = (totals[key] || 0) + amt;
                 } else {
@@ -4882,22 +4974,27 @@
 
         // --- Summary Stats Preparation ---
         const filter = state.mainViewFilter;
+        const now = new Date();
+        const cycle = getCurrentCycleDates(now, state.budget.cycleStartDay || 1);
+        const cycleStart = cycle.startDate;
+        const cycleEnd = cycle.endDate;
+        const cycleTotalDays = Math.round((cycleEnd - cycleStart) / (1000 * 3600 * 24)) + 1;
+
         const balVal = formatDisplayAmount(state.balance);
         const dailyVal = (safeParseFloat(state.budget.g4) || 0) / 30;
         
         // Month total for current (flexible) spending
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const currentSpent = state.transactions.reduce((acc, tx) => {
             if (tx.isAdjustment) return acc;
-            if (parseLocalDate(tx.date) < monthStart) return acc;
+            const d = parseLocalDate(tx.date);
+            if (d < cycleStart || d > cycleEnd) return acc;
             const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
             const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
             if (!isPlanned && !isFixed) return acc + safeParseFloat(tx.amount);
             return acc;
         }, 0);
         
-        const monthlyBudget = safeParseFloat(state.budget.g4) || 0;
+        const monthlyBudget = dailyVal * cycleTotalDays;
         const monthlyUtil = monthlyBudget > 0 ? (currentSpent / monthlyBudget) * 100 : 0;
         
         // Annual reservation details
@@ -4962,11 +5059,13 @@
                 const remaining = budget - spending;
                 const over = spending > budget;
 
-                // Dynamic daily budget and pacing calculation
-                const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-                const currentDayOfMonth = now.getDate();
-                const dynamicDailyBudget = budget / totalDaysInMonth;
-                const currentBudget = dynamicDailyBudget * currentDayOfMonth;
+                // Dynamic daily budget and pacing calculation based on custom cycle dates
+                const msPassed = now.getTime() - cycleStart.getTime();
+                const daysPassedInCycle = Math.floor(msPassed / (1000 * 3600 * 24)) + 1;
+                const cycleDayNum = Math.min(cycleTotalDays, Math.max(1, daysPassedInCycle));
+
+                const dynamicDailyBudget = budget / cycleTotalDays;
+                const currentBudget = dynamicDailyBudget * cycleDayNum;
 
                 const spendingPct = budget > 0 ? (spending / budget) * 100 : 0;
                 const currentBudgetPct = budget > 0 ? (currentBudget / budget) * 100 : 0;
@@ -5307,6 +5406,10 @@
         setEl('summaryRemaining', Math.round(rem).toLocaleString());
         const g4El = document.getElementById('g4Input');
         if (g4El) g4El.value = Math.round(formatDisplayAmount(safeParseFloat(b.g4))).toLocaleString();
+        const cycleStartEl = document.getElementById('cycleStartDaySelect');
+        if (cycleStartEl) {
+            cycleStartEl.value = (b.cycleStartDay || 1).toString();
+        }
         // תאריך התחלה = תאריך התנועה הראשונה
         let displayStartDate = b.startDate || '';
         if (state.transactions.length > 0) {
@@ -6323,6 +6426,47 @@
         const numericG4 = Math.round(formatDisplayAmount(safeParseFloat(state.budget.g4)));
         btn.disabled = numericInp === numericG4;
     };
+    window.checkCycleStartDayChange = () => {
+        const btn = document.getElementById('cycleStartDayUpdateBtn'), sel = document.getElementById('cycleStartDaySelect');
+        if (!btn || !sel) return;
+        const val = parseInt(sel.value);
+        const currentVal = state.budget.cycleStartDay || 1;
+        btn.disabled = val === currentVal;
+    };
+    window.updateCycleStartDay = async function() {
+        if (!sbClient) return;
+        setLoading(true, true);
+        const sel = document.getElementById('cycleStartDaySelect');
+        if (!sel) return;
+        const val = parseInt(sel.value);
+        try {
+            // Delete old __month_start_day__ setting in budget_settings table
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__month_start_day__');
+            // Insert the new setting
+            await sbClient.from('budget_settings').insert({ category_name: '__month_start_day__', budget_amount: val, type: 'system', user_token: USER_TOKEN });
+            
+            state.budget.cycleStartDay = val;
+            localStorage.setItem('cycle_start_day', val.toString());
+            
+            // Re-sync stats starting day as well
+            state.stats.startDay = val;
+            
+            // Update UI elements
+            const btn = document.getElementById('cycleStartDayUpdateBtn');
+            if (btn) btn.disabled = true;
+            
+            // Refresh calculations and render
+            render();
+            renderCategorySummary();
+            
+            window.showToast('עדכון יום תחילת החודש בוצע בהצלחה', 'check');
+        } catch(e) {
+            console.error('Error updating cycle start day:', e);
+            window.showToast('שגיאה בעדכון', 'circle-xmark');
+        } finally {
+            setLoading(false, true);
+        }
+    };
     window.closeRetroUpdateModal = () => { const o = document.getElementById('retroUpdateOverlay'); if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); } };
 
     // =====================================================
@@ -6376,8 +6520,18 @@
     window.updateStats = function() {
         if (state.currentView !== 'stats') return;
         const startDay = parseInt(document.getElementById('monthStartDay').value);
-        state.stats.startDay = startDay;
-        localStorage.setItem('stats_start_day', startDay);
+        if (state.stats.startDay !== startDay) {
+            state.stats.startDay = startDay;
+            state.budget.cycleStartDay = startDay;
+            localStorage.setItem('stats_start_day', startDay.toString());
+            localStorage.setItem('cycle_start_day', startDay.toString());
+            if (sbClient) {
+                sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__month_start_day__')
+                    .then(() => {
+                        sbClient.from('budget_settings').insert({ category_name: '__month_start_day__', budget_amount: startDay, type: 'system', user_token: USER_TOKEN });
+                    });
+            }
+        }
         let startDate, endDate;
         const monthVal = document.getElementById('specificMonthSelect').value;
         if (!monthVal) {
@@ -8467,7 +8621,7 @@
         // Populate month start day select
         const msdSelect = document.getElementById('monthStartDay');
         if (msdSelect) {
-            msdSelect.innerHTML = Array.from({length: 31}, (_, i) =>
+            msdSelect.innerHTML = Array.from({length: 28}, (_, i) =>
                 `<option value="${i+1}" ${state.stats.startDay === i+1 ? 'selected' : ''}>${i+1}</option>`
             ).join('');
         }
