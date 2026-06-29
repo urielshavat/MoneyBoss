@@ -188,6 +188,14 @@
                 <button id="onboardingBtn" onclick="window.openOnboarding()" class="hidden bg-blue-50 border border-blue-200 text-blue-600 text-[10px] font-bold px-2.5 py-1 rounded-full hover:bg-blue-100 transition-colors whitespace-nowrap" title="איך מתחילים?">איך מתחילים?</button>
             </div>
             <div class="flex items-center gap-2">
+                <button id="mainSearchBtn" onclick="window.toggleSearch()" class="hidden items-center justify-center w-8 h-8 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-500 rounded-full transition-colors">
+                    <i id="mainSearchIcon" class="fa-solid fa-magnifying-glass text-[11px]"></i>
+                </button>
+                <button id="mainDateFilterBtn" onclick="window.openDateFilter()" class="hidden flex items-center gap-1 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-[10px] px-2.5 py-1.5 rounded-full transition-colors">
+                    <i class="fa-solid fa-calendar-days text-[9px] text-slate-400"></i>
+                    <span id="mainDateFilterLabel">30 תנועות</span>
+                    <i class="fa-solid fa-chevron-down text-[8px] text-slate-400"></i>
+                </button>
                 <button id="mainSyncBtn" onclick="window.fetchTransactionsOnly(true)" class="btn-sync">
                     <i id="refreshIcon" class="fa-solid fa-arrows-rotate"></i>
                 </button>
@@ -201,6 +209,17 @@
         </div>
 
         <div id="mainView" class="view-content">
+            <!-- Search bar -->
+            <div id="mainSearchBar" class="hidden mb-3 px-1">
+                <div class="flex items-center gap-2 bg-white rounded-xl shadow-sm border border-slate-200 px-3 py-2">
+                    <i class="fa-solid fa-magnifying-glass text-[11px] text-slate-400 flex-shrink-0"></i>
+                    <input id="mainSearchInput" type="text" placeholder="חיפוש לפי שם..." oninput="window.onSearchInput(this.value)" class="flex-1 text-sm text-slate-700 bg-transparent outline-none placeholder-slate-400 text-right" autocomplete="off" autocorrect="off" spellcheck="false">
+                    <button onclick="window.clearSearch()" class="text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
             <!-- View Switcher -->
             <div class="mb-3 px-1">
                 <div class="flex bg-slate-100 p-1 rounded-xl">
@@ -248,15 +267,9 @@
 
         <div id="statsView" class="view-content hidden">
             <div class="card p-3 mb-4 border border-slate-200 bg-white shadow-sm">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[9px] text-slate-400 mb-1 font-bold">יום תחילת חודש</label>
-                        <select id="monthStartDay" onchange="window.updateStats()" class="input-field w-full px-3 py-2 rounded-xl text-xs"></select>
-                    </div>
-                    <div>
-                        <label class="block text-[9px] text-slate-400 mb-1 font-bold">חודש להצגה</label>
-                        <select id="specificMonthSelect" onchange="window.updateStats()" class="input-field w-full px-3 py-2 rounded-xl text-xs"></select>
-                    </div>
+                <div>
+                    <label class="block text-[9px] text-slate-400 mb-1 font-bold">חודש להצגה</label>
+                    <select id="specificMonthSelect" onchange="window.updateStats()" class="input-field w-full px-3 py-2 rounded-xl text-xs"></select>
                 </div>
             </div>
             
@@ -356,8 +369,8 @@
             <div id="annualCategoriesContainer" class="space-y-3 pb-8"></div>
         </div>
 
-        <div id="budgetView" class="view-content hidden">
-            <!-- Wizard CTA — shown when budget is empty -->
+         <div id="budgetView" class="view-content hidden">
+             <!-- Wizard CTA — shown when budget is empty -->
             <div id="budgetWizardCta" class="hidden mb-3">
                 <button onclick="window.openWizard()" class="w-full flex items-center gap-3 bg-blue-600 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 active:scale-[0.98]">
                     <div class="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -370,6 +383,15 @@
                     <i class="fa-solid fa-chevron-left text-sm text-blue-300"></i>
                 </button>
             </div>
+
+            <div id="copyCurrentBudgetContainer" class="hidden card p-4 mb-4 border border-blue-200 bg-blue-50/50 flex flex-col gap-2">
+                <div class="flex justify-between items-center">
+                    <h4 class="text-blue-900 font-bold text-xs"><i class="fa-solid fa-clone ml-1.5"></i>העתקת תקציב קיים</h4>
+                    <button onclick="window.copyCurrentToFutureBudget()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg text-[10px] transition-colors">העתק עכשיו</button>
+                </div>
+                <p class="text-[10px] text-blue-800 leading-normal">התקציב העתידי שלך ריק כרגע. תוכל להעתיק את כל הקטגוריות והערכים מהתקציב הפעיל הנוכחי כדי להתחיל לערוך אותו בקלות, או להוסיף קטגוריות חדשות מאפס.</p>
+            </div>
+
             <div id="budgetSummary" class="card p-4 mb-4 border border-slate-200 bg-white shadow-sm">
                 <div class="flex flex-col mb-4">
                     <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest">סיכום חודשי</h3>
@@ -443,6 +465,30 @@
                                     </select>
                                 </div>
                                 <button id="cycleStartDayUpdateBtn" onclick="window.updateCycleStartDay()" disabled class="bg-blue-600 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed">עדכן</button>
+                            </div>
+                        </div>
+                        <div id="futureStartDateContainer" class="hidden border-t border-slate-100 pt-3 mt-3 flex flex-col gap-2">
+                            <div class="flex justify-between items-center px-1">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">תאריך הפעלה עתידי</span>
+                                <div class="flex gap-2 items-center">
+                                    <input type="date" id="futureStartDateInput" onchange="window.saveFutureStartDate()" class="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none">
+                                </div>
+                            </div>
+                            <p class="text-[9px] text-slate-400 font-semibold text-right leading-normal">הגדר מתי תקציב זה יכנס לתוקף. המעבר והחלפת התקציבים יתרחשו אוטומטית בתאריך זה, והמאזן ההיסטורי יישמר בצורה מדויקת.</p>
+                            
+                            <div id="futureBudgetActions" class="hidden border-t border-slate-100 pt-2.5 mt-1 flex flex-col gap-2">
+                                <button id="wipeFutureBudgetBtn" onclick="window.showWipeFutureBudgetConfirm()" class="w-full text-right text-red-500 hover:text-red-600 font-bold text-[10px] flex items-center justify-end gap-1.5 transition-colors">
+                                    <i class="fa-regular fa-trash-can"></i> מחק תקציב עתידי והחל מהתחלה
+                                </button>
+                                
+                                <div id="wipeFutureBudgetConfirm" class="hidden p-3 bg-red-50/70 border border-red-200 rounded-2xl flex flex-col gap-2 shadow-sm text-right">
+                                    <p class="text-[10px] text-red-800 font-bold leading-normal">בטוח שברצונך למחוק את כל נתוני התקציב העתידי מהשרת? (קטגוריות, סכומי תקציב ותאריך הפעלה)</p>
+                                    <p class="text-[9px] text-red-700 leading-normal">זה ינקה לחלוטין את התקציב העתידי ויאפשר לך להעתיק מחדש את התקציב הפעיל הנוכחי.</p>
+                                    <div class="flex gap-2 justify-end mt-1">
+                                        <button onclick="window.wipeFutureBudget()" class="bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold py-1 px-3 rounded-lg transition-all active:scale-95 shadow-sm">כן, מחק לחלוטין</button>
+                                        <button onclick="window.cancelWipeFutureBudget()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold py-1 px-3 rounded-lg transition-all active:scale-95">ביטול</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -583,6 +629,11 @@
                 <span>החשבון שלי</span>
             </button>
             <div class="border-t border-slate-100 mx-3"></div>
+            <button onclick="window.closeHamburgerMenu(); if(state.currentView !== 'budget') window.setNav('budget'); window.switchBudgetTab('future');" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-calendar-days text-purple-500 w-4 text-center flex-shrink-0"></i>
+                <span>תקציב עתידי</span>
+            </button>
+            <div class="border-t border-slate-100 mx-3"></div>
             <!-- התקנה with submenu -->
             <div id="installMenuWrapper">
                 <button onclick="window.toggleInstallSubmenu()" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
@@ -652,6 +703,68 @@
         </div>
     </div>
     <!-- ====================================================== -->
+
+    <!-- =================== DATE FILTER SHEET =================== -->
+    <div id="dateFilterBackdrop" class="fixed inset-0 z-[90] hidden bg-black/30" onclick="window.closeDateFilter()"></div>
+    <div id="dateFilterSheet" class="fixed bottom-0 left-0 right-0 z-[95] hidden bg-white rounded-t-2xl shadow-2xl" style="max-height:85vh;overflow-y:auto">
+        <div class="px-4 pt-3 pb-8">
+            <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"></div>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right mb-3">סינון לפי תאריך</p>
+
+            <div class="space-y-0.5">
+                <button id="dfLast30" onclick="window.setDateFilter('last30')" class="df-opt w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors text-right">
+                    <i class="fa-solid fa-clock-rotate-left w-4 text-center text-slate-400 flex-shrink-0"></i>
+                    <span class="flex-1">30 תנועות אחרונות</span>
+                </button>
+                <button id="dfCurrentMonth" onclick="window.setDateFilter('currentMonth')" class="df-opt w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors text-right">
+                    <i class="fa-solid fa-calendar-day w-4 text-center text-blue-400 flex-shrink-0"></i>
+                    <span class="flex-1">חודש נוכחי</span>
+                </button>
+                <button id="dfPrevMonth" onclick="window.setDateFilter('prevMonth')" class="df-opt w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors text-right">
+                    <i class="fa-solid fa-calendar-minus w-4 text-center text-slate-400 flex-shrink-0"></i>
+                    <span class="flex-1">חודש קודם</span>
+                </button>
+                <button id="dfLast3Months" onclick="window.setDateFilter('last3Months')" class="df-opt w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors text-right">
+                    <i class="fa-solid fa-calendar-week w-4 text-center text-indigo-400 flex-shrink-0"></i>
+                    <span class="flex-1">3 חודשים אחרונים</span>
+                </button>
+                <button id="dfAll" onclick="window.setDateFilter('all')" class="df-opt w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors text-right">
+                    <i class="fa-solid fa-infinity w-4 text-center text-slate-400 flex-shrink-0"></i>
+                    <span class="flex-1">הכל</span>
+                </button>
+
+                <div class="border-t border-slate-100 my-1"></div>
+
+                <button id="dfSpecificMonthBtn" onclick="window.toggleDfSection('specificMonth')" class="df-opt w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors text-right">
+                    <i class="fa-solid fa-calendar-check w-4 text-center text-purple-400 flex-shrink-0"></i>
+                    <span class="flex-1">בחירת חודש</span>
+                    <i id="dfSpecificMonthChevron" class="fa-solid fa-chevron-down text-[10px] text-slate-300 flex-shrink-0 transition-transform duration-200"></i>
+                </button>
+                <div id="dfSpecificMonthSection" class="hidden px-3 pb-2">
+                    <select id="dfMonthSelect" onchange="window.setDateFilter('specificMonth')" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-700 text-right outline-none cursor-pointer">
+                    </select>
+                </div>
+
+                <button id="dfDateRangeBtn" onclick="window.toggleDfSection('dateRange')" class="df-opt w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors text-right">
+                    <i class="fa-solid fa-calendar-days w-4 text-center text-green-500 flex-shrink-0"></i>
+                    <span class="flex-1">בין תאריכים</span>
+                    <i id="dfDateRangeChevron" class="fa-solid fa-chevron-down text-[10px] text-slate-300 flex-shrink-0 transition-transform duration-200"></i>
+                </button>
+                <div id="dfDateRangeSection" class="hidden px-3 pb-3 space-y-2">
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] font-bold text-slate-400 w-6 flex-shrink-0">מ-</span>
+                        <input type="date" id="dfFromDate" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none">
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] font-bold text-slate-400 w-6 flex-shrink-0">עד-</span>
+                        <input type="date" id="dfToDate" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none">
+                    </div>
+                    <button onclick="window.setDateFilter('dateRange', true)" class="w-full bg-blue-600 text-white font-bold text-xs py-2.5 rounded-xl mt-1 hover:bg-blue-700 active:bg-blue-800 transition-colors">החל סינון</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- =========================================================== -->
 
     <!-- Bulk Categorize Bar -->
     <div id="bulkCatBar" class="fixed bottom-24 left-0 right-0 px-4 z-[60] pointer-events-none hidden">
@@ -1713,7 +1826,7 @@
 
     window.copyTokenUrl = function() {
         const tok = document.getElementById('newTokenDisplay').textContent;
-        const url = `https://urielshavat.github.io/MoneyBoss/?token=${tok}`;
+        const url = `https://moneyboss.netlify.app/?token=${tok}`;
         const btn = document.getElementById('copyNewUrlBtn');
         navigator.clipboard.writeText(url).then(() => {
             if (btn) {
@@ -1732,7 +1845,7 @@
     window.copyExistingTokenUrl = function() {
         const tok = (document.getElementById('existingTokenInput').value || '').trim().toUpperCase();
         if (!tok) { window.showToast('הזן טוקן תחילה', 'circle-xmark'); return; }
-        const url = `https://urielshavat.github.io/MoneyBoss/?token=${tok}`;
+        const url = `https://moneyboss.netlify.app/?token=${tok}`;
         const btn = document.getElementById('copyExistUrlBtn');
         navigator.clipboard.writeText(url).then(() => {
             if (btn) {
@@ -1915,6 +2028,7 @@
     let state = {
         balance: safeParseFloat(localStorage.getItem('cached_balance')),
         transactions: JSON.parse(localStorage.getItem('expense_history') || '[]'),
+        budgetMode: 'active', // 'active' or 'future'
         budget: {
             incomes: [],
             fixed: [],
@@ -1922,7 +2036,17 @@
             savings: [],
             g4: safeParseFloat(localStorage.getItem('cached_g4')),
             startDate: localStorage.getItem('cached_start_date') || '',
-            cycleStartDay: parseInt(localStorage.getItem('cycle_start_day')) || 1
+            cycleStartDay: 1,
+            dailyBudgetHistory: []
+        },
+        futureBudget: {
+            incomes: [],
+            fixed: [],
+            annual: [],
+            savings: [],
+            g4: 0,
+            startDate: '',
+            cycleStartDay: 1
         },
         currentView: 'main',
         isLoading: false,
@@ -1938,12 +2062,19 @@
         isPrivacyMode: localStorage.getItem('isPrivacyMode') === 'true',
         showZeroSections: { income: false, fixed: false, annual: false, savings: false },
         displayedTransactionsCount: 30,
+        dateFilter: { type: 'last30' },
+        dateFilterFrom: '',
+        dateFilterTo: '',
+        dateFilterMonth: '',
+        balanceShowDays: false,
+        searchText: '',
+        searchOpen: false,
         collapsedGroups: JSON.parse(localStorage.getItem('collapsedGroups') || '{}'),
         editingParentType: null,
         editingParentName: null,
         pendingG4: null,
         stats: {
-            startDay: parseInt(localStorage.getItem('cycle_start_day')) || parseInt(localStorage.getItem('stats_start_day')) || 1,
+            startDay: 1,
             specificMonth: ''
         },
         expenseCategories: JSON.parse(localStorage.getItem('expense_categories') || '[]'),
@@ -2006,7 +2137,9 @@
             ]);
             if (txRes.error) throw txRes.error;
             state.transactions = (txRes.data || []).map(mapSupabaseTx);
+            
             state.balance = balance;
+            
             localStorage.setItem('expense_history', JSON.stringify(state.transactions));
             localStorage.setItem('cached_balance', state.balance.toString());
 
@@ -2106,6 +2239,89 @@
         return sep !== -1 ? tag.slice(sep + 3).trim() : (tag||'').trim();
     }
 
+    // Returns the daily budget for a specific date (yyyy-mm-dd or Date)
+    window.getDailyBudgetForDate = function(dateStr) {
+        const history = state.budget.dailyBudgetHistory || [];
+        const fallback = (safeParseFloat(state.budget.g4) || 0) / 30;
+
+        if (history.length === 0) return fallback;
+
+        let targetStr = dateStr;
+        if (dateStr instanceof Date) {
+            // Use local date string to avoid UTC offset issues
+            const d = dateStr;
+            targetStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        } else if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            targetStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+
+        const sortedHistory = [...history].sort((a,b) => a.startDate.localeCompare(b.startDate));
+
+        let activeBudget = fallback;
+        for (const record of sortedHistory) {
+            if (targetStr >= record.startDate) {
+                activeBudget = record.dailyBudget;
+            } else {
+                break;
+            }
+        }
+        return activeBudget;
+    };
+
+    window.calculateAccumulatedBudget = function(untilDate = new Date()) {
+        const history = state.budget.dailyBudgetHistory || [];
+        if (history.length === 0) return 0;
+        
+        const sorted = [...history].sort((a,b) => a.startDate.localeCompare(b.startDate));
+        const target = new Date(untilDate);
+        target.setHours(0,0,0,0);
+        
+        let total = 0;
+        for (let i = 0; i < sorted.length; i++) {
+            const current = sorted[i];
+            const next = sorted[i+1];
+            
+            const currentStart = new Date(current.startDate);
+            currentStart.setHours(0,0,0,0);
+            
+            if (target < currentStart) {
+                break;
+            }
+            
+            let periodEnd = new Date(target);
+            if (next) {
+                const nextStart = new Date(next.startDate);
+                nextStart.setHours(0,0,0,0);
+                const dayBeforeNext = new Date(nextStart.getTime() - 24*3600*1000);
+                if (dayBeforeNext < periodEnd) {
+                    periodEnd = dayBeforeNext;
+                }
+            }
+            
+            const diffMs = periodEnd.getTime() - currentStart.getTime();
+            const days = Math.max(0, Math.floor(diffMs / (1000*3600*24)) + 1);
+            
+            total += days * current.dailyBudget;
+        }
+        
+        return total;
+    };
+
+    window.calculateClientSideBalance = function() {
+        const accumulated = window.calculateAccumulatedBudget(new Date());
+        
+        const currentTxs = state.transactions.filter(tx => {
+            const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+            const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+            const isLegacyAdjustment = tx.isAdjustment || tx.category === 'איזון עדכון תקציב';
+            return !isPlanned && !isFixed && !isLegacyAdjustment;
+        });
+        
+        const sumTxs = currentTxs.reduce((sum, tx) => sum + safeParseFloat(tx.amount), 0);
+        return accumulated - sumTxs;
+    };
+
     window.fetchBudgetData = async function(isManual = false) {
         if (!sbClient || !USER_TOKEN) return;
         const icon = document.getElementById('budgetRefreshIcon');
@@ -2118,7 +2334,13 @@
                 .order('category_name');
             if (error) throw error;
 
-            const rows = data || [];
+            const rawRows = data || [];
+            const rows = rawRows.map(r => {
+                if (r && r.type && r.type.startsWith('future_') && r.category_name && r.category_name.startsWith('__future__:')) {
+                    return { ...r, category_name: r.category_name.slice(11) };
+                }
+                return r;
+            });
 
             // פרסר קטגוריות אב מתוך שם הקטגוריה אם parent_group ריק
             // "אחזקת רכב > ביטוח רכב" → category_name="ביטוח רכב", parent_group="אחזקת רכב"
@@ -2133,6 +2355,13 @@
                 };
             });
 
+            // Load daily budget history
+            const historyRows = rows.filter(r => r.category_name && r.category_name.startsWith('__daily_budget_history__:'));
+            state.budget.dailyBudgetHistory = historyRows.map(r => ({
+                startDate: r.parent_group || r.category_name.split(':')[1],
+                dailyBudget: safeParseFloat(r.budget_amount)
+            }));
+
             state.budget.incomes = parsedRows.filter(r => r.type === 'income');
             state.budget.fixed   = parsedRows.filter(r => r.type === 'fixed');
             state.budget.annual  = parsedRows.filter(r => r.type === 'annual');
@@ -2145,14 +2374,60 @@
             const startRow = rows.find(r => r.category_name === '__start_date__' || r.category_name.endsWith('__start_date__'));
             state.budget.startDate = startRow ? (startRow.parent_group || '') : state.budget.startDate;
 
+            // If there's no history but there is a current g4, initialize daily budget history
+            if (state.budget.dailyBudgetHistory.length === 0 && state.budget.g4 > 0) {
+                let sDate = '1970-01-01';
+                if (state.budget.startDate) {
+                    const sp = state.budget.startDate.split('/');
+                    if (sp.length === 3) sDate = `${sp[2]}-${sp[1].padStart(2,'0')}-${sp[0].padStart(2,'0')}`;
+                }
+                state.budget.dailyBudgetHistory = [{
+                    startDate: sDate,
+                    dailyBudget: state.budget.g4 / 30
+                }];
+                // Save proactively
+                sbClient.from('budget_settings').insert({
+                    category_name: '__daily_budget_history__:' + sDate,
+                    budget_amount: state.budget.g4 / 30,
+                    parent_group: sDate,
+                    type: 'system',
+                    user_token: USER_TOKEN
+                }).then();
+            }
+
+            // Parse future budget items
+            if (!state.futureBudget) {
+                state.futureBudget = { incomes: [], fixed: [], annual: [], savings: [], g4: 0, startDate: '' };
+            }
+            state.futureBudget.incomes = parsedRows.filter(r => r.type === 'future_income');
+            state.futureBudget.fixed   = parsedRows.filter(r => r.type === 'future_fixed');
+            state.futureBudget.annual  = parsedRows.filter(r => r.type === 'future_annual');
+            state.futureBudget.savings = parsedRows.filter(r => r.type === 'future_savings');
+            
+            const futureG4Row = rows.find(r => r.category_name === '__future_g4__');
+            state.futureBudget.g4 = futureG4Row ? safeParseFloat(futureG4Row.budget_amount) : 0;
+            
+            const futureStartRow = rows.find(r => r.category_name === '__future_start_date__');
+            state.futureBudget.startDate = futureStartRow ? (futureStartRow.parent_group || '') : '';
+
+            // Check automatic activation of prepared future budget
+            if (state.futureBudget.startDate) {
+                const todayStr = new Date().toISOString().split('T')[0];
+                if (todayStr >= state.futureBudget.startDate) {
+                    setTimeout(() => {
+                        window.activateFutureBudget();
+                    }, 500);
+                    return;
+                }
+            }
+
             // __month_start_day__ stored as a special budget_setting row
             const cycleStartRow = rows.find(r => r.category_name === '__month_start_day__' || r.category_name.endsWith('__month_start_day__'));
-            state.budget.cycleStartDay = cycleStartRow ? parseInt(cycleStartRow.budget_amount) : (parseInt(localStorage.getItem('cycle_start_day')) || 1);
+            state.budget.cycleStartDay = cycleStartRow ? parseInt(cycleStartRow.budget_amount) : 1;
             state.stats.startDay = state.budget.cycleStartDay;
 
             localStorage.setItem('cached_g4', state.budget.g4.toString());
             localStorage.setItem('cached_start_date', state.budget.startDate);
-            localStorage.setItem('cycle_start_day', state.budget.cycleStartDay.toString());
 
             // Keep user_tokens.daily_budget in sync so get_balance is accurate
             if (state.budget.g4 > 0) {
@@ -2191,7 +2466,10 @@
         setLoading(true);
         state.displayedTransactionsCount = 30;
         try {
-            await Promise.all([window.fetchTransactionsOnly(), window.fetchBudgetData(), window.fetchExpenseCategories()]);
+            // fetchBudgetData must complete first so dailyBudgetHistory is available
+            // before fetchTransactionsOnly calls calculateClientSideBalance
+            await window.fetchBudgetData();
+            await Promise.all([window.fetchTransactionsOnly(), window.fetchExpenseCategories()]);
             state.isDirty = false;
             render();
         } catch (e) {
@@ -2746,9 +3024,18 @@
         window.closeNewCategoryModal();
         try {
             const amount = safeParseFloat((amtInp?.value || '').replace(/,/g, ''));
+            
+            // Map type to future if in future budget mode
+            let insertType = state.pendingAddType;
+            let dbCatName = newName;
+            if (state.budgetMode === 'future') {
+                insertType = 'future_' + insertType;
+                dbCatName = '__future__:' + newName;
+            }
+
             const { data, error } = await sbClient
                 .from('budget_settings')
-                .insert({ category_name: newName, budget_amount: amount, type: state.pendingAddType, user_token: USER_TOKEN })
+                .insert({ category_name: dbCatName, budget_amount: amount, type: insertType, user_token: USER_TOKEN })
                 .select('id')
                 .single();
             if (error) throw error;
@@ -2868,7 +3155,9 @@
         try {
             const updates = { budget_amount: state.isPrivacyMode ? denormalizeAmount(newAmt) : newAmt };
             const oldName = item.category_name.trim();
-            if (newName !== oldName) updates.category_name = newName;
+            if (newName !== oldName) {
+                updates.category_name = (item.type && item.type.startsWith('future_')) ? '__future__:' + newName : newName;
+            }
 
             // Use id if available, otherwise fall back to matching by category_name + parent_group
             let query = sbClient.from('budget_settings').update(updates).eq('user_token', USER_TOKEN);
@@ -2876,13 +3165,16 @@
                 query = query.eq('id', itemId);
             } else {
                 // Try child name + parent_group first
-                let q = sbClient.from('budget_settings').update(updates).eq('user_token', USER_TOKEN).eq('category_name', oldName);
+                let qOldName = (item.type && item.type.startsWith('future_')) ? '__future__:' + oldName : oldName;
+                let q = sbClient.from('budget_settings').update(updates).eq('user_token', USER_TOKEN).eq('category_name', qOldName);
                 if (item.parent_group) q = q.eq('parent_group', item.parent_group);
                 const { error: e1, count: c1 } = await q.select('id');
                 if (!e1) {
                     // also try full "parent > child" legacy format
                     if (item.parent_group) {
-                        await sbClient.from('budget_settings').update(updates).eq('user_token', USER_TOKEN).eq('category_name', `${item.parent_group} > ${oldName}`);
+                        let qLegacy = `${item.parent_group} > ${oldName}`;
+                        if (item.type && item.type.startsWith('future_')) qLegacy = '__future__:' + qLegacy;
+                        await sbClient.from('budget_settings').update(updates).eq('user_token', USER_TOKEN).eq('category_name', qLegacy);
                     }
                     // skip the general query below
                     if (newName !== oldName) {
@@ -2936,14 +3228,17 @@
             }
             if (!deleted) {
                 // Try with child name + parent_group column
-                let q = sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', item.category_name.trim());
+                let qName = item.category_name.trim();
+                if (item.type && item.type.startsWith('future_')) qName = '__future__:' + qName;
+                let q = sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', qName);
                 if (item.parent_group) q = q.eq('parent_group', item.parent_group.trim());
                 const { error: e1 } = await q;
                 if (!e1) deleted = true;
             }
             if (!deleted) {
                 // Try with full "parent > child" format in category_name (legacy storage)
-                const fullName = item.parent_group ? `${item.parent_group} > ${item.category_name}` : item.category_name;
+                let fullName = item.parent_group ? `${item.parent_group} > ${item.category_name}` : item.category_name;
+                if (item.type && item.type.startsWith('future_')) fullName = '__future__:' + fullName;
                 const { error: e2 } = await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', fullName.trim());
                 if (e2) throw e2;
             }
@@ -3033,15 +3328,17 @@
         window.closeParentGroupModal();
         setLoading(true, true);
         try {
+            const b = state.budgetMode === 'future' ? state.futureBudget : state.budget;
             for (const chk of checkboxes) {
                 const catName = chk.value;
+                const qCatName = (state.budgetMode === 'future') ? '__future__:' + catName : catName;
                 if (chk.checked) {
-                    await sbClient.from('budget_settings').update({ parent_group: parentName }).eq('category_name', catName).eq('user_token', USER_TOKEN);
+                    await sbClient.from('budget_settings').update({ parent_group: parentName }).eq('category_name', qCatName).eq('user_token', USER_TOKEN);
                 } else {
                     // Only clear if it was in this group
-                    const item = [...state.budget.incomes, ...state.budget.fixed, ...state.budget.annual, ...(state.budget.savings||[])].find(i => i.category_name === catName);
+                    const item = [...b.incomes, ...b.fixed, ...b.annual, ...(b.savings||[])].find(i => i.category_name === catName);
                     if (item && item.parent_group === parentName) {
-                        await sbClient.from('budget_settings').update({ parent_group: null }).eq('category_name', catName).eq('user_token', USER_TOKEN);
+                        await sbClient.from('budget_settings').update({ parent_group: null }).eq('category_name', qCatName).eq('user_token', USER_TOKEN);
                     }
                 }
             }
@@ -3058,6 +3355,24 @@
     window.initG4Update = function() {
         const requestedMonthlyDisplay = safeParseFloat(document.getElementById('g4Input').value.replace(/,/g, ''));
         const actualRequested = denormalizeAmount(requestedMonthlyDisplay);
+        
+        if (state.budgetMode === 'future') {
+            setLoading(true, true);
+            sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__future_g4__')
+            .then(() => {
+                sbClient.from('budget_settings').insert({ category_name: '__future_g4__', budget_amount: actualRequested, type: 'system', user_token: USER_TOKEN })
+                .then(() => {
+                    window.fetchBudgetData().then(() => {
+                        const g4Btn = document.getElementById('g4UpdateBtn');
+                        if (g4Btn) g4Btn.disabled = true;
+                        window.showToast('עדכון תקציב עתידי נשמר', 'check');
+                        setLoading(false, true);
+                    });
+                });
+            });
+            return;
+        }
+
         const oldMonthly = safeParseFloat(state.budget.g4);
 
         // חשב תאריך התחלה מהתנועה הראשונה
@@ -3124,49 +3439,50 @@
                 const effectiveStart = startDate || new Date();
                 startDateISO = `${effectiveStart.getFullYear()}-${String(effectiveStart.getMonth()+1).padStart(2,'0')}-01`;
 
+                // Update/insert history starting at this retro start date
+                await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__daily_budget_history__:' + startDateISO);
+                await sbClient.from('budget_settings').insert({
+                    category_name: '__daily_budget_history__:' + startDateISO,
+                    budget_amount: dailyBudget,
+                    parent_group: startDateISO,
+                    type: 'system',
+                    user_token: USER_TOKEN
+                });
+
             } else if (mode === 'month') {
                 const fromDate = selVal ? new Date(selVal) : new Date();
                 fromDate.setHours(0,0,0,0);
+                
+                const historyStartDate = `${fromDate.getFullYear()}-${String(fromDate.getMonth()+1).padStart(2,'0')}-01`;
 
-                // תאריך התחלה המקורי (ה-start_date הנוכחי בDB)
-                const originalStart = startDate ? new Date(startDate.getFullYear(), startDate.getMonth(), 1) : new Date();
-                originalStart.setHours(0,0,0,0);
-
-                // ימים מה-start_date המקורי עד לתאריך הנבחר (לא עד היום!)
-                // כי get_balance מחשב: (ימים_מ_start_עד_היום × תקציב_יומי_חדש) - sum(amount)
-                // אחרי העדכון, הימים לפני fromDate יקבלו תקציב_יומי_חדש במקום תקציב_יומי_ישן
-                // לכן נוסיף הוצאת איזון = הפרש_יומי × ימים_מ_start_עד_fromDate
-                const daysBeforeSelected = Math.max(0, Math.floor((fromDate - originalStart) / (1000*3600*24)));
-
-                // get_balance = (ימים × תקציב_יומי_חדש) - sum(amount)
-                // כדי שהמאזן ישתנה רק מהחודש הנבחר ולא רטרואקטיבית —
-                // נוסיף הוצאה = הפרש_יומי × ימים_שעברו_מה_start_עד_החודש_הנבחר
-                // אם התקציב עלה (dailyDiff > 0) — נוסיף הוצאה חיובית (מנטרל את העלייה הרטרואקטיבית)
-                // אם התקציב ירד (dailyDiff < 0) — נוסיף הוצאה שלילית (מנטרל את הירידה הרטרואקטיבית)
-                const dailyDiff = dailyBudget - oldDailyBudget;
-                const balancingAmount = dailyDiff * daysBeforeSelected;
-                console.log('📊 Budget update:', { finalG4, oldG4, dailyBudget, oldDailyBudget, dailyDiff, originalStart, fromDate, daysBeforeSelected, balancingAmount });
-
-                if (Math.abs(balancingAmount) > 0.1) {
-                    const adjPayload = {
-                        amount: balancingAmount,
-                        name: 'איזון עדכון תקציב',
-                        category: 'איזון עדכון תקציב',
-                        created_at: fromDate.toISOString(),
+                // Save previous rate start date in history if it doesn't exist
+                let prevStartISO = '1970-01-01';
+                if (startDate) {
+                    prevStartISO = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-01`;
+                }
+                const existingPrev = (state.budget.dailyBudgetHistory || []).some(h => h.startDate === prevStartISO);
+                if (!existingPrev) {
+                    await sbClient.from('budget_settings').insert({
+                        category_name: '__daily_budget_history__:' + prevStartISO,
+                        budget_amount: oldDailyBudget,
+                        parent_group: prevStartISO,
+                        type: 'system',
                         user_token: USER_TOKEN
-                    };
-                    console.log('💰 Inserting adjustment:', adjPayload);
-                    const { error: adjErr } = await sbClient.from('transactions').insert(adjPayload);
-                    if (adjErr) console.error('❌ adjustment insert error:', adjErr);
-                    else console.log('✅ adjustment inserted OK');
-                } else {
-                    console.log('⚠️ balancingAmount too small to insert:', balancingAmount, 'dailyDiff:', dailyDiff, 'days:', daysFromSelectedMonth);
+                    });
                 }
 
-                // start_date נשאר כפי שהוא ב-DB
-                startDateISO = startDate
-                    ? `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-01`
-                    : null;
+                // Delete any duplicate entry for historyStartDate
+                await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__daily_budget_history__:' + historyStartDate);
+                // Insert the new rate start date
+                await sbClient.from('budget_settings').insert({
+                    category_name: '__daily_budget_history__:' + historyStartDate,
+                    budget_amount: dailyBudget,
+                    parent_group: historyStartDate,
+                    type: 'system',
+                    user_token: USER_TOKEN
+                });
+
+                startDateISO = historyStartDate;
             }
 
             // שמור g4 ב-budget_settings
@@ -3181,11 +3497,10 @@
             });
             if (rpcErr) throw rpcErr;
 
-            state.balance = safeParseFloat(await fetchBalance());
-            localStorage.setItem('cached_balance', state.balance.toString());
             state.isDirty = true;
             await window.fetchBudgetData();
             await window.fetchTransactionsOnly(false);
+            
             // השבת כפתור העדכון עד שיוקלד ערך חדש
             const g4Btn = document.getElementById('g4UpdateBtn');
             if (g4Btn) g4Btn.disabled = true;
@@ -3193,6 +3508,243 @@
         } catch (e) {
             console.error(e);
             window.showToast('שגיאה בעדכון', 'circle-xmark');
+        } finally {
+            setLoading(false, true);
+        }
+    };
+
+    window.switchBudgetTab = function(tab) {
+        state.budgetMode = tab; // 'active' or 'future'
+        const activeTab = document.getElementById('viewActiveBudgetTab');
+        const futureTab = document.getElementById('viewFutureBudgetTab');
+        if (activeTab && futureTab) {
+            if (tab === 'future') {
+                activeTab.className = "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-500";
+                futureTab.className = "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all bg-white text-slate-800 shadow-sm";
+            } else {
+                activeTab.className = "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all bg-white text-slate-800 shadow-sm";
+                futureTab.className = "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-500";
+            }
+        }
+        renderBudget();
+    };
+
+    window.copyCurrentToFutureBudget = async function() {
+        if (!sbClient) return;
+        setLoading(true, true);
+        try {
+            // First, delete any existing future rows (categories + G4)
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('type', ['future_income', 'future_fixed', 'future_annual', 'future_savings']);
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__future_g4__');
+
+            // Copy categories defensively ensuring accurate types
+            const currentItems = [
+                ...state.budget.incomes.map(i => ({...i, type: 'income'})),
+                ...state.budget.fixed.map(i => ({...i, type: 'fixed'})),
+                ...state.budget.annual.map(i => ({...i, type: 'annual'})),
+                ...(state.budget.savings || []).map(i => ({...i, type: 'savings'}))
+            ];
+
+            const rowsToInsert = currentItems.map(item => {
+                const fType = 'future_' + item.type;
+                const dbName = item.parent_group ? `${item.parent_group} > ${item.category_name}` : item.category_name;
+                return {
+                    category_name: '__future__:' + dbName,
+                    parent_group: item.parent_group || null,
+                    budget_amount: safeParseFloat(item.budget_amount) || 0,
+                    type: fType,
+                    user_token: USER_TOKEN
+                };
+            });
+
+            if (rowsToInsert.length > 0) {
+                const { error } = await sbClient.from('budget_settings').insert(rowsToInsert);
+                if (error) {
+                    console.error('Error inserting future budget items:', error);
+                    throw error;
+                }
+            }
+
+            // Copy G4
+            if (state.budget.g4 > 0) {
+                const { error: g4Err } = await sbClient.from('budget_settings').insert({
+                    category_name: '__future_g4__',
+                    budget_amount: safeParseFloat(state.budget.g4) || 0,
+                    type: 'system',
+                    user_token: USER_TOKEN
+                });
+                if (g4Err) {
+                    console.error('Error inserting future G4:', g4Err);
+                    throw g4Err;
+                }
+            }
+
+            window.showToast('התקציב הועתק בהצלחה!', 'check');
+            await window.fetchBudgetData();
+        } catch (e) {
+            console.error(e);
+            const errMsg = e.message || e.details || (typeof e === 'object' ? JSON.stringify(e) : String(e));
+            window.showToast('שגיאה: ' + errMsg, 'circle-xmark');
+        } finally {
+            setLoading(false, true);
+        }
+    };
+
+    window.saveFutureStartDate = async function() {
+        if (!sbClient) return;
+        const inp = document.getElementById('futureStartDateInput');
+        if (!inp || !inp.value) return;
+        setLoading(true, true);
+        try {
+            // Delete existing
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__future_start_date__');
+            // Insert
+            await sbClient.from('budget_settings').insert({
+                category_name: '__future_start_date__',
+                parent_group: inp.value,
+                budget_amount: 0,
+                type: 'system',
+                user_token: USER_TOKEN
+            });
+            window.showToast('תאריך הפעלה נשמר', 'check');
+            await window.fetchBudgetData();
+        } catch (e) {
+            console.error(e);
+            window.showToast('שגיאה בשמירת תאריך', 'circle-xmark');
+        } finally {
+            setLoading(false, true);
+        }
+    };
+
+    window.showWipeFutureBudgetConfirm = function() {
+        const wipeBtn = document.getElementById('wipeFutureBudgetBtn');
+        const confirmDiv = document.getElementById('wipeFutureBudgetConfirm');
+        if (wipeBtn && confirmDiv) {
+            wipeBtn.classList.add('hidden');
+            confirmDiv.classList.remove('hidden');
+        }
+    };
+
+    window.cancelWipeFutureBudget = function() {
+        const wipeBtn = document.getElementById('wipeFutureBudgetBtn');
+        const confirmDiv = document.getElementById('wipeFutureBudgetConfirm');
+        if (wipeBtn && confirmDiv) {
+            wipeBtn.classList.remove('hidden');
+            confirmDiv.classList.add('hidden');
+        }
+    };
+
+    window.wipeFutureBudget = async function() {
+        if (!sbClient) return;
+        setLoading(true, true);
+        try {
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('type', ['future_income', 'future_fixed', 'future_annual', 'future_savings']);
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('category_name', ['__future_g4__', '__future_start_date__']);
+            
+            window.showToast('תקציב עתידי נמחק בהצלחה', 'trash');
+            
+            state.futureBudget = {
+                incomes: [],
+                fixed: [],
+                annual: [],
+                savings: [],
+                g4: 0,
+                startDate: '',
+                cycleStartDay: 1
+            };
+            
+            await window.fetchBudgetData();
+            window.cancelWipeFutureBudget();
+        } catch (e) {
+            console.error(e);
+            window.showToast('שגיאה במחיקת תקציב', 'circle-xmark');
+        } finally {
+            setLoading(false, true);
+        }
+    };
+
+    window.activateFutureBudget = async function() {
+        if (!sbClient) return;
+        setLoading(true, true);
+        try {
+            console.log('🚀 Promoting future budget to active!');
+            
+            // 1. Fetch future category rows
+            const { data: futRows } = await sbClient
+                .from('budget_settings')
+                .select('*')
+                .eq('user_token', USER_TOKEN)
+                .in('type', ['future_income', 'future_fixed', 'future_annual', 'future_savings']);
+
+            const promotedCategories = (futRows || []).map(r => {
+                let catName = r.category_name || '';
+                if (catName.startsWith('__future__:')) catName = catName.slice(11);
+                return {
+                    category_name: catName,
+                    parent_group: r.parent_group || null,
+                    budget_amount: safeParseFloat(r.budget_amount) || 0,
+                    type: (r.type || '').replace('future_', ''),
+                    user_token: USER_TOKEN
+                };
+            });
+
+            // 2. Delete all current active and future budget rows
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('type', [
+                'income', 'fixed', 'annual', 'savings',
+                'future_income', 'future_fixed', 'future_annual', 'future_savings'
+            ]);
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('category_name', [
+                '__g4__', '__start_date__', '__future_g4__', '__future_start_date__'
+            ]);
+
+            // 3. Insert promoted rows
+            if (promotedCategories.length > 0) {
+                const { error: insErr } = await sbClient.from('budget_settings').insert(promotedCategories);
+                if (insErr) throw insErr;
+            }
+            await sbClient.from('budget_settings').insert([
+                { category_name: '__g4__', budget_amount: safeParseFloat(state.futureBudget.g4) || 0, type: 'system', user_token: USER_TOKEN },
+                { category_name: '__start_date__', budget_amount: 0, type: 'system', parent_group: state.futureBudget.startDate || '', user_token: USER_TOKEN }
+            ]);
+
+            // 4. Record new rate in history to maintain flawless balance calculations
+            const futureG4 = state.futureBudget.g4;
+            const dailyBudget = futureG4 / 30;
+            const startDateISO = state.futureBudget.startDate;
+
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__daily_budget_history__:' + startDateISO);
+            await sbClient.from('budget_settings').insert({
+                category_name: '__daily_budget_history__:' + startDateISO,
+                budget_amount: dailyBudget,
+                parent_group: startDateISO,
+                type: 'system',
+                user_token: USER_TOKEN
+            });
+
+            // 5. Update user_tokens start_date & daily_budget
+            await sbClient.rpc('update_daily_budget', {
+                p_user_token: USER_TOKEN,
+                p_daily_budget: dailyBudget,
+                p_start_date: startDateISO
+            });
+
+            state.budgetMode = 'active';
+            state.futureBudget = null;
+
+            window.showToast('התקציב העתידי הופעל בהצלחה!', 'check');
+            await window.fetchBudgetData();
+            await window.fetchTransactionsOnly(false);
+            
+            // Switch tabs back to active
+            const activeTab = document.getElementById('viewActiveBudgetTab');
+            const futureTab = document.getElementById('viewFutureBudgetTab');
+            if (activeTab && futureTab) {
+                activeTab.className = "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all bg-white text-slate-800 shadow-sm";
+                futureTab.className = "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-500";
+            }
+        } catch (e) {
+            console.error(e);
+            window.showToast('שגיאה בהפעלת התקציב', 'circle-xmark');
         } finally {
             setLoading(false, true);
         }
@@ -4915,15 +5467,19 @@
         if (navMap[view]) document.getElementById(navMap[view]).classList.add('active');
         updateNavigationUI();
         if (view === 'annual') window.fetchAnnualData();
-        else if (view === 'budget') { if (state.isDirty || state.budget.incomes.length === 0) window.fetchBudgetData(); else renderBudget(); }
-        else if (view === 'stats') window.updateStats();
+        else if (view === 'budget') { state.budgetMode = 'active'; if (state.isDirty || state.budget.incomes.length === 0) window.fetchBudgetData(); else renderBudget(); }
+        else if (view === 'stats') window.updateStats(true);
         else render();
     };
 
     function updateNavigationUI() {
         ['main','budget','annual','stats'].forEach(v => {
             const el = document.getElementById(v + 'View');
-            if (el) el.classList.toggle('hidden', state.currentView !== v);
+            if (el) {
+                const isCurrent = state.currentView === v;
+                el.classList.toggle('hidden', !isCurrent);
+                el.style.display = isCurrent ? '' : 'none';
+            }
         });
         const titles = { main: 'הוצאות', budget: 'ניהול תקציב', annual: 'הוצאות מתוכננות', stats: 'נתונים וסטטיסטיקה' };
         const pt = document.getElementById('pageTitle'); if (pt) pt.innerText = titles[state.currentView];
@@ -4950,6 +5506,15 @@
         if (updateBtn) {
             const show = state.currentView === 'budget' && Object.keys(state.dirtyBudgetItems).length > 0;
             updateBtn.classList.toggle('visible', show);
+        }
+        const dateFilterBtn = document.getElementById('mainDateFilterBtn');
+        if (dateFilterBtn) dateFilterBtn.classList.toggle('hidden', state.currentView !== 'main');
+        const searchBtn = document.getElementById('mainSearchBtn');
+        if (searchBtn) searchBtn.classList.toggle('hidden', state.currentView !== 'main');
+        if (state.currentView !== 'main') {
+            state.searchOpen = false;
+            const sb = document.getElementById('mainSearchBar');
+            if (sb) sb.classList.add('hidden');
         }
     }
 
@@ -5092,6 +5657,15 @@
                     `;
                 }
 
+                const isNegativeBal = balVal < 0 && dailyVal > 0;
+                const balDaysVal = isNegativeBal ? Math.ceil(Math.abs(balVal) / dailyVal) : 0;
+                const showDays = isNegativeBal && state.balanceShowDays;
+                const balDispNum = showDays ? `-${balDaysVal}` : Math.round(balVal).toLocaleString();
+                const balDispUnit = showDays ? 'ימים' : '₪';
+                const balColor = balVal < 0 ? 'text-red-500' : 'text-slate-900';
+                const balUnitColor = balVal < 0 ? 'text-red-400' : 'text-slate-400';
+                const balClickable = isNegativeBal ? `onclick="window.toggleBalanceDays()" style="cursor:pointer" title="${showDays ? 'לחץ לחזרה למאזן' : 'לחץ לראות כמה ימים'}"` : '';
+
                 headerRow.innerHTML = `
                     <!-- Daily Budget (Left in Current) -->
                     <div class="flex-1 flex flex-col items-center px-1 border-l border-slate-50">
@@ -5104,9 +5678,9 @@
                     <!-- Balance (Center in Current) -->
                     <div class="flex-1 flex flex-col items-center border-l border-slate-50 px-1">
                         <p class="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-1">מאזן נוכחי</p>
-                        <div class="flex items-baseline gap-0.5">
-                            <span class="text-xl font-black text-slate-900 ltr-num">${Math.round(balVal).toLocaleString()}</span>
-                            <span class="text-xs text-slate-400 font-bold">₪</span>
+                        <div id="balanceDisplayCell" class="flex items-baseline gap-1 select-none ${isNegativeBal ? 'cursor-pointer active:opacity-70 transition-opacity' : ''}" ${balClickable}>
+                            <span class="text-xl font-black ${balColor} ltr-num">${balDispNum}</span>
+                            <span class="text-xs ${balUnitColor} font-bold">${balDispUnit}</span>
                         </div>
                     </div>
                     <!-- Monthly Utilization (Right in Current) -->
@@ -5152,7 +5726,15 @@
         updateBulkBar();
         renderSavingsReminders();
 
-        const filteredTxs = state.transactions.filter(tx => {
+        const dateFiltered = applyDateFilter(state.transactions);
+        const useDatePagination = dateFiltered === null;
+        const txsAfterDate = useDatePagination ? state.transactions : dateFiltered;
+        const searchQ = (state.searchText || '').trim().toLowerCase();
+        const txsForFilter = searchQ
+            ? txsAfterDate.filter(tx => (tx.name || '').toLowerCase().includes(searchQ))
+            : txsAfterDate;
+
+        const filteredTxs = txsForFilter.filter(tx => {
             if (tx.isAdjustment) return state.mainViewFilter === 'all' || state.mainViewFilter === 'planned';
             
             // Filter by type
@@ -5191,7 +5773,7 @@
             const adjInFiltered = filteredTxs.filter(t => t.isAdjustment);
             console.log('🔍 adjustment in filteredTxs:', adjInFiltered.length, 'total filtered:', filteredTxs.length, 'paginated:', state.displayedTransactionsCount);
         }
-        const paginatedTxs = filteredTxs.slice(0, state.displayedTransactionsCount);
+        const paginatedTxs = (useDatePagination && !searchQ) ? filteredTxs.slice(0, state.displayedTransactionsCount) : filteredTxs;
         const grouped = {};
         paginatedTxs.forEach(tx => {
             grouped[tx.date] = grouped[tx.date] || { items: [], total: 0 };
@@ -5215,7 +5797,6 @@
                     }
                     return (b.row || 0) - (a.row || 0);
                 });
-            const dailyVal = (safeParseFloat(state.budget.g4) || 0) / 30;
             const today = new Date();
             today.setHours(0,0,0,0);
             
@@ -5270,7 +5851,7 @@
             listEl.appendChild(fragment);
         }
         const lmBtn = document.getElementById('loadMoreBtn');
-        if (lmBtn) lmBtn.classList.toggle('hidden', state.displayedTransactionsCount >= filteredTxs.length || filteredTxs.length === 0);
+        if (lmBtn) lmBtn.classList.toggle('hidden', !useDatePagination || !!searchQ || state.displayedTransactionsCount >= filteredTxs.length || filteredTxs.length === 0);
     }
 
     function createTransactionEl(tx, hideDate = true, hideTag = false) {
@@ -5386,16 +5967,39 @@
     // RENDER BUDGET
     // =====================================================
     function renderBudget() {
-        const b = state.budget;
+        if (state.currentView !== 'budget') return;
+        const isFuture = state.budgetMode === 'future';
+        const b = isFuture ? state.futureBudget : state.budget;
+
+        // Show/hide Copy Current Budget banners & Future date input
+        const copyBanner = document.getElementById('copyCurrentBudgetContainer');
+        const futureDateContainer = document.getElementById('futureStartDateContainer');
+        const futureDateInp = document.getElementById('futureStartDateInput');
+        
+        if (isFuture) {
+            const isFutureEmpty = b.incomes.length === 0 && b.fixed.length === 0 && b.annual.length === 0;
+            if (copyBanner) copyBanner.classList.toggle('hidden', !isFutureEmpty);
+            if (futureDateContainer) futureDateContainer.classList.remove('hidden');
+            if (futureDateInp) futureDateInp.value = b.startDate || '';
+            
+            const futureActions = document.getElementById('futureBudgetActions');
+            if (futureActions) {
+                futureActions.classList.toggle('hidden', isFutureEmpty);
+            }
+        } else {
+            if (copyBanner) copyBanner.classList.add('hidden');
+            if (futureDateContainer) futureDateContainer.classList.add('hidden');
+        }
+
         const incTotal = b.incomes.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
         const fixTotal = b.fixed.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
         const annMTotal = b.annual.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0) / 12;
         const savTotal = (b.savings || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
 
-        // Show wizard CTA only when budget is completely empty
+        // Show wizard CTA only when budget is completely empty & not in future mode
         const isEmpty = b.incomes.length === 0 && b.fixed.length === 0 && b.annual.length === 0;
         const ctaEl = document.getElementById('budgetWizardCta');
-        if (ctaEl) ctaEl.classList.toggle('hidden', !isEmpty);
+        if (ctaEl) ctaEl.classList.toggle('hidden', isEmpty ? isFuture : true);
 
         const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
         setEl('summaryTotalIncome', state.isPrivacyMode ? '20,000' : Math.round(incTotal).toLocaleString());
@@ -5412,13 +6016,17 @@
         }
         // תאריך התחלה = תאריך התנועה הראשונה
         let displayStartDate = b.startDate || '';
-        if (state.transactions.length > 0) {
+        if (!isFuture && state.transactions.length > 0) {
             const sorted = [...state.transactions].sort((a, b) =>
                 new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
             );
             displayStartDate = sorted[0].date;
         }
-        setEl('startDateDisplay', 'תאריך התחלה: ' + (displayStartDate || '--'));
+        if (isFuture) {
+            setEl('startDateDisplay', b.startDate ? 'הפעלה עתידית: ' + b.startDate : 'טרם הוגדר תאריך הפעלה');
+        } else {
+            setEl('startDateDisplay', 'תאריך התחלה: ' + (displayStartDate || '--'));
+        }
 
         ['income', 'fixed', 'annual', 'savings'].forEach(type => {
             const list = type === 'income' ? b.incomes : (type === 'fixed' ? b.fixed : (type === 'annual' ? b.annual : (b.savings || [])));
@@ -5716,6 +6324,253 @@
             btns[filter].classList.remove('text-slate-400');
         }
         
+        render();
+    };
+
+    // =====================================================
+    // DATE FILTER
+    // =====================================================
+
+    function applyDateFilter(transactions) {
+        const startDay = state.budget.cycleStartDay || 1;
+        const type = (state.dateFilter && state.dateFilter.type) || 'last30';
+
+        if (type === 'last30') return null; // use existing pagination
+
+        if (type === 'all') return transactions;
+
+        if (type === 'currentMonth') {
+            const { startDate, endDate } = getCurrentCycleDates(new Date(), startDay);
+            return transactions.filter(tx => { const d = parseLocalDate(tx.date); return d >= startDate && d <= endDate; });
+        }
+
+        if (type === 'prevMonth') {
+            const { startDate: curStart } = getCurrentCycleDates(new Date(), startDay);
+            const prevDate = new Date(curStart.getTime() - 1);
+            const { startDate, endDate } = getCurrentCycleDates(prevDate, startDay);
+            return transactions.filter(tx => { const d = parseLocalDate(tx.date); return d >= startDate && d <= endDate; });
+        }
+
+        if (type === 'last3Months') {
+            const { endDate } = getCurrentCycleDates(new Date(), startDay);
+            const { startDate: m1 } = getCurrentCycleDates(new Date(), startDay);
+            const { startDate: m2 } = getCurrentCycleDates(new Date(m1.getTime() - 1), startDay);
+            const { startDate: m3 } = getCurrentCycleDates(new Date(m2.getTime() - 1), startDay);
+            return transactions.filter(tx => { const d = parseLocalDate(tx.date); return d >= m3 && d <= endDate; });
+        }
+
+        if (type === 'specificMonth') {
+            if (!state.dateFilterMonth) return transactions;
+            const [year, month] = state.dateFilterMonth.split('-').map(Number);
+            const daysInMon = new Date(year, month, 0).getDate();
+            const sd = Math.min(startDay, daysInMon);
+            const cycleStart = new Date(year, month - 1, sd, 0, 0, 0, 0);
+            const ny = month === 12 ? year + 1 : year;
+            const nm = month === 12 ? 1 : month + 1;
+            const daysInNext = new Date(ny, nm, 0).getDate();
+            const nextSd = Math.min(startDay, daysInNext);
+            const cycleEnd = new Date(ny, nm - 1, nextSd, 0, 0, 0, 0);
+            cycleEnd.setMilliseconds(-1);
+            return transactions.filter(tx => { const d = parseLocalDate(tx.date); return d >= cycleStart && d <= cycleEnd; });
+        }
+
+        if (type === 'dateRange') {
+            const fromVal = state.dateFilterFrom;
+            const toVal = state.dateFilterTo;
+            if (!fromVal && !toVal) return transactions;
+            const from = fromVal ? (() => { const p = fromVal.split('-'); return new Date(+p[0], +p[1]-1, +p[2], 0,0,0,0); })() : null;
+            const to   = toVal   ? (() => { const p = toVal.split('-');   return new Date(+p[0], +p[1]-1, +p[2], 23,59,59,999); })() : null;
+            return transactions.filter(tx => {
+                const d = parseLocalDate(tx.date);
+                if (from && d < from) return false;
+                if (to   && d > to)   return false;
+                return true;
+            });
+        }
+
+        return transactions;
+    }
+
+    function getDateFilterLabel() {
+        const type = (state.dateFilter && state.dateFilter.type) || 'last30';
+        if (type === 'last30')      return '30 תנועות';
+        if (type === 'currentMonth') return 'חודש נוכחי';
+        if (type === 'prevMonth')   return 'חודש קודם';
+        if (type === 'last3Months') return '3 חודשים';
+        if (type === 'all')         return 'הכל';
+        if (type === 'specificMonth') {
+            if (!state.dateFilterMonth) return 'חודש';
+            const [y, m] = state.dateFilterMonth.split('-').map(Number);
+            return new Date(y, m-1, 1).toLocaleDateString('he-IL', { month: 'short', year: 'numeric' });
+        }
+        if (type === 'dateRange') {
+            if (!state.dateFilterFrom && !state.dateFilterTo) return 'טווח';
+            const fmt = s => { const p = s.split('-'); return `${+p[2]}/${+p[1]}`; };
+            if (state.dateFilterFrom && state.dateFilterTo) return `${fmt(state.dateFilterFrom)}–${fmt(state.dateFilterTo)}`;
+            return state.dateFilterFrom ? `מ-${fmt(state.dateFilterFrom)}` : `עד-${fmt(state.dateFilterTo)}`;
+        }
+        return '30 תנועות';
+    }
+
+    function updateDateFilterLabel() {
+        const el = document.getElementById('mainDateFilterLabel');
+        if (el) el.textContent = getDateFilterLabel();
+    }
+
+    function updateDfActiveState() {
+        const type = (state.dateFilter && state.dateFilter.type) || 'last30';
+        const map = { last30:'dfLast30', currentMonth:'dfCurrentMonth', prevMonth:'dfPrevMonth', last3Months:'dfLast3Months', all:'dfAll', specificMonth:'dfSpecificMonthBtn', dateRange:'dfDateRangeBtn' };
+        document.querySelectorAll('.df-opt').forEach(b => {
+            b.classList.remove('bg-blue-50', 'text-blue-700');
+            b.classList.add('text-slate-700');
+        });
+        const activeId = map[type];
+        if (activeId) {
+            const btn = document.getElementById(activeId);
+            if (btn) { btn.classList.add('bg-blue-50', 'text-blue-700'); btn.classList.remove('text-slate-700'); }
+        }
+    }
+
+    function populateDfMonthDropdown() {
+        const select = document.getElementById('dfMonthSelect');
+        if (!select) return;
+        const earliest = getBudgetStartDate();
+        const now = new Date();
+        const months = [];
+        let cur = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
+        while (cur <= now) {
+            const y = cur.getFullYear(), m = cur.getMonth() + 1;
+            const val = `${y}-${String(m).padStart(2,'0')}`;
+            const label = new Date(y, m-1, 1).toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+            months.push({ val, label });
+            cur.setMonth(cur.getMonth() + 1);
+        }
+        months.reverse();
+        select.innerHTML = months.map(mo => `<option value="${mo.val}"${state.dateFilterMonth === mo.val ? ' selected' : ''}>${mo.label}</option>`).join('');
+        if (!state.dateFilterMonth && months.length) state.dateFilterMonth = months[0].val;
+    }
+
+    window.openDateFilter = function() {
+        populateDfMonthDropdown();
+        updateDfActiveState();
+        // Restore sub-section state
+        const dfType = (state.dateFilter && state.dateFilter.type) || 'last30';
+        const specSection = document.getElementById('dfSpecificMonthSection');
+        const rangeSection = document.getElementById('dfDateRangeSection');
+        const specChevron = document.getElementById('dfSpecificMonthChevron');
+        const rangeChevron = document.getElementById('dfDateRangeChevron');
+        if (specSection) specSection.classList.toggle('hidden', dfType !== 'specificMonth');
+        if (rangeSection) rangeSection.classList.toggle('hidden', dfType !== 'dateRange');
+        if (specChevron) specChevron.style.transform = dfType === 'specificMonth' ? 'rotate(-180deg)' : '';
+        if (rangeChevron) rangeChevron.style.transform = dfType === 'dateRange' ? 'rotate(-180deg)' : '';
+        if (dfType === 'dateRange') {
+            const fi = document.getElementById('dfFromDate'); if (fi) fi.value = state.dateFilterFrom || '';
+            const ti = document.getElementById('dfToDate');   if (ti) ti.value = state.dateFilterTo   || '';
+        }
+        document.getElementById('dateFilterBackdrop').classList.remove('hidden');
+        document.getElementById('dateFilterSheet').classList.remove('hidden');
+    };
+
+    window.closeDateFilter = function() {
+        document.getElementById('dateFilterBackdrop').classList.add('hidden');
+        document.getElementById('dateFilterSheet').classList.add('hidden');
+    };
+
+    window.toggleDfSection = function(section) {
+        const sections = { specificMonth: ['dfSpecificMonthSection','dfSpecificMonthChevron'], dateRange: ['dfDateRangeSection','dfDateRangeChevron'] };
+        const other    = section === 'specificMonth' ? 'dateRange' : 'specificMonth';
+        const [secId, chevId] = sections[section];
+        const [oSecId, oChevId] = sections[other];
+        const el = document.getElementById(secId);
+        const chevron = document.getElementById(chevId);
+        const isHidden = el.classList.contains('hidden');
+        // Collapse the other
+        document.getElementById(oSecId).classList.add('hidden');
+        document.getElementById(oChevId).style.transform = '';
+        // Toggle this one
+        el.classList.toggle('hidden', !isHidden);
+        chevron.style.transform = isHidden ? 'rotate(-180deg)' : '';
+    };
+
+    window.setDateFilter = function(type, apply) {
+        if (type === 'specificMonth') {
+            const sel = document.getElementById('dfMonthSelect');
+            state.dateFilterMonth = sel ? sel.value : '';
+            state.dateFilter = { type: 'specificMonth' };
+            window.closeDateFilter();
+        } else if (type === 'dateRange') {
+            const fromEl = document.getElementById('dfFromDate');
+            const toEl   = document.getElementById('dfToDate');
+            state.dateFilterFrom = fromEl ? fromEl.value : '';
+            state.dateFilterTo   = toEl   ? toEl.value   : '';
+            state.dateFilter = { type: 'dateRange' };
+            if (apply) window.closeDateFilter();
+            else { updateDateFilterLabel(); render(); return; }
+        } else {
+            state.dateFilter = { type };
+            state.dateFilterFrom = '';
+            state.dateFilterTo = '';
+            state.dateFilterMonth = '';
+            window.closeDateFilter();
+        }
+        state.displayedTransactionsCount = 30;
+        updateDateFilterLabel();
+        render();
+    };
+
+    // =====================================================
+    // SEARCH FILTER
+    // =====================================================
+
+    window.toggleBalanceDays = function() {
+        state.balanceShowDays = !state.balanceShowDays;
+        const balVal = formatDisplayAmount(state.balance);
+        const dailyVal = (safeParseFloat(state.budget.g4) || 0) / 30;
+        if (balVal >= 0 || dailyVal <= 0) return;
+        const balDaysVal = Math.ceil(Math.abs(balVal) / dailyVal);
+        const showDays = state.balanceShowDays;
+        const balDispNum = showDays ? `-${balDaysVal}` : Math.round(balVal).toLocaleString();
+        const balDispUnit = showDays ? 'ימים' : '₪';
+        const cell = document.getElementById('balanceDisplayCell');
+        if (cell) {
+            cell.title = showDays ? 'לחץ לחזרה למאזן' : 'לחץ לראות כמה ימים';
+            cell.innerHTML = `<span class="text-xl font-black text-red-500 ltr-num">${balDispNum}</span><span class="text-xs text-red-400 font-bold">${balDispUnit}</span>`;
+        }
+    };
+
+    window.toggleSearch = function() {
+        state.searchOpen = !state.searchOpen;
+        const bar = document.getElementById('mainSearchBar');
+        const icon = document.getElementById('mainSearchIcon');
+        const input = document.getElementById('mainSearchInput');
+        if (bar) bar.classList.toggle('hidden', !state.searchOpen);
+        if (icon) icon.className = state.searchOpen
+            ? 'fa-solid fa-magnifying-glass-minus text-[11px] text-blue-500'
+            : 'fa-solid fa-magnifying-glass text-[11px]';
+        if (state.searchOpen && input) {
+            input.value = state.searchText || '';
+            setTimeout(() => input.focus(), 50);
+        } else {
+            state.searchText = '';
+            state.displayedTransactionsCount = 30;
+            render();
+        }
+    };
+
+    window.onSearchInput = function(val) {
+        state.searchText = val;
+        state.displayedTransactionsCount = 30;
+        render();
+    };
+
+    window.clearSearch = function() {
+        state.searchText = '';
+        state.searchOpen = false;
+        const bar = document.getElementById('mainSearchBar');
+        const icon = document.getElementById('mainSearchIcon');
+        if (bar) bar.classList.add('hidden');
+        if (icon) icon.className = 'fa-solid fa-magnifying-glass text-[11px]';
+        state.displayedTransactionsCount = 30;
         render();
     };
 
@@ -6342,7 +7197,8 @@
     window.initParentGroupModal = (type, existingParent = null) => {
         state.editingParentType = type;
         state.editingParentName = existingParent;
-        const list = type === 'income' ? state.budget.incomes : (type === 'fixed' ? state.budget.fixed : (type === 'annual' ? state.budget.annual : (state.budget.savings || [])));
+        const b = state.budgetMode === 'future' ? state.futureBudget : state.budget;
+        const list = type === 'income' ? b.incomes : (type === 'fixed' ? b.fixed : (type === 'annual' ? b.annual : (b.savings || [])));
         const container = document.getElementById('parentGroupList');
         const nameInput = document.getElementById('parentGroupName');
         nameInput.value = existingParent || '';
@@ -6423,7 +7279,8 @@
         const btn = document.getElementById('g4UpdateBtn'), inp = document.getElementById('g4Input');
         if (!btn || !inp) return;
         const numericInp = safeParseFloat(inp.value.replace(/,/g, ''));
-        const numericG4 = Math.round(formatDisplayAmount(safeParseFloat(state.budget.g4)));
+        const b = state.budgetMode === 'future' ? state.futureBudget : state.budget;
+        const numericG4 = Math.round(formatDisplayAmount(safeParseFloat(b.g4)));
         btn.disabled = numericInp === numericG4;
     };
     window.checkCycleStartDayChange = () => {
@@ -6446,7 +7303,6 @@
             await sbClient.from('budget_settings').insert({ category_name: '__month_start_day__', budget_amount: val, type: 'system', user_token: USER_TOKEN });
             
             state.budget.cycleStartDay = val;
-            localStorage.setItem('cycle_start_day', val.toString());
             
             // Re-sync stats starting day as well
             state.stats.startDay = val;
@@ -6517,21 +7373,10 @@
     // =====================================================
     let statsChartInstance = null;
 
-    window.updateStats = function() {
+    window.updateStats = function(forceSyncWithStateByOpening = false) {
         if (state.currentView !== 'stats') return;
-        const startDay = parseInt(document.getElementById('monthStartDay').value);
-        if (state.stats.startDay !== startDay) {
-            state.stats.startDay = startDay;
-            state.budget.cycleStartDay = startDay;
-            localStorage.setItem('stats_start_day', startDay.toString());
-            localStorage.setItem('cycle_start_day', startDay.toString());
-            if (sbClient) {
-                sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__month_start_day__')
-                    .then(() => {
-                        sbClient.from('budget_settings').insert({ category_name: '__month_start_day__', budget_amount: startDay, type: 'system', user_token: USER_TOKEN });
-                    });
-            }
-        }
+        const startDay = state.budget.cycleStartDay || 1;
+        state.stats.startDay = startDay;
         let startDate, endDate;
         const monthVal = document.getElementById('specificMonthSelect').value;
         if (!monthVal) {
@@ -8031,7 +8876,7 @@
 
     window.copyAndroidSiteUrl = function() {
         var tok = USER_TOKEN || '';
-        var url = 'https://urielshavat.github.io/MoneyBoss/' + (tok ? '?token=' + tok : '');
+        var url = 'https://moneyboss.netlify.app/' + (tok ? '?token=' + tok : '');
         var btn = document.getElementById('copyAndroidSiteBtn');
         navigator.clipboard.writeText(url).then(function() {
             if (btn) { btn.textContent = '✓ הועתק'; btn.classList.add('bg-green-50','border-green-200','text-green-600'); btn.classList.remove('bg-blue-50','border-blue-200','text-blue-600'); }
@@ -8616,14 +9461,6 @@
                 locale: "he",
                 disableMobile: true
             });
-        }
-
-        // Populate month start day select
-        const msdSelect = document.getElementById('monthStartDay');
-        if (msdSelect) {
-            msdSelect.innerHTML = Array.from({length: 28}, (_, i) =>
-                `<option value="${i+1}" ${state.stats.startDay === i+1 ? 'selected' : ''}>${i+1}</option>`
-            ).join('');
         }
 
         // Init Supabase — use stored override or fallback to hardcoded
