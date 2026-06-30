@@ -85,6 +85,8 @@
         .btn-group-cat-annual { background: #fffbeb; color: #d97706; }
         .btn-add-cat-savings { background: #faf5ff; color: #7c3aed; }
         .btn-group-cat-savings { background: #faf5ff; color: #7c3aed; }
+        .btn-add-cat-loan { background: #f1f5f9; color: #475569; }
+        .btn-group-cat-loan { background: #f1f5f9; color: #475569; }
         .savings-reminder-banner { background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); border: 1px solid #d8b4fe; border-radius: 1rem; padding: 0.875rem 1rem; margin-bottom: 1rem; }
         @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
         .savings-reminder-banner { animation: fadeSlideIn 0.3s ease-out forwards; }
@@ -414,6 +416,10 @@
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">חסכונות (חודשי)</span>
                         <span class="text-sm font-bold text-purple-600 ltr-num">- ₪<span id="summaryTotalSavings" class="ltr-num">0</span></span>
                     </div>
+                    <div class="flex justify-between items-center px-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">הלוואות (חודשי)</span>
+                        <span class="text-sm font-bold text-slate-600 ltr-num">- ₪<span id="summaryTotalLoans" class="ltr-num">0</span></span>
+                    </div>
                     <div class="border-t border-slate-100 pt-3 mt-1 flex flex-col gap-3">
                         <div class="flex justify-between items-center px-1">
                             <span class="text-[10px] font-bold text-slate-800 uppercase tracking-wider">תקציב נותר לשוטף</span>
@@ -496,7 +502,7 @@
             </div>
             <div class="mb-4">
                 <div class="flex justify-between items-center py-2">
-                    <h3 class="text-slate-800 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-circle-arrow-up text-green-500"></i>הכנסות</h3>
+                    <h3 class="text-slate-800 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-circle-arrow-up text-green-500"></i>הכנסות<span id="sectionTotal_income"></span></h3>
                     <div class="flex">
                         <button onclick="window.initParentGroupModal('income')" class="btn-group-cat btn-group-cat-income"><i class="fa-regular fa-folder-open"></i></button>
                         <button onclick="window.initNewCategory('income')" class="btn-add-cat btn-add-cat-income"><i class="fa-solid fa-plus"></i></button>
@@ -507,7 +513,7 @@
             </div>
             <div class="mb-4">
                 <div class="flex justify-between items-center py-2">
-                    <h3 class="text-slate-800 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-circle-arrow-down text-red-500"></i>הוצאות קבועות</h3>
+                    <h3 class="text-slate-800 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-circle-arrow-down text-red-500"></i>הוצאות קבועות<span id="sectionTotal_fixed"></span></h3>
                     <div class="flex">
                         <button onclick="window.initParentGroupModal('fixed')" class="btn-group-cat btn-group-cat-fixed"><i class="fa-regular fa-folder-open"></i></button>
                         <button onclick="window.initNewCategory('fixed')" class="btn-add-cat btn-add-cat-fixed"><i class="fa-solid fa-plus"></i></button>
@@ -518,7 +524,7 @@
             </div>
             <div class="mb-4">
                 <div class="flex justify-between items-center py-2">
-                    <h3 class="text-slate-800 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-calendar text-amber-500"></i>הוצאות מתוכננות</h3>
+                    <h3 class="text-slate-800 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-calendar text-amber-500"></i>הוצאות מתוכננות<span id="sectionTotal_annual"></span></h3>
                     <div class="flex">
                         <button onclick="window.initParentGroupModal('annual')" class="btn-group-cat btn-group-cat-annual"><i class="fa-regular fa-folder-open"></i></button>
                         <button onclick="window.initNewCategory('annual')" class="btn-add-cat btn-add-cat-annual"><i class="fa-solid fa-plus"></i></button>
@@ -529,7 +535,7 @@
             </div>
             <div class="mb-8">
                 <div class="flex justify-between items-center py-2">
-                    <h3 class="text-slate-800 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-piggy-bank text-purple-500"></i>חסכונות</h3>
+                    <h3 class="text-slate-800 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-piggy-bank text-purple-500"></i>חסכונות<span id="sectionTotal_savings"></span><span id="sectionBalance_savings"></span></h3>
                     <div class="flex">
                         <button onclick="window.initParentGroupModal('savings')" class="btn-group-cat btn-group-cat-savings"><i class="fa-regular fa-folder-open"></i></button>
                         <button onclick="window.initNewCategory('savings')" class="btn-add-cat btn-add-cat-savings"><i class="fa-solid fa-plus"></i></button>
@@ -537,6 +543,16 @@
                 </div>
                 <div id="savingsList" class="space-y-1.5"></div>
                 <button id="showZeroSavingsBtn" onclick="window.toggleZeroItems('savings')" class="show-zero-btn hidden">הצג סעיפים ללא תקציב</button>
+            </div>
+            <div class="mb-8">
+                <div class="flex justify-between items-center py-2">
+                    <h3 class="text-slate-800 font-bold text-xs flex items-center gap-1.5"><i class="fa-solid fa-hand-holding-dollar text-slate-500"></i>הלוואות<span id="sectionTotal_loan"></span><span id="sectionBalance_loan"></span></h3>
+                    <div class="flex">
+                        <button onclick="window.initParentGroupModal('loan')" class="btn-group-cat btn-group-cat-loan"><i class="fa-regular fa-folder-open"></i></button>
+                        <button onclick="window.initNewCategory('loan')" class="btn-add-cat btn-add-cat-loan"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                </div>
+                <div id="loanList" class="space-y-1.5"></div>
             </div>
             <div class="mb-8 pb-16">
                 <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2 px-1">כלים פיננסיים</h3>
@@ -796,6 +812,7 @@
                     <div id="wizProg1" class="flex-1 h-1 rounded-full bg-slate-200"></div>
                     <div id="wizProg2" class="flex-1 h-1 rounded-full bg-slate-200"></div>
                     <div id="wizProg3" class="flex-1 h-1 rounded-full bg-slate-200"></div>
+                    <div id="wizProg4" class="flex-1 h-1 rounded-full bg-slate-200"></div>
                 </div>
             </div>
             <!-- Content -->
@@ -1150,9 +1167,9 @@
 
     <!-- New Category Modal -->
     <div id="newCategoryOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
-        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-            <h3 id="newCategoryTitle" class="text-lg font-bold text-slate-900 mb-5 text-center">הוספת קטגוריה</h3>
-            <div class="space-y-3">
+        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
+            <h3 id="newCategoryTitle" class="text-lg font-bold text-slate-900 pt-6 px-6 pb-4 text-center flex-shrink-0">הוספת קטגוריה</h3>
+            <div class="space-y-3 overflow-y-auto px-6 pb-2 flex-1">
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">שם</label>
                     <input type="text" id="newCategoryName" placeholder="" class="input-field w-full px-4 py-3 rounded-xl text-slate-800">
@@ -1179,10 +1196,50 @@
                         </div>
                     </div>
                 </div>
-                <div class="flex gap-2 pt-1">
-                    <button id="confirmAddCatBtn" onclick="window.submitNewCategory()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl">הוסף</button>
-                    <button onclick="window.closeNewCategoryModal()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl">ביטול</button>
+                <!-- Savings-only: balance and yield -->
+                <div id="newCategorySavingsSection" class="hidden space-y-2 bg-purple-50 border border-purple-100 rounded-xl p-3">
+                    <p class="text-[10px] font-bold text-purple-600 uppercase tracking-wider">פרטי חיסכון</p>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">יתרה נוכחית בחיסכון</label>
+                        <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
+                            <span class="text-slate-400 font-bold text-sm">₪</span>
+                            <input type="text" inputmode="decimal" id="newCategorySavingsBalance" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תשואה שנתית ממוצעת</label>
+                        <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
+                            <input type="text" inputmode="decimal" id="newCategorySavingsYield" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
+                            <span class="text-slate-400 font-bold text-sm">%</span>
+                        </div>
+                    </div>
                 </div>
+                <!-- Loan-only: balance, rate, remaining months -->
+                <div id="newCategoryLoanSection" class="hidden space-y-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <p class="text-[10px] font-bold text-slate-600 uppercase tracking-wider">פרטי הלוואה</p>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">יתרת ההלוואה הנוכחית</label>
+                        <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
+                            <span class="text-slate-400 font-bold text-sm">₪</span>
+                            <input type="text" inputmode="decimal" id="newCategoryLoanBalance" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">ריבית שנתית</label>
+                        <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
+                            <input type="text" inputmode="decimal" id="newCategoryLoanRate" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
+                            <span class="text-slate-400 font-bold text-sm">%</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">מספר חודשים שנותרו</label>
+                        <input type="number" inputmode="numeric" id="newCategoryLoanMonths" min="0" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 text-sm outline-none" placeholder="0">
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-2 px-6 py-4 flex-shrink-0 border-t border-slate-100">
+                <button id="confirmAddCatBtn" onclick="window.submitNewCategory()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl">הוסף</button>
+                <button onclick="window.closeNewCategoryModal()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl">ביטול</button>
             </div>
         </div>
     </div>
@@ -1376,6 +1433,46 @@
                             <input type="number" id="budgetItemReminderDate" min="1" max="28" value="11" class="w-14 text-sm font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-2 py-1 text-center outline-none" onchange="window.saveBudgetItemReminderDate()">
                             <span class="text-[10px] text-slate-500">לחודש</span>
                         </div>
+                    </div>
+                </div>
+                <!-- Savings-only: current balance and annual yield -->
+                <div id="budgetItemSavingsSection" class="hidden space-y-2 bg-purple-50 border border-purple-100 rounded-xl p-3">
+                    <p class="text-[10px] font-bold text-purple-600 uppercase tracking-wider">פרטי חיסכון</p>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">יתרה נוכחית בחיסכון</label>
+                        <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
+                            <span class="text-slate-400 font-bold text-sm">₪</span>
+                            <input type="text" inputmode="decimal" id="budgetItemSavingsBalance" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תשואה שנתית ממוצעת</label>
+                        <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
+                            <input type="text" inputmode="decimal" id="budgetItemSavingsYield" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
+                            <span class="text-slate-400 font-bold text-sm">%</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Loan-only: current balance, rate, remaining months -->
+                <div id="budgetItemLoanSection" class="hidden space-y-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <p class="text-[10px] font-bold text-slate-600 uppercase tracking-wider">פרטי הלוואה</p>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">יתרת ההלוואה הנוכחית</label>
+                        <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
+                            <span class="text-slate-400 font-bold text-sm">₪</span>
+                            <input type="text" inputmode="decimal" id="budgetItemLoanBalance" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">ריבית שנתית</label>
+                        <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
+                            <input type="text" inputmode="decimal" id="budgetItemLoanRate" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
+                            <span class="text-slate-400 font-bold text-sm">%</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">חודשים שנותרו</label>
+                        <input type="number" inputmode="numeric" id="budgetItemLoanMonths" min="0" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 text-sm outline-none" placeholder="0">
                     </div>
                 </div>
                 <div class="flex gap-2 pt-1">
@@ -2034,6 +2131,9 @@
             fixed: [],
             annual: [],
             savings: [],
+            loans: [],
+            savingsMeta: {},
+            loanMeta: {},
             g4: safeParseFloat(localStorage.getItem('cached_g4')),
             startDate: localStorage.getItem('cached_start_date') || '',
             cycleStartDay: 1,
@@ -2044,6 +2144,7 @@
             fixed: [],
             annual: [],
             savings: [],
+            loans: [],
             g4: 0,
             startDate: '',
             cycleStartDay: 1
@@ -2060,7 +2161,7 @@
         mainViewFilter: 'current', // 'all', 'current', 'fixed', 'planned'
         statsFilter: 'current',    // 'current', 'fixed', 'planned'
         isPrivacyMode: localStorage.getItem('isPrivacyMode') === 'true',
-        showZeroSections: { income: false, fixed: false, annual: false, savings: false },
+        showZeroSections: { income: false, fixed: false, annual: false, savings: false, loan: false },
         displayedTransactionsCount: 30,
         dateFilter: { type: 'last30' },
         dateFilterFrom: '',
@@ -2366,6 +2467,33 @@
             state.budget.fixed   = parsedRows.filter(r => r.type === 'fixed');
             state.budget.annual  = parsedRows.filter(r => r.type === 'annual');
             state.budget.savings = parsedRows.filter(r => r.type === 'savings');
+            state.budget.loans   = parsedRows.filter(r => r.type === 'loan');
+
+            // Load savings metadata: __savings_meta__:{id}:{field}
+            state.budget.savingsMeta = {};
+            rows.filter(r => r.category_name && r.category_name.startsWith('__savings_meta__:')).forEach(r => {
+                const parts = r.category_name.split(':');
+                if (parts.length < 3) return;
+                const id = parts[1];
+                const field = parts[2];
+                if (!state.budget.savingsMeta[id]) state.budget.savingsMeta[id] = {};
+                state.budget.savingsMeta[id][field] = field === 'last_update'
+                    ? (r.parent_group || '')
+                    : safeParseFloat(r.budget_amount);
+            });
+
+            // Load loan metadata: __loan_meta__:{id}:{field}
+            state.budget.loanMeta = {};
+            rows.filter(r => r.category_name && r.category_name.startsWith('__loan_meta__:')).forEach(r => {
+                const parts = r.category_name.split(':');
+                if (parts.length < 3) return;
+                const id = parts[1];
+                const field = parts[2];
+                if (!state.budget.loanMeta[id]) state.budget.loanMeta[id] = {};
+                state.budget.loanMeta[id][field] = field === 'last_update'
+                    ? (r.parent_group || '')
+                    : safeParseFloat(r.budget_amount);
+            });
 
             // g4 stored as a special budget_setting row
             const g4Row = rows.find(r => r.category_name === '__g4__' || r.category_name.endsWith('__g4__'));
@@ -2397,12 +2525,13 @@
 
             // Parse future budget items
             if (!state.futureBudget) {
-                state.futureBudget = { incomes: [], fixed: [], annual: [], savings: [], g4: 0, startDate: '' };
+                state.futureBudget = { incomes: [], fixed: [], annual: [], savings: [], loans: [], g4: 0, startDate: '' };
             }
             state.futureBudget.incomes = parsedRows.filter(r => r.type === 'future_income');
             state.futureBudget.fixed   = parsedRows.filter(r => r.type === 'future_fixed');
             state.futureBudget.annual  = parsedRows.filter(r => r.type === 'future_annual');
             state.futureBudget.savings = parsedRows.filter(r => r.type === 'future_savings');
+            state.futureBudget.loans   = parsedRows.filter(r => r.type === 'future_loan');
             
             const futureG4Row = rows.find(r => r.category_name === '__future_g4__');
             state.futureBudget.g4 = futureG4Row ? safeParseFloat(futureG4Row.budget_amount) : 0;
@@ -3016,9 +3145,35 @@
         // Capture reminder settings before closing modal
         const hasReminder = state.pendingAddType === 'savings' || state.pendingAddType === 'fixed';
         const isSavings = state.pendingAddType === 'savings';
+        const isLoan = state.pendingAddType === 'loan';
         const remEnabled = hasReminder && (document.getElementById('newCategoryReminderEnabled')?.checked || false);
         const remDate = parseInt(document.getElementById('newCategoryReminderDate')?.value || '1');
         const newName = nameInp.value.trim();
+
+        // Capture savings extra fields
+        let newSavingsMeta = null;
+        if (isSavings) {
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+            newSavingsMeta = {
+                balance: parseFloat((document.getElementById('newCategorySavingsBalance')?.value || '').replace(/,/g, '')) || 0,
+                yield: parseFloat((document.getElementById('newCategorySavingsYield')?.value || '').replace(/,/g, '')) || 0,
+                last_update: currentMonth
+            };
+        }
+
+        // Capture loan extra fields
+        let newLoanMeta = null;
+        if (isLoan) {
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+            newLoanMeta = {
+                balance: parseFloat((document.getElementById('newCategoryLoanBalance')?.value || '').replace(/,/g, '')) || 0,
+                rate: parseFloat((document.getElementById('newCategoryLoanRate')?.value || '').replace(/,/g, '')) || 0,
+                months: parseInt(document.getElementById('newCategoryLoanMonths')?.value || '0') || 0,
+                last_update: currentMonth
+            };
+        }
 
         setLoading(true, true);
         window.closeNewCategoryModal();
@@ -3040,13 +3195,25 @@
                 .single();
             if (error) throw error;
 
-        // Save reminder settings to localStorage
-        if (isSavings || state.pendingAddType === 'fixed') {
-            const remId = data?.id || newName;
-            const remKey = `budget_reminder_${state.pendingAddType}_${remId}`;
-            localStorage.setItem(remKey + '_enabled', remEnabled ? 'true' : 'false');
-            localStorage.setItem(remKey + '_date', remDate);
-        }
+            const newId = data?.id;
+
+            // Save reminder settings to localStorage
+            if (isSavings || state.pendingAddType === 'fixed') {
+                const remId = newId || newName;
+                const remKey = `budget_reminder_${state.pendingAddType}_${remId}`;
+                localStorage.setItem(remKey + '_enabled', remEnabled ? 'true' : 'false');
+                localStorage.setItem(remKey + '_date', remDate);
+            }
+
+            // Save savings meta to DB
+            if (newSavingsMeta && newId) {
+                await window.saveSavingsMetaToDB(newId, newSavingsMeta);
+            }
+
+            // Save loan meta to DB
+            if (newLoanMeta && newId) {
+                await window.saveLoanMetaToDB(newId, newLoanMeta);
+            }
 
             nameInp.value = '';
             if (amtInp) amtInp.value = '';
@@ -3072,7 +3239,8 @@
 
     // ── Budget item edit via ellipsis ─────────────────────────────────────
     window.initBudgetItemEdit = function(dbName) {
-        const allItems = [...state.budget.incomes, ...state.budget.fixed, ...state.budget.annual, ...(state.budget.savings || [])];
+        const b = state.budgetMode === 'future' ? state.futureBudget : state.budget;
+        const allItems = [...b.incomes, ...b.fixed, ...b.annual, ...(b.savings || []), ...(b.loans || [])];
         const sep = dbName.indexOf(' > ');
         const searchName = sep !== -1 ? dbName.slice(sep + 3).trim() : dbName.trim();
         const searchParent = sep !== -1 ? dbName.slice(0, sep).trim() : null;
@@ -3082,10 +3250,10 @@
         );
         if (!item) return;
         state.pendingBudgetItem = { dbName, item, itemId: item.id };
-        const titles = { income: 'עריכת הכנסה', fixed: 'עריכת הוצאה קבועה', annual: 'עריכת הוצאה מתוכננת', savings: 'עריכת חיסכון' };
+        const titles = { income: 'עריכת הכנסה', fixed: 'עריכת הוצאה קבועה', annual: 'עריכת הוצאה מתוכננת', savings: 'עריכת חיסכון', loan: 'עריכת הלוואה' };
         const titleEl = document.getElementById('budgetItemEditTitle');
         if (titleEl) titleEl.textContent = titles[item.type] || 'עריכה';
-        const amtLabels = { income: 'סכום חודשי', fixed: 'סכום חודשי', annual: 'סכום שנתי', savings: 'סכום הפקדה חודשי' };
+        const amtLabels = { income: 'סכום חודשי', fixed: 'סכום חודשי', annual: 'סכום שנתי', savings: 'סכום הפקדה חודשי', loan: 'החזר חודשי (0 ללא החזר קבוע)' };
         const amtLabelEl = document.getElementById('budgetItemEditAmountLabel');
         if (amtLabelEl) amtLabelEl.textContent = amtLabels[item.type] || 'סכום';
         document.getElementById('budgetItemEditName').value = item.category_name;
@@ -3106,6 +3274,38 @@
                 if (dateWrap) dateWrap.classList.toggle('hidden', !remEnabled);
                 const dateInp = document.getElementById('budgetItemReminderDate');
                 if (dateInp) dateInp.value = remDate;
+            }
+        }
+
+        // Show savings details section
+        const savSection = document.getElementById('budgetItemSavingsSection');
+        if (savSection) {
+            const isSavings = item.type === 'savings';
+            savSection.classList.toggle('hidden', !isSavings);
+            if (isSavings) {
+                const id = item.id || item.category_name;
+                const meta = (state.budget.savingsMeta || {})[id] || {};
+                const balInp = document.getElementById('budgetItemSavingsBalance');
+                const yldInp = document.getElementById('budgetItemSavingsYield');
+                if (balInp) balInp.value = meta.balance ? Math.round(meta.balance).toString() : '';
+                if (yldInp) yldInp.value = meta.yield ? meta.yield.toString() : '';
+            }
+        }
+
+        // Show loan details section
+        const loanSection = document.getElementById('budgetItemLoanSection');
+        if (loanSection) {
+            const isLoan = item.type === 'loan';
+            loanSection.classList.toggle('hidden', !isLoan);
+            if (isLoan) {
+                const id = item.id || item.category_name;
+                const meta = (state.budget.loanMeta || {})[id] || {};
+                const balInp = document.getElementById('budgetItemLoanBalance');
+                const rateInp = document.getElementById('budgetItemLoanRate');
+                const monthsInp = document.getElementById('budgetItemLoanMonths');
+                if (balInp) balInp.value = meta.balance ? Math.round(meta.balance).toString() : '';
+                if (rateInp) rateInp.value = meta.rate ? meta.rate.toString() : '';
+                if (monthsInp) monthsInp.value = meta.months ? meta.months.toString() : '';
             }
         }
 
@@ -3150,6 +3350,32 @@
         const newName = document.getElementById('budgetItemEditName').value.trim();
         const newAmt  = safeParseFloat(document.getElementById('budgetItemEditAmount').value.replace(/,/g, ''));
         if (!newName) return;
+
+        // Capture savings/loan extra fields before closing modal
+        const itemKey = item.id || item.category_name;
+        let pendingSavingsMeta = null;
+        let pendingLoanMeta = null;
+        if (item.type === 'savings') {
+            const balInp = document.getElementById('budgetItemSavingsBalance');
+            const yldInp = document.getElementById('budgetItemSavingsYield');
+            const newBal = parseFloat((balInp?.value || '').replace(/,/g, '')) || 0;
+            const newYld = parseFloat((yldInp?.value || '').replace(/,/g, '')) || 0;
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+            pendingSavingsMeta = { balance: newBal, yield: newYld, last_update: currentMonth };
+        }
+        if (item.type === 'loan') {
+            const balInp = document.getElementById('budgetItemLoanBalance');
+            const rateInp = document.getElementById('budgetItemLoanRate');
+            const monthsInp = document.getElementById('budgetItemLoanMonths');
+            const newBal = parseFloat((balInp?.value || '').replace(/,/g, '')) || 0;
+            const newRate = parseFloat((rateInp?.value || '').replace(/,/g, '')) || 0;
+            const newMonths = parseInt(monthsInp?.value || '0') || 0;
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+            pendingLoanMeta = { balance: newBal, rate: newRate, months: newMonths, last_update: currentMonth };
+        }
+
         window.closeBudgetItemEditModal();
         setLoading(true, true);
         try {
@@ -3204,6 +3430,18 @@
                         .eq('category', dbName).eq('user_token', USER_TOKEN);
                 }
             }
+            // Save savings/loan meta to DB
+            if (pendingSavingsMeta && itemKey) {
+                await window.saveSavingsMetaToDB(itemKey, pendingSavingsMeta);
+                if (!state.budget.savingsMeta) state.budget.savingsMeta = {};
+                state.budget.savingsMeta[itemKey] = pendingSavingsMeta;
+            }
+            if (pendingLoanMeta && itemKey) {
+                await window.saveLoanMetaToDB(itemKey, pendingLoanMeta);
+                if (!state.budget.loanMeta) state.budget.loanMeta = {};
+                state.budget.loanMeta[itemKey] = pendingLoanMeta;
+            }
+
             await window.fetchBudgetData();
             window.showToast('עודכן', 'check');
         } catch (e) {
@@ -3212,6 +3450,33 @@
         } finally {
             setLoading(false, true);
         }
+    };
+
+    window.saveSavingsMetaToDB = async function(id, meta) {
+        if (!sbClient || !USER_TOKEN) return;
+        const now = new Date();
+        const currentMonth = meta.last_update || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN)
+            .in('category_name', [`__savings_meta__:${id}:balance`, `__savings_meta__:${id}:yield`, `__savings_meta__:${id}:last_update`]);
+        await sbClient.from('budget_settings').insert([
+            { category_name: `__savings_meta__:${id}:balance`, budget_amount: meta.balance || 0, type: 'system', user_token: USER_TOKEN },
+            { category_name: `__savings_meta__:${id}:yield`, budget_amount: meta.yield || 0, type: 'system', user_token: USER_TOKEN },
+            { category_name: `__savings_meta__:${id}:last_update`, budget_amount: 0, parent_group: currentMonth, type: 'system', user_token: USER_TOKEN }
+        ]);
+    };
+
+    window.saveLoanMetaToDB = async function(id, meta) {
+        if (!sbClient || !USER_TOKEN) return;
+        const now = new Date();
+        const currentMonth = meta.last_update || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN)
+            .in('category_name', [`__loan_meta__:${id}:balance`, `__loan_meta__:${id}:rate`, `__loan_meta__:${id}:months`, `__loan_meta__:${id}:last_update`]);
+        await sbClient.from('budget_settings').insert([
+            { category_name: `__loan_meta__:${id}:balance`, budget_amount: meta.balance || 0, type: 'system', user_token: USER_TOKEN },
+            { category_name: `__loan_meta__:${id}:rate`, budget_amount: meta.rate || 0, type: 'system', user_token: USER_TOKEN },
+            { category_name: `__loan_meta__:${id}:months`, budget_amount: meta.months || 0, type: 'system', user_token: USER_TOKEN },
+            { category_name: `__loan_meta__:${id}:last_update`, budget_amount: 0, parent_group: currentMonth, type: 'system', user_token: USER_TOKEN }
+        ]);
     };
 
     window.deleteBudgetItem = async function() {
@@ -3648,6 +3913,7 @@
                 fixed: [],
                 annual: [],
                 savings: [],
+                loans: [],
                 g4: 0,
                 startDate: '',
                 cycleStartDay: 1
@@ -5995,6 +6261,10 @@
         const fixTotal = b.fixed.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
         const annMTotal = b.annual.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0) / 12;
         const savTotal = (b.savings || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        const loanTotal = (b.loans || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+
+        // Run monthly auto-update for savings and loans
+        window.autoUpdateSavingsAndLoans(b);
 
         // Show wizard CTA only when budget is completely empty & not in future mode
         const isEmpty = b.incomes.length === 0 && b.fixed.length === 0 && b.annual.length === 0;
@@ -6006,7 +6276,28 @@
         setEl('summaryTotalFixed', Math.round(formatDisplayAmount(fixTotal)).toLocaleString());
         setEl('summaryTotalAnnualMonthly', Math.round(formatDisplayAmount(annMTotal)).toLocaleString());
         setEl('summaryTotalSavings', Math.round(formatDisplayAmount(savTotal)).toLocaleString());
-        const rem = state.isPrivacyMode ? (20000 - formatDisplayAmount(fixTotal) - formatDisplayAmount(annMTotal) - formatDisplayAmount(savTotal)) : (incTotal - fixTotal - annMTotal - savTotal);
+        setEl('summaryTotalLoans', Math.round(formatDisplayAmount(loanTotal)).toLocaleString());
+
+        // Section header totals
+        const fmt = v => v > 0 ? ` — ₪${Math.round(v).toLocaleString()}` : '';
+        setEl('sectionTotal_income', state.isPrivacyMode ? '' : fmt(incTotal));
+        setEl('sectionTotal_fixed', fmt(formatDisplayAmount(fixTotal)));
+        setEl('sectionTotal_annual', annMTotal > 0 ? ` — ₪${Math.round(formatDisplayAmount(annMTotal)).toLocaleString()}/חודש` : '');
+        setEl('sectionTotal_savings', fmt(formatDisplayAmount(savTotal)));
+        setEl('sectionTotal_loan', fmt(formatDisplayAmount(loanTotal)));
+
+        // Section balance totals (sum of current balances from meta)
+        const savingsBalanceTotal = (b.savings || []).reduce((sum, item) => {
+            const meta = (state.budget.savingsMeta || {})[item.id] || {};
+            return sum + (meta.balance || 0);
+        }, 0);
+        const loanBalanceTotal = (b.loans || []).reduce((sum, item) => {
+            const meta = (state.budget.loanMeta || {})[item.id] || {};
+            return sum + (meta.balance || 0);
+        }, 0);
+        setEl('sectionBalance_savings', savingsBalanceTotal > 0 ? ` (סה"כ יתרה ₪${Math.round(savingsBalanceTotal).toLocaleString()})` : '');
+        setEl('sectionBalance_loan', loanBalanceTotal > 0 ? ` (סה"כ יתרה ₪${Math.round(loanBalanceTotal).toLocaleString()})` : '');
+        const rem = state.isPrivacyMode ? (20000 - formatDisplayAmount(fixTotal) - formatDisplayAmount(annMTotal) - formatDisplayAmount(savTotal) - formatDisplayAmount(loanTotal)) : (incTotal - fixTotal - annMTotal - savTotal - loanTotal);
         setEl('summaryRemaining', Math.round(rem).toLocaleString());
         const g4El = document.getElementById('g4Input');
         if (g4El) g4El.value = Math.round(formatDisplayAmount(safeParseFloat(b.g4))).toLocaleString();
@@ -6028,8 +6319,8 @@
             setEl('startDateDisplay', 'תאריך התחלה: ' + (displayStartDate || '--'));
         }
 
-        ['income', 'fixed', 'annual', 'savings'].forEach(type => {
-            const list = type === 'income' ? b.incomes : (type === 'fixed' ? b.fixed : (type === 'annual' ? b.annual : (b.savings || [])));
+        ['income', 'fixed', 'annual', 'savings', 'loan'].forEach(type => {
+            const list = type === 'income' ? b.incomes : (type === 'fixed' ? b.fixed : (type === 'annual' ? b.annual : (type === 'savings' ? (b.savings || []) : (b.loans || []))));
             const container = document.getElementById(type + 'List');
             const zeroBtn = document.getElementById(`showZero${type.charAt(0).toUpperCase()+type.slice(1)}Btn`);
             if (!container) return;
@@ -6049,17 +6340,19 @@
             });
 
             let hasZeroItems = false;
-            const isShowingZeros = state.showZeroSections[type];
+            const isShowingZeros = state.showZeroSections[type] || false;
 
-            const typeAmountColors = { income: '#16a34a', fixed: '#e11d48', annual: '#d97706', savings: '#7c3aed' };
+            const typeAmountColors = { income: '#16a34a', fixed: '#e11d48', annual: '#d97706', savings: '#7c3aed', loan: '#475569' };
             const amtColor = typeAmountColors[type] || '#475569';
 
             const renderItem = (item, isChild = false) => {
                 const val = safeParseFloat(item.budget_amount), isZero = val === 0;
-                if (isZero) hasZeroItems = true;
-                if (!isZero || isShowingZeros) {
+                // Savings and loan items with 0 amount are still meaningful — always show
+                const treatAsZero = isZero && type !== 'savings' && type !== 'loan';
+                if (treatAsZero) hasZeroItems = true;
+                if (!treatAsZero || isShowingZeros) {
                     const div = document.createElement('div');
-                    div.className = `bg-white px-3 py-2 rounded-xl flex justify-between items-center shadow-sm gap-2 ${isZero ? 'opacity-60 border-dashed border border-slate-200' : ''} ${isChild ? 'ml-4 border-r-2 border-slate-100 rounded-r-none' : ''}`;
+                    div.className = `bg-white px-3 py-2 rounded-xl flex justify-between items-center shadow-sm gap-2 ${treatAsZero ? 'opacity-60 border-dashed border border-slate-200' : ''} ${isChild ? 'ml-4 border-r-2 border-slate-100 rounded-r-none' : ''}`;
                     const numericVal = type === 'annual'
                         ? Math.round(formatDisplayAmount(val / 12))
                         : Math.round(formatDisplayAmount(val, type === 'savings' ? 'general' : type));
@@ -6069,12 +6362,70 @@
                     const dbName = item.parent_group
                         ? `${item.parent_group} > ${item.category_name}`
                         : item.category_name;
+                    const safeDbName = dbName.replace(/'/g,"\\'").replace(/"/g, "&quot;");
+
+                    if (type === 'savings') {
+                        const id = item.id || item.category_name;
+                        const meta = (state.budget.savingsMeta || {})[id] || {};
+                        const balance = meta.balance || 0;
+                        const yieldPct = meta.yield || 0;
+                        const hasDetails = balance > 0 || yieldPct > 0;
+                        div.className = `bg-white px-3 py-2.5 rounded-xl shadow-sm gap-2 ${isChild ? 'ml-4 border-r-2 border-slate-100 rounded-r-none' : ''}`;
+                        div.innerHTML = `
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1 min-w-0">
+                                    <span class="text-xs font-semibold text-slate-700 block leading-tight">${item.category_name || ''}</span>
+                                    ${hasDetails ? `<div class="flex items-center gap-2 mt-1 flex-wrap">
+                                        ${balance > 0 ? `<span class="text-[10px] font-bold text-purple-600 ltr-num">₪${Math.round(balance).toLocaleString()}</span>` : ''}
+                                        ${yieldPct > 0 ? `<span class="text-[10px] text-slate-400 font-semibold">${yieldPct}% שנתי</span>` : ''}
+                                    </div>` : ''}
+                                </div>
+                                <div class="flex items-center gap-1.5 flex-shrink-0 mr-2">
+                                    <div class="text-left">
+                                        <span class="text-xs font-bold ltr-num" style="color:${amtColor}">₪${numericVal.toLocaleString()}</span>
+                                        <span class="text-[9px] text-slate-400 block">/חודש</span>
+                                    </div>
+                                    <button onclick="window.initBudgetItemEdit('${safeDbName}')" class="p-1"><i class="fa-solid fa-ellipsis-vertical text-[10px] text-slate-300"></i></button>
+                                </div>
+                            </div>`;
+                        return div;
+                    }
+
+                    if (type === 'loan') {
+                        const id = item.id || item.category_name;
+                        const meta = (state.budget.loanMeta || {})[id] || {};
+                        const balance = meta.balance || 0;
+                        const rate = meta.rate || 0;
+                        const months = meta.months || 0;
+                        const hasDetails = balance > 0 || rate > 0 || months > 0;
+                        div.className = `bg-white px-3 py-2.5 rounded-xl shadow-sm gap-2 ${isChild ? 'ml-4 border-r-2 border-slate-100 rounded-r-none' : ''}`;
+                        div.innerHTML = `
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1 min-w-0">
+                                    <span class="text-xs font-semibold text-slate-700 block leading-tight">${item.category_name || ''}</span>
+                                    ${hasDetails ? `<div class="flex items-center gap-2 mt-1 flex-wrap">
+                                        ${balance > 0 ? `<span class="text-[10px] font-bold text-slate-600 ltr-num">₪${Math.round(balance).toLocaleString()}</span>` : ''}
+                                        ${months > 0 ? `<span class="text-[10px] text-slate-400 font-semibold">${months} חודשים</span>` : ''}
+                                        ${rate > 0 ? `<span class="text-[10px] text-slate-400 font-semibold">${rate}% ריבית</span>` : ''}
+                                    </div>` : ''}
+                                </div>
+                                <div class="flex items-center gap-1.5 flex-shrink-0 mr-2">
+                                    <div class="text-left">
+                                        <span class="text-xs font-bold ltr-num" style="color:${amtColor}">₪${numericVal.toLocaleString()}</span>
+                                        <span class="text-[9px] text-slate-400 block">/חודש</span>
+                                    </div>
+                                    <button onclick="window.initBudgetItemEdit('${safeDbName}')" class="p-1"><i class="fa-solid fa-ellipsis-vertical text-[10px] text-slate-300"></i></button>
+                                </div>
+                            </div>`;
+                        return div;
+                    }
+
                     div.innerHTML = `
                         <span class="text-xs font-semibold text-slate-700 flex-1">${item.category_name || ''}</span>
                         <div class="flex items-center gap-1.5">
                             ${annualHtml}
                             <span class="text-xs font-bold ltr-num" style="color:${amtColor}">₪${numericVal.toLocaleString()}</span>
-                            <button onclick="window.initBudgetItemEdit('${dbName.replace(/'/g,"\\'").replace(/"/g, "&quot;")}')"
+                            <button onclick="window.initBudgetItemEdit('${safeDbName}')"
                                 class="p-1"><i class="fa-solid fa-ellipsis-vertical text-[10px] text-slate-300"></i></button>
                         </div>`;
                     return div;
@@ -6089,12 +6440,12 @@
                 const header = document.createElement('div');
                 header.className = 'budget-parent-header';
                 header.onclick = () => window.toggleGroup(group.name);
-                const typeColors = { income: '#16a34a', fixed: '#e11d48', annual: '#d97706', savings: '#7c3aed' };
+                const typeColors = { income: '#16a34a', fixed: '#e11d48', annual: '#d97706', savings: '#7c3aed', loan: '#475569' };
                 const headerColor = typeColors[type] || '#2563eb';
                 // For annual: show monthly as main amount, annual total in small grey parentheses
                 const displayVal = type === 'annual'
                     ? Math.round(formatDisplayAmount(group.totalValue / 12))
-                    : Math.round(formatDisplayAmount(group.totalValue, type === 'savings' ? 'general' : type));
+                    : Math.round(formatDisplayAmount(group.totalValue, (type === 'savings' || type === 'loan') ? 'general' : type));
                 const annualGroupHtml = type === 'annual'
                     ? `<span class="text-[9px] font-bold text-slate-400 ltr-num ml-1">(שנתי ${Math.round(formatDisplayAmount(group.totalValue)).toLocaleString()})</span>`
                     : '';
@@ -6152,6 +6503,81 @@
     window.toggleZeroItems = function(section) {
         state.showZeroSections[section] = !state.showZeroSections[section];
         renderBudget();
+    };
+
+    // =====================================================
+    // SAVINGS & LOAN AUTO-UPDATE (monthly compound / amortization)
+    // =====================================================
+    window.autoUpdateSavingsAndLoans = function(b) {
+        if (!b) return;
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        const savingsMeta = state.budget.savingsMeta || {};
+        const loanMeta = state.budget.loanMeta || {};
+
+        // Auto-update savings balances
+        (b.savings || []).forEach(item => {
+            const id = item.id;
+            if (!id) return;
+            const meta = savingsMeta[id] || {};
+            const lastUpdate = meta.last_update || '';
+            if (!lastUpdate || lastUpdate >= currentMonth) return; // already up to date
+
+            let balance = meta.balance || 0;
+            const yieldPct = meta.yield || 0;
+            const monthlyDeposit = safeParseFloat(item.budget_amount) || 0;
+            const monthlyRate = yieldPct / 100 / 12;
+
+            const [lastYear, lastMon] = lastUpdate.split('-').map(Number);
+            const [curYear, curMon] = currentMonth.split('-').map(Number);
+            const monthsElapsed = (curYear - lastYear) * 12 + (curMon - lastMon);
+
+            for (let m = 0; m < monthsElapsed; m++) {
+                balance = balance * (1 + monthlyRate) + monthlyDeposit;
+            }
+            balance = Math.round(balance);
+
+            // Update in-memory state immediately (for current render)
+            const updatedMeta = { ...meta, balance, last_update: currentMonth };
+            state.budget.savingsMeta[id] = updatedMeta;
+
+            // Persist to DB asynchronously (fire-and-forget)
+            window.saveSavingsMetaToDB(id, updatedMeta).catch(e => console.error('savings meta save error:', e));
+        });
+
+        // Auto-update loan balances (Shpitzer amortization)
+        (b.loans || []).forEach(item => {
+            const id = item.id;
+            if (!id) return;
+            const meta = loanMeta[id] || {};
+            const lastUpdate = meta.last_update || '';
+            if (!lastUpdate || lastUpdate >= currentMonth) return; // already up to date
+
+            let balance = meta.balance || 0;
+            const annualRate = meta.rate || 0;
+            let months = meta.months || 0;
+            const monthlyPayment = safeParseFloat(item.budget_amount) || 0;
+            const monthlyRate = annualRate / 100 / 12;
+
+            if (balance <= 0 || monthlyPayment <= 0) return;
+
+            const [lastYear, lastMon] = lastUpdate.split('-').map(Number);
+            const [curYear, curMon] = currentMonth.split('-').map(Number);
+            const monthsElapsed = (curYear - lastYear) * 12 + (curMon - lastMon);
+
+            for (let m = 0; m < monthsElapsed && balance > 0 && months > 0; m++) {
+                const interest = balance * monthlyRate;
+                const principal = monthlyPayment - interest;
+                balance = Math.max(0, balance - principal);
+                months = Math.max(0, months - 1);
+            }
+            balance = Math.round(balance);
+
+            const updatedMeta = { ...meta, balance, months, last_update: currentMonth };
+            state.budget.loanMeta[id] = updatedMeta;
+
+            window.saveLoanMetaToDB(id, updatedMeta).catch(e => console.error('loan meta save error:', e));
+        });
     };
 
     // =====================================================
@@ -7150,9 +7576,9 @@
     // =====================================================
     window.initNewCategory = (type) => {
         state.pendingAddType = type;
-        const titles = { income: 'הוספת הכנסה', fixed: 'הוספת הוצאה קבועה', annual: 'הוספת הוצאה מתוכננת', savings: 'הוספת חיסכון' };
-        const placeholders = { income: 'משכורת, קצבת ילדים, נכס מניב', fixed: 'שכר דירה, ביטוחים, חשמל, מים, ארנונה', annual: 'חופשה, אחזקת רכב, קייטנות', savings: 'קרן חירום, פנסיה, חיסכון לילדים' };
-        const amtLabels = { income: 'סכום חודשי', fixed: 'סכום חודשי', annual: 'סכום שנתי', savings: 'סכום הפקדה חודשי' };
+        const titles = { income: 'הוספת הכנסה', fixed: 'הוספת הוצאה קבועה', annual: 'הוספת הוצאה מתוכננת', savings: 'הוספת חיסכון', loan: 'הוספת הלוואה' };
+        const placeholders = { income: 'משכורת, קצבת ילדים, נכס מניב', fixed: 'שכר דירה, ביטוחים, חשמל, מים, ארנונה', annual: 'חופשה, אחזקת רכב, קייטנות', savings: 'קרן חירום, חיסכון לילדים, חיסכון לדירה', loan: 'הלוואת רכב, הלוואה בנקאית, הלוואה מחבר' };
+        const amtLabels = { income: 'סכום חודשי', fixed: 'סכום חודשי', annual: 'סכום שנתי', savings: 'סכום הפקדה חודשי', loan: 'החזר חודשי (0 ללא החזר קבוע)' };
         const titleEl = document.getElementById('newCategoryTitle');
         if (titleEl) titleEl.textContent = titles[type] || 'הוספת קטגוריה';
         const nameInp = document.getElementById('newCategoryName');
@@ -7177,9 +7603,35 @@
             }
         }
 
+        // Show/hide savings details section
+        const savingsSection = document.getElementById('newCategorySavingsSection');
+        if (savingsSection) {
+            savingsSection.classList.toggle('hidden', type !== 'savings');
+            if (type === 'savings') {
+                const b = document.getElementById('newCategorySavingsBalance');
+                const y = document.getElementById('newCategorySavingsYield');
+                if (b) b.value = '';
+                if (y) y.value = '';
+            }
+        }
+
+        // Show/hide loan details section
+        const loanSection = document.getElementById('newCategoryLoanSection');
+        if (loanSection) {
+            loanSection.classList.toggle('hidden', type !== 'loan');
+            if (type === 'loan') {
+                const b = document.getElementById('newCategoryLoanBalance');
+                const r = document.getElementById('newCategoryLoanRate');
+                const m = document.getElementById('newCategoryLoanMonths');
+                if (b) b.value = '';
+                if (r) r.value = '';
+                if (m) m.value = '';
+            }
+        }
+
         // Button color
         const btn = document.getElementById('confirmAddCatBtn');
-        const btnColors = { income: 'bg-green-600', fixed: 'bg-red-500', annual: 'bg-amber-500', savings: 'bg-purple-600' };
+        const btnColors = { income: 'bg-green-600', fixed: 'bg-red-500', annual: 'bg-amber-500', savings: 'bg-purple-600', loan: 'bg-slate-600' };
         if (btn) btn.className = `flex-1 ${btnColors[type] || 'bg-blue-600'} text-white font-bold py-3 rounded-xl`;
 
         const o = document.getElementById('newCategoryOverlay');
@@ -7198,7 +7650,7 @@
         state.editingParentType = type;
         state.editingParentName = existingParent;
         const b = state.budgetMode === 'future' ? state.futureBudget : state.budget;
-        const list = type === 'income' ? b.incomes : (type === 'fixed' ? b.fixed : (type === 'annual' ? b.annual : (b.savings || [])));
+        const list = type === 'income' ? b.incomes : (type === 'fixed' ? b.fixed : (type === 'annual' ? b.annual : (type === 'savings' ? (b.savings || []) : (b.loans || []))));
         const container = document.getElementById('parentGroupList');
         const nameInput = document.getElementById('parentGroupName');
         nameInput.value = existingParent || '';
@@ -8985,7 +9437,7 @@
     // BUDGET WIZARD
     // =====================================================
     let _wizStep = 0;
-    const _wizData = { incomes: [], fixed: [], annual: [], savings: [] };
+    const _wizData = { incomes: [], fixed: [], annual: [], savings: [], loans: [] };
 
     const WIZARD_STEPS = [
         {
@@ -9023,11 +9475,20 @@
         },
         {
             title: 'חסכונות',
-            subtitle: 'סכום הפקדה חודשי לכל חיסכון — ניתן להפעיל תזכורת חודשית',
+            subtitle: 'הפקדה חודשית, יתרה נוכחית ותשואה שנתית לכל חיסכון',
             type: 'savings',
             items: [
                 { name: 'החלפת רכב', checked: false },
                 { name: 'ילדים', checked: false }
+            ]
+        },
+        {
+            title: 'הלוואות',
+            subtitle: 'הלוואות פעילות — החזר חודשי, יתרה, ריבית וחודשים שנותרו',
+            type: 'loans',
+            items: [
+                { name: 'הלוואת רכב', checked: false },
+                { name: 'הלוואה בנקאית', checked: false },
             ]
         },
         {
@@ -9057,7 +9518,9 @@
                     _wizData.annual.push({ parent: '', name, checked: false, amount: '' })
                 );
             } else if (step.type === 'savings') {
-                _wizData.savings = step.items.map(i => ({ ...i, amount: '' }));
+                _wizData.savings = step.items.map(i => ({ ...i, amount: '', balance: '', yield: '' }));
+            } else if (step.type === 'loans') {
+                _wizData.loans = step.items.map(i => ({ ...i, amount: '', balance: '', rate: '', months: '' }));
             }
         });
         renderWizardStep();
@@ -9065,14 +9528,134 @@
         if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
     };
 
+    function makeWizardSavingsRow(item, idx) {
+        const wrap = document.createElement('div');
+        wrap.className = `rounded-xl border transition-all ${item.checked ? 'bg-purple-50 border-purple-100' : 'border-transparent'}`;
+
+        const mainRow = document.createElement('div');
+        mainRow.className = 'flex items-center gap-2 py-1.5 px-2';
+        const cbId = `wiz_savings_${idx}`;
+        mainRow.innerHTML = `
+            <input type="checkbox" id="${cbId}" class="w-4 h-4 rounded accent-purple-600 flex-shrink-0 cursor-pointer" ${item.checked ? 'checked' : ''}>
+            <input type="text" value="${(item.name || '').replace(/"/g,'&quot;')}" placeholder="שם החיסכון"
+                class="flex-1 bg-transparent text-xs font-bold text-slate-700 border-b border-transparent focus:border-purple-300 outline-none min-w-0 py-0.5"
+                oninput="window._wizSetName('savings',${idx},this.value)">
+            <div class="flex items-center gap-0.5 flex-shrink-0">
+                <span class="text-[9px] text-slate-400 font-bold">₪/חודש</span>
+                <input type="number" inputmode="decimal" id="wiz_amt_savings_${idx}" value="${item.amount || ''}" placeholder="0"
+                    class="no-spin w-16 text-xs font-bold text-slate-700 text-left bg-white rounded-lg px-2 py-1 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    oninput="window._wizSetAmount('savings',${idx},this.value)"
+                    ${!item.checked ? 'disabled' : ''}>
+            </div>`;
+
+        const subRow = document.createElement('div');
+        subRow.className = `flex gap-2 px-2 pb-2 ${item.checked ? '' : 'hidden'}`;
+        subRow.id = `wiz_savings_sub_${idx}`;
+        subRow.innerHTML = `
+            <div class="flex-1 flex items-center gap-1 bg-white rounded-lg border border-purple-100 px-2 py-1">
+                <span class="text-[9px] text-slate-400 font-bold whitespace-nowrap">יתרה ₪</span>
+                <input type="number" inputmode="decimal" value="${item.balance || ''}" placeholder="0"
+                    class="no-spin flex-1 text-xs font-bold text-slate-700 text-left bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    oninput="window._wizSetMeta('savings',${idx},'balance',this.value)">
+            </div>
+            <div class="flex items-center gap-1 bg-white rounded-lg border border-purple-100 px-2 py-1">
+                <input type="number" inputmode="decimal" value="${item.yield || ''}" placeholder="0"
+                    class="no-spin w-10 text-xs font-bold text-slate-700 text-left bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    oninput="window._wizSetMeta('savings',${idx},'yield',this.value)">
+                <span class="text-[9px] text-slate-400 font-bold whitespace-nowrap">% שנתי</span>
+            </div>`;
+
+        wrap.appendChild(mainRow);
+        wrap.appendChild(subRow);
+
+        const cb = mainRow.querySelector(`#${cbId}`);
+        cb.addEventListener('change', () => {
+            window._wizToggle('savings', idx, cb.checked);
+            wrap.classList.toggle('bg-purple-50', cb.checked);
+            wrap.classList.toggle('border-purple-100', cb.checked);
+            wrap.classList.toggle('border-transparent', !cb.checked);
+            mainRow.querySelector('input[type=number]').disabled = !cb.checked;
+            subRow.classList.toggle('hidden', !cb.checked);
+        });
+        return wrap;
+    }
+
     function renderWizardSavings(container) {
         _wizData.savings.forEach((item, idx) => {
-            container.appendChild(makeWizardRow(item, idx, 'savings'));
+            container.appendChild(makeWizardSavingsRow(item, idx));
         });
         container.appendChild(makeAddMoreBtn(() => {
-            _wizData.savings.push({ name: 'חיסכון נוסף', checked: true, amount: '' });
+            _wizData.savings.push({ name: '', checked: true, amount: '', balance: '', yield: '' });
             renderWizardStep();
         }, 'הוסף חיסכון'));
+    }
+
+    function makeWizardLoanRow(item, idx) {
+        const wrap = document.createElement('div');
+        wrap.className = `rounded-xl border transition-all ${item.checked ? 'bg-slate-50 border-slate-200' : 'border-transparent'}`;
+
+        const mainRow = document.createElement('div');
+        mainRow.className = 'flex items-center gap-2 py-1.5 px-2';
+        const cbId = `wiz_loans_${idx}`;
+        mainRow.innerHTML = `
+            <input type="checkbox" id="${cbId}" class="w-4 h-4 rounded accent-slate-600 flex-shrink-0 cursor-pointer" ${item.checked ? 'checked' : ''}>
+            <input type="text" value="${(item.name || '').replace(/"/g,'&quot;')}" placeholder="שם ההלוואה"
+                class="flex-1 bg-transparent text-xs font-bold text-slate-700 border-b border-transparent focus:border-slate-400 outline-none min-w-0 py-0.5"
+                oninput="window._wizSetName('loans',${idx},this.value)">
+            <div class="flex items-center gap-0.5 flex-shrink-0">
+                <span class="text-[9px] text-slate-400 font-bold">₪/חודש</span>
+                <input type="number" inputmode="decimal" value="${item.amount || ''}" placeholder="0"
+                    class="no-spin w-16 text-xs font-bold text-slate-700 text-left bg-white rounded-lg px-2 py-1 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    oninput="window._wizSetAmount('loans',${idx},this.value)"
+                    ${!item.checked ? 'disabled' : ''}>
+            </div>`;
+
+        const subRow = document.createElement('div');
+        subRow.className = `flex gap-2 px-2 pb-2 flex-wrap ${item.checked ? '' : 'hidden'}`;
+        subRow.id = `wiz_loans_sub_${idx}`;
+        subRow.innerHTML = `
+            <div class="flex-1 flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-2 py-1 min-w-[80px]">
+                <span class="text-[9px] text-slate-400 font-bold whitespace-nowrap">יתרה ₪</span>
+                <input type="number" inputmode="decimal" value="${item.balance || ''}" placeholder="0"
+                    class="no-spin flex-1 text-xs font-bold text-slate-700 text-left bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    oninput="window._wizSetMeta('loans',${idx},'balance',this.value)">
+            </div>
+            <div class="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-2 py-1">
+                <input type="number" inputmode="decimal" value="${item.rate || ''}" placeholder="0"
+                    class="no-spin w-10 text-xs font-bold text-slate-700 text-left bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    oninput="window._wizSetMeta('loans',${idx},'rate',this.value)">
+                <span class="text-[9px] text-slate-400 font-bold whitespace-nowrap">% ריבית</span>
+            </div>
+            <div class="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-2 py-1">
+                <input type="number" inputmode="numeric" value="${item.months || ''}" placeholder="0"
+                    class="no-spin w-10 text-xs font-bold text-slate-700 text-left bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    oninput="window._wizSetMeta('loans',${idx},'months',this.value)">
+                <span class="text-[9px] text-slate-400 font-bold whitespace-nowrap">חודשים</span>
+            </div>`;
+
+        wrap.appendChild(mainRow);
+        wrap.appendChild(subRow);
+
+        const cb = mainRow.querySelector(`#${cbId}`);
+        cb.addEventListener('change', () => {
+            window._wizToggle('loans', idx, cb.checked);
+            wrap.classList.toggle('bg-slate-50', cb.checked);
+            wrap.classList.toggle('border-slate-200', cb.checked);
+            wrap.classList.toggle('border-transparent', !cb.checked);
+            mainRow.querySelector('input[type=number]').disabled = !cb.checked;
+            subRow.classList.toggle('hidden', !cb.checked);
+        });
+        return wrap;
+    }
+
+    function renderWizardLoans(container) {
+        _wizData.loans.forEach((item, idx) => {
+            container.appendChild(makeWizardLoanRow(item, idx));
+        });
+        container.appendChild(makeAddMoreBtn(() => {
+            _wizData.loans.push({ name: '', checked: true, amount: '', balance: '', rate: '', months: '' });
+            renderWizardStep();
+        }, 'הוסף הלוואה'));
     }
 
     window.closeWizard = function() {
@@ -9084,13 +9667,14 @@
         const step = WIZARD_STEPS[_wizStep];
         document.getElementById('wizardTitle').textContent = `שלב ${_wizStep + 1} — ${step.title}`;
         document.getElementById('wizardSubtitle').textContent = step.subtitle;
-        // Progress bars
+        // Progress bars (5 bars for 6 steps, summary shares the last bar)
         [0,1,2,3,4].forEach(i => {
             const el = document.getElementById(`wizProg${i}`);
             if (el) {
                 const isActive = i <= _wizStep;
                 let color = 'bg-blue-500';
                 if (WIZARD_STEPS[i]?.type === 'savings') color = 'bg-purple-500';
+                if (WIZARD_STEPS[i]?.type === 'loans') color = 'bg-slate-500';
                 if (WIZARD_STEPS[i]?.type === 'summary') color = 'bg-green-500';
                 el.className = `flex-1 h-1 rounded-full ${isActive ? color : 'bg-slate-200'}`;
             }
@@ -9106,7 +9690,8 @@
         } else {
             nextBtn.textContent = _wizStep === WIZARD_STEPS.length - 2 ? 'צור תקציב ✓' : 'המשך';
             const isSavings = step.type === 'savings';
-            nextBtn.className = `flex-1 font-bold py-3 rounded-2xl text-sm ${_wizStep === WIZARD_STEPS.length - 2 ? 'bg-green-600 text-white shadow-md shadow-green-200' : (isSavings ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : 'bg-blue-600 text-white shadow-md shadow-blue-200')}`;
+            const isLoans = step.type === 'loans';
+            nextBtn.className = `flex-1 font-bold py-3 rounded-2xl text-sm ${_wizStep === WIZARD_STEPS.length - 2 ? 'bg-green-600 text-white shadow-md shadow-green-200' : (isSavings ? 'bg-purple-600 text-white shadow-md shadow-purple-200' : (isLoans ? 'bg-slate-600 text-white shadow-md shadow-slate-200' : 'bg-blue-600 text-white shadow-md shadow-blue-200'))}`;
         }
 
         const content = document.getElementById('wizardContent');
@@ -9116,6 +9701,7 @@
         else if (step.type === 'fixed') renderWizardGrouped(content, _wizData.fixed, step.groups);
         else if (step.type === 'annual') renderWizardGrouped(content, _wizData.annual, step.groups, step.standalone);
         else if (step.type === 'savings') renderWizardSavings(content);
+        else if (step.type === 'loans') renderWizardLoans(content);
         else if (step.type === 'summary') renderWizardSummary(content);
     }
 
@@ -9238,15 +9824,22 @@
 
     window._wizToggle = (type, idx, checked) => {
         if (type === 'savings') _wizData.savings[idx].checked = checked;
+        else if (type === 'loans') _wizData.loans[idx].checked = checked;
         else _wizData[type][idx].checked = checked;
     };
     window._wizSetName = (type, idx, val) => {
         if (type === 'savings') _wizData.savings[idx].name = val;
+        else if (type === 'loans') _wizData.loans[idx].name = val;
         else _wizData[type][idx].name = val;
     };
     window._wizSetAmount = (type, idx, val) => {
         if (type === 'savings') _wizData.savings[idx].amount = val;
+        else if (type === 'loans') _wizData.loans[idx].amount = val;
         else _wizData[type][idx].amount = val;
+    };
+    window._wizSetMeta = (type, idx, field, val) => {
+        if (type === 'savings') _wizData.savings[idx][field] = val;
+        else if (type === 'loans') _wizData.loans[idx][field] = val;
     };
 
     window.wizardNav = function(dir) {
@@ -9289,21 +9882,52 @@
         (_wizData.savings || []).filter(i => i.checked && i.name.trim()).forEach(i => {
             rows.push({ category_name: i.name.trim(), budget_amount: safeParseFloat(i.amount) || 0, type: 'savings', parent_group: null, user_token: USER_TOKEN });
         });
+        // Loans
+        (_wizData.loans || []).filter(i => i.checked && i.name.trim()).forEach(i => {
+            rows.push({ category_name: i.name.trim(), budget_amount: safeParseFloat(i.amount) || 0, type: 'loan', parent_group: null, user_token: USER_TOKEN });
+        });
 
         if (rows.length === 0) return;
 
         try {
             setLoading(true, true);
-            // Delete existing and insert fresh
+            // Delete existing and insert fresh, get back IDs for meta saving
             await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN);
-            await sbClient.from('budget_settings').insert(rows);
+            const { data: insertedRows } = await sbClient.from('budget_settings').insert(rows).select('id, category_name, type');
+
+            // Save savings meta (balance, yield) for each savings item that has them
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+            for (const wizItem of (_wizData.savings || []).filter(i => i.checked && i.name.trim())) {
+                const dbRow = (insertedRows || []).find(r => r.type === 'savings' && r.category_name === wizItem.name.trim());
+                if (dbRow && (parseFloat(wizItem.balance) > 0 || parseFloat(wizItem.yield) > 0)) {
+                    await window.saveSavingsMetaToDB(dbRow.id, {
+                        balance: parseFloat(wizItem.balance) || 0,
+                        yield: parseFloat(wizItem.yield) || 0,
+                        last_update: currentMonth
+                    });
+                }
+            }
+            // Save loan meta (balance, rate, months) for each loan item that has them
+            for (const wizItem of (_wizData.loans || []).filter(i => i.checked && i.name.trim())) {
+                const dbRow = (insertedRows || []).find(r => r.type === 'loan' && r.category_name === wizItem.name.trim());
+                if (dbRow && (parseFloat(wizItem.balance) > 0 || parseFloat(wizItem.rate) > 0 || parseInt(wizItem.months) > 0)) {
+                    await window.saveLoanMetaToDB(dbRow.id, {
+                        balance: parseFloat(wizItem.balance) || 0,
+                        rate: parseFloat(wizItem.rate) || 0,
+                        months: parseInt(wizItem.months) || 0,
+                        last_update: currentMonth
+                    });
+                }
+            }
 
             // Calculate summary
             const totalIncome = rows.filter(r => r.type === 'income').reduce((s, r) => s + r.budget_amount, 0);
             const totalFixed  = rows.filter(r => r.type === 'fixed').reduce((s, r) => s + r.budget_amount, 0);
             const totalAnnualMonthly = rows.filter(r => r.type === 'annual').reduce((s, r) => s + r.budget_amount / 12, 0);
             const totalSavings = rows.filter(r => r.type === 'savings').reduce((s, r) => s + r.budget_amount, 0);
-            const remaining = totalIncome - totalFixed - totalAnnualMonthly - totalSavings;
+            const totalLoans = rows.filter(r => r.type === 'loan').reduce((s, r) => s + r.budget_amount, 0);
+            const remaining = totalIncome - totalFixed - totalAnnualMonthly - totalSavings - totalLoans;
 
             // Find largest multiple of 150 (=5×30) ≤ remaining
             const g4 = Math.max(0, Math.floor(remaining / 150) * 150);
@@ -9319,6 +9943,7 @@
                 totalFixed,
                 totalAnnualMonthly,
                 totalSavings,
+                totalLoans,
                 monthlyBudget: g4,
                 dailyBudget: g4 / 30
             };
@@ -9358,6 +9983,10 @@
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">חסכונות</span>
                         <span class="text-sm font-bold text-purple-600 ltr-num">- ₪${s.totalSavings.toLocaleString()}</span>
                     </div>
+                    ${s.totalLoans > 0 ? `<div class="flex justify-between items-center px-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">הלוואות</span>
+                        <span class="text-sm font-bold text-slate-600 ltr-num">- ₪${s.totalLoans.toLocaleString()}</span>
+                    </div>` : ''}
                 </div>
 
                 <div class="bg-blue-600 rounded-3xl p-4 text-center shadow-xl shadow-blue-100">
