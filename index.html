@@ -645,9 +645,9 @@
                 <span>החשבון שלי</span>
             </button>
             <div class="border-t border-slate-100 mx-3"></div>
-            <button onclick="window.closeHamburgerMenu(); if(state.currentView !== 'budget') window.setNav('budget'); window.switchBudgetTab('future');" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
-                <i class="fa-solid fa-calendar-days text-purple-500 w-4 text-center flex-shrink-0"></i>
-                <span>תקציב עתידי</span>
+            <button id="futureBudgetMenuBtn" onclick="window.toggleBudgetModeFromMenu()" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i id="futureBudgetMenuIcon" class="fa-solid fa-calendar-days text-purple-500 w-4 text-center flex-shrink-0"></i>
+                <span id="futureBudgetMenuLabel">תקציב עתידי</span>
             </button>
             <div class="border-t border-slate-100 mx-3"></div>
             <!-- התקנה with submenu -->
@@ -2436,6 +2436,26 @@
             if (error) throw error;
 
             const rawRows = data || [];
+
+            // One-time cleanup: fix future budget rows where parent > child was
+            // incorrectly embedded in category_name (e.g. "__future__:חגים > פסח")
+            const corruptedFutureRows = rawRows.filter(r =>
+                r.type && r.type.startsWith('future_') &&
+                r.category_name && r.category_name.startsWith('__future__:') &&
+                r.category_name.includes(' > ')
+            );
+            if (corruptedFutureRows.length > 0) {
+                for (const r of corruptedFutureRows) {
+                    const withoutPrefix = r.category_name.slice(11);
+                    const sep = withoutPrefix.indexOf(' > ');
+                    if (sep !== -1) {
+                        const fixedName = '__future__:' + withoutPrefix.slice(sep + 3).trim();
+                        sbClient.from('budget_settings').update({ category_name: fixedName })
+                            .eq('id', r.id).eq('user_token', USER_TOKEN).then();
+                    }
+                }
+            }
+
             const rows = rawRows.map(r => {
                 if (r && r.type && r.type.startsWith('future_') && r.category_name && r.category_name.startsWith('__future__:')) {
                     return { ...r, category_name: r.category_name.slice(11) };
@@ -2443,10 +2463,12 @@
                 return r;
             });
 
-            // פרסר קטגוריות אב מתוך שם הקטגוריה אם parent_group ריק
+            // פרסר קטגוריות אב מתוך שם הקטגוריה
             // "אחזקת רכב > ביטוח רכב" → category_name="ביטוח רכב", parent_group="אחזקת רכב"
+            // Note: always parse regardless of whether parent_group is already set,
+            // to handle cases where category_name was incorrectly stored as "parent > child"
             const parsedRows = rows.map(r => {
-                if (r.parent_group || !r.category_name) return r;
+                if (!r.category_name) return r;
                 const sep = r.category_name.indexOf(' > ');
                 if (sep === -1) return r;
                 return {
@@ -3250,22 +3272,28 @@
         );
         if (!item) return;
         state.pendingBudgetItem = { dbName, item, itemId: item.id };
+
+        // Normalize type — strip 'future_' prefix for UI logic
+        const baseType = (item.type || '').replace('future_', '');
+        // Meta is always stored in state.budget (keyed by DB id), regardless of active/future mode
+        const metaSource = state.budget;
+
         const titles = { income: 'עריכת הכנסה', fixed: 'עריכת הוצאה קבועה', annual: 'עריכת הוצאה מתוכננת', savings: 'עריכת חיסכון', loan: 'עריכת הלוואה' };
         const titleEl = document.getElementById('budgetItemEditTitle');
-        if (titleEl) titleEl.textContent = titles[item.type] || 'עריכה';
+        if (titleEl) titleEl.textContent = titles[baseType] || 'עריכה';
         const amtLabels = { income: 'סכום חודשי', fixed: 'סכום חודשי', annual: 'סכום שנתי', savings: 'סכום הפקדה חודשי', loan: 'החזר חודשי (0 ללא החזר קבוע)' };
         const amtLabelEl = document.getElementById('budgetItemEditAmountLabel');
-        if (amtLabelEl) amtLabelEl.textContent = amtLabels[item.type] || 'סכום';
+        if (amtLabelEl) amtLabelEl.textContent = amtLabels[baseType] || 'סכום';
         document.getElementById('budgetItemEditName').value = item.category_name;
         document.getElementById('budgetItemEditAmount').value = Math.round(formatDisplayAmount(safeParseFloat(item.budget_amount))).toLocaleString();
 
         // Show reminder section for savings and fixed
         const remSection = document.getElementById('budgetItemReminderSection');
         if (remSection) {
-            const hasReminder = item.type === 'savings' || item.type === 'fixed';
+            const hasReminder = baseType === 'savings' || baseType === 'fixed';
             remSection.classList.toggle('hidden', !hasReminder);
             if (hasReminder) {
-                const remKey = `budget_reminder_${item.type}_${item.id || item.category_name}`;
+                const remKey = `budget_reminder_${baseType}_${item.id || item.category_name}`;
                 const remEnabled = localStorage.getItem(remKey + '_enabled') === 'true';
                 const remDate = parseInt(localStorage.getItem(remKey + '_date') || '1');
                 const chk = document.getElementById('budgetItemReminderEnabled');
@@ -3280,11 +3308,11 @@
         // Show savings details section
         const savSection = document.getElementById('budgetItemSavingsSection');
         if (savSection) {
-            const isSavings = item.type === 'savings';
+            const isSavings = baseType === 'savings';
             savSection.classList.toggle('hidden', !isSavings);
             if (isSavings) {
                 const id = item.id || item.category_name;
-                const meta = (state.budget.savingsMeta || {})[id] || {};
+                const meta = (metaSource.savingsMeta || {})[id] || {};
                 const balInp = document.getElementById('budgetItemSavingsBalance');
                 const yldInp = document.getElementById('budgetItemSavingsYield');
                 if (balInp) balInp.value = meta.balance ? Math.round(meta.balance).toString() : '';
@@ -3295,11 +3323,11 @@
         // Show loan details section
         const loanSection = document.getElementById('budgetItemLoanSection');
         if (loanSection) {
-            const isLoan = item.type === 'loan';
+            const isLoan = baseType === 'loan';
             loanSection.classList.toggle('hidden', !isLoan);
             if (isLoan) {
                 const id = item.id || item.category_name;
-                const meta = (state.budget.loanMeta || {})[id] || {};
+                const meta = (metaSource.loanMeta || {})[id] || {};
                 const balInp = document.getElementById('budgetItemLoanBalance');
                 const rateInp = document.getElementById('budgetItemLoanRate');
                 const monthsInp = document.getElementById('budgetItemLoanMonths');
@@ -3320,7 +3348,7 @@
         const dateWrap = document.getElementById('budgetItemReminderDateWrap');
         const enabled = chk?.checked || false;
         if (dateWrap) dateWrap.classList.toggle('hidden', !enabled);
-        const remKey = `budget_reminder_${item.type}_${item.id || item.category_name}`;
+        const remKey = `budget_reminder_${(item.type || '').replace('future_', '')}_${item.id || item.category_name}`;
         localStorage.setItem(remKey + '_enabled', enabled ? 'true' : 'false');
         if (enabled && !localStorage.getItem(remKey + '_date')) {
             localStorage.setItem(remKey + '_date', '1');
@@ -3334,7 +3362,7 @@
         const dateInp = document.getElementById('budgetItemReminderDate');
         const d = Math.max(1, Math.min(28, parseInt(dateInp?.value || '1')));
         if (dateInp) dateInp.value = d;
-        const remKey = `budget_reminder_${item.type}_${item.id || item.category_name}`;
+        const remKey = `budget_reminder_${(item.type || '').replace('future_', '')}_${item.id || item.category_name}`;
         localStorage.setItem(remKey + '_date', d);
         renderSavingsReminders();
     };
@@ -3353,9 +3381,10 @@
 
         // Capture savings/loan extra fields before closing modal
         const itemKey = item.id || item.category_name;
+        const baseType = (item.type || '').replace('future_', '');
         let pendingSavingsMeta = null;
         let pendingLoanMeta = null;
-        if (item.type === 'savings') {
+        if (baseType === 'savings') {
             const balInp = document.getElementById('budgetItemSavingsBalance');
             const yldInp = document.getElementById('budgetItemSavingsYield');
             const newBal = parseFloat((balInp?.value || '').replace(/,/g, '')) || 0;
@@ -3364,7 +3393,7 @@
             const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
             pendingSavingsMeta = { balance: newBal, yield: newYld, last_update: currentMonth };
         }
-        if (item.type === 'loan') {
+        if (baseType === 'loan') {
             const balInp = document.getElementById('budgetItemLoanBalance');
             const rateInp = document.getElementById('budgetItemLoanRate');
             const monthsInp = document.getElementById('budgetItemLoanMonths');
@@ -3791,6 +3820,7 @@
                 futureTab.className = "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-500";
             }
         }
+        window.updateNavigationUI();
         renderBudget();
     };
 
@@ -3799,7 +3829,7 @@
         setLoading(true, true);
         try {
             // First, delete any existing future rows (categories + G4)
-            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('type', ['future_income', 'future_fixed', 'future_annual', 'future_savings']);
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('type', ['future_income', 'future_fixed', 'future_annual', 'future_savings', 'future_loan']);
             await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__future_g4__');
 
             // Copy categories defensively ensuring accurate types
@@ -3807,14 +3837,14 @@
                 ...state.budget.incomes.map(i => ({...i, type: 'income'})),
                 ...state.budget.fixed.map(i => ({...i, type: 'fixed'})),
                 ...state.budget.annual.map(i => ({...i, type: 'annual'})),
-                ...(state.budget.savings || []).map(i => ({...i, type: 'savings'}))
+                ...(state.budget.savings || []).map(i => ({...i, type: 'savings'})),
+                ...(state.budget.loans || []).map(i => ({...i, type: 'loan'}))
             ];
 
             const rowsToInsert = currentItems.map(item => {
                 const fType = 'future_' + item.type;
-                const dbName = item.parent_group ? `${item.parent_group} > ${item.category_name}` : item.category_name;
                 return {
-                    category_name: '__future__:' + dbName,
+                    category_name: '__future__:' + item.category_name,
                     parent_group: item.parent_group || null,
                     budget_amount: safeParseFloat(item.budget_amount) || 0,
                     type: fType,
@@ -3823,10 +3853,35 @@
             });
 
             if (rowsToInsert.length > 0) {
-                const { error } = await sbClient.from('budget_settings').insert(rowsToInsert);
+                const { data: insertedFuture, error } = await sbClient.from('budget_settings').insert(rowsToInsert).select('id, category_name, type');
                 if (error) {
                     console.error('Error inserting future budget items:', error);
                     throw error;
+                }
+
+                // Copy savings meta to future budget items
+                const now = new Date();
+                const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+                for (const futRow of (insertedFuture || []).filter(r => r.type === 'future_savings')) {
+                    const catName = (futRow.category_name || '').replace(/^__future__:/, '');
+                    const currentItem = state.budget.savings.find(s => s.category_name === catName);
+                    if (currentItem) {
+                        const currentMeta = (state.budget.savingsMeta || {})[currentItem.id] || {};
+                        if (currentMeta.balance > 0 || currentMeta.yield > 0) {
+                            await window.saveSavingsMetaToDB(futRow.id, { ...currentMeta, last_update: currentMonth });
+                        }
+                    }
+                }
+                // Copy loan meta to future budget items
+                for (const futRow of (insertedFuture || []).filter(r => r.type === 'future_loan')) {
+                    const catName = (futRow.category_name || '').replace(/^__future__:/, '');
+                    const currentItem = (state.budget.loans || []).find(s => s.category_name === catName);
+                    if (currentItem) {
+                        const currentMeta = (state.budget.loanMeta || {})[currentItem.id] || {};
+                        if (currentMeta.balance > 0 || currentMeta.rate > 0 || currentMeta.months > 0) {
+                            await window.saveLoanMetaToDB(futRow.id, { ...currentMeta, last_update: currentMonth });
+                        }
+                    }
                 }
             }
 
@@ -3903,7 +3958,7 @@
         if (!sbClient) return;
         setLoading(true, true);
         try {
-            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('type', ['future_income', 'future_fixed', 'future_annual', 'future_savings']);
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('type', ['future_income', 'future_fixed', 'future_annual', 'future_savings', 'future_loan']);
             await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('category_name', ['__future_g4__', '__future_start_date__']);
             
             window.showToast('תקציב עתידי נמחק בהצלחה', 'trash');
@@ -3940,11 +3995,14 @@
                 .from('budget_settings')
                 .select('*')
                 .eq('user_token', USER_TOKEN)
-                .in('type', ['future_income', 'future_fixed', 'future_annual', 'future_savings']);
+                .in('type', ['future_income', 'future_fixed', 'future_annual', 'future_savings', 'future_loan']);
 
             const promotedCategories = (futRows || []).map(r => {
                 let catName = r.category_name || '';
                 if (catName.startsWith('__future__:')) catName = catName.slice(11);
+                // Strip any accidentally embedded "parent > child" format from category name
+                const sep = catName.indexOf(' > ');
+                if (sep !== -1) catName = catName.slice(sep + 3).trim();
                 return {
                     category_name: catName,
                     parent_group: r.parent_group || null,
@@ -3956,8 +4014,8 @@
 
             // 2. Delete all current active and future budget rows
             await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('type', [
-                'income', 'fixed', 'annual', 'savings',
-                'future_income', 'future_fixed', 'future_annual', 'future_savings'
+                'income', 'fixed', 'annual', 'savings', 'loan',
+                'future_income', 'future_fixed', 'future_annual', 'future_savings', 'future_loan'
             ]);
             await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('category_name', [
                 '__g4__', '__start_date__', '__future_g4__', '__future_start_date__'
@@ -5603,6 +5661,21 @@
         window.closeInstallSubmenu();
     };
 
+    window.toggleBudgetModeFromMenu = function() {
+        window.closeHamburgerMenu();
+        const inFutureBudget = state.currentView === 'budget' && state.budgetMode === 'future';
+        if (inFutureBudget) {
+            // Return to active budget
+            state.budgetMode = 'active';
+            if (state.currentView !== 'budget') window.setNav('budget');
+            else { window.updateNavigationUI(); renderBudget(); }
+        } else {
+            // Go to future budget
+            if (state.currentView !== 'budget') window.setNav('budget');
+            window.switchBudgetTab('future');
+        }
+    };
+
     window.toggleInstallSubmenu = function() {
         const sub = document.getElementById('installSubmenu');
         const chevron = document.getElementById('installChevron');
@@ -5747,8 +5820,24 @@
                 el.style.display = isCurrent ? '' : 'none';
             }
         });
-        const titles = { main: 'הוצאות', budget: 'ניהול תקציב', annual: 'הוצאות מתוכננות', stats: 'נתונים וסטטיסטיקה' };
-        const pt = document.getElementById('pageTitle'); if (pt) pt.innerText = titles[state.currentView];
+        const pt = document.getElementById('pageTitle');
+        if (pt) {
+            if (state.currentView === 'budget' && state.budgetMode === 'future') {
+                pt.innerHTML = 'ניהול תקציב <span style="color:#dc2626">עתידי</span>';
+            } else {
+                const titles = { main: 'הוצאות', budget: 'ניהול תקציב', annual: 'הוצאות מתוכננות', stats: 'נתונים וסטטיסטיקה' };
+                pt.innerText = titles[state.currentView] || '';
+            }
+        }
+
+        // Update future/current budget menu button
+        const inFutureBudget = state.currentView === 'budget' && state.budgetMode === 'future';
+        const menuLabel = document.getElementById('futureBudgetMenuLabel');
+        const menuIcon  = document.getElementById('futureBudgetMenuIcon');
+        if (menuLabel) menuLabel.textContent = inFutureBudget ? 'תקציב נוכחי' : 'תקציב עתידי';
+        if (menuIcon)  menuIcon.className = inFutureBudget
+            ? 'fa-solid fa-wallet text-blue-500 w-4 text-center flex-shrink-0'
+            : 'fa-solid fa-calendar-days text-purple-500 w-4 text-center flex-shrink-0';
         const helpBtn = document.getElementById('budgetHelpBtn');
         if (helpBtn) helpBtn.classList.toggle('hidden', state.currentView !== 'budget');
         const mainHelpBtn = document.getElementById('mainHelpBtn');
@@ -9540,12 +9629,15 @@
             <input type="text" value="${(item.name || '').replace(/"/g,'&quot;')}" placeholder="שם החיסכון"
                 class="flex-1 bg-transparent text-xs font-bold text-slate-700 border-b border-transparent focus:border-purple-300 outline-none min-w-0 py-0.5"
                 oninput="window._wizSetName('savings',${idx},this.value)">
-            <div class="flex items-center gap-0.5 flex-shrink-0">
-                <span class="text-[9px] text-slate-400 font-bold">₪/חודש</span>
-                <input type="number" inputmode="decimal" id="wiz_amt_savings_${idx}" value="${item.amount || ''}" placeholder="0"
-                    class="no-spin w-16 text-xs font-bold text-slate-700 text-left bg-white rounded-lg px-2 py-1 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    oninput="window._wizSetAmount('savings',${idx},this.value)"
-                    ${!item.checked ? 'disabled' : ''}>
+            <div class="flex flex-col items-end flex-shrink-0">
+                <span class="text-[9px] text-slate-400 font-bold leading-none mb-0.5">הפקדה חודשית</span>
+                <div class="flex items-center gap-0.5">
+                    <span class="text-[9px] text-slate-400 font-bold">₪</span>
+                    <input type="number" inputmode="decimal" id="wiz_amt_savings_${idx}" value="${item.amount || ''}" placeholder="0"
+                        class="no-spin w-16 text-xs font-bold text-slate-700 text-left bg-white rounded-lg px-2 py-1 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        oninput="window._wizSetAmount('savings',${idx},this.value)"
+                        ${!item.checked ? 'disabled' : ''}>
+                </div>
             </div>`;
 
         const subRow = document.createElement('div');
@@ -9602,35 +9694,45 @@
             <input type="text" value="${(item.name || '').replace(/"/g,'&quot;')}" placeholder="שם ההלוואה"
                 class="flex-1 bg-transparent text-xs font-bold text-slate-700 border-b border-transparent focus:border-slate-400 outline-none min-w-0 py-0.5"
                 oninput="window._wizSetName('loans',${idx},this.value)">
-            <div class="flex items-center gap-0.5 flex-shrink-0">
-                <span class="text-[9px] text-slate-400 font-bold">₪/חודש</span>
-                <input type="number" inputmode="decimal" value="${item.amount || ''}" placeholder="0"
-                    class="no-spin w-16 text-xs font-bold text-slate-700 text-left bg-white rounded-lg px-2 py-1 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    oninput="window._wizSetAmount('loans',${idx},this.value)"
-                    ${!item.checked ? 'disabled' : ''}>
+            <div class="flex flex-col items-end flex-shrink-0">
+                <span class="text-[9px] text-slate-400 font-bold leading-none mb-0.5">החזר חודשי</span>
+                <div class="flex items-center gap-0.5">
+                    <span class="text-[9px] text-slate-400 font-bold">₪</span>
+                    <input type="number" inputmode="decimal" value="${item.amount || ''}" placeholder="0"
+                        class="no-spin w-16 text-xs font-bold text-slate-700 text-left bg-white rounded-lg px-2 py-1 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        oninput="window._wizSetAmount('loans',${idx},this.value)"
+                        ${!item.checked ? 'disabled' : ''}>
+                </div>
             </div>`;
 
         const subRow = document.createElement('div');
-        subRow.className = `flex gap-2 px-2 pb-2 flex-wrap ${item.checked ? '' : 'hidden'}`;
+        subRow.className = `space-y-1.5 px-2 pb-2 ${item.checked ? '' : 'hidden'}`;
         subRow.id = `wiz_loans_sub_${idx}`;
         subRow.innerHTML = `
-            <div class="flex-1 flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-2 py-1 min-w-[80px]">
-                <span class="text-[9px] text-slate-400 font-bold whitespace-nowrap">יתרה ₪</span>
+            <div class="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-2 py-1.5 w-full">
+                <span class="text-[9px] text-slate-400 font-bold whitespace-nowrap flex-shrink-0">יתרה ₪</span>
                 <input type="number" inputmode="decimal" value="${item.balance || ''}" placeholder="0"
-                    class="no-spin flex-1 text-xs font-bold text-slate-700 text-left bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    class="no-spin flex-1 min-w-0 text-xs font-bold text-slate-700 text-right bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     oninput="window._wizSetMeta('loans',${idx},'balance',this.value)">
             </div>
-            <div class="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-2 py-1">
-                <input type="number" inputmode="decimal" value="${item.rate || ''}" placeholder="0"
-                    class="no-spin w-10 text-xs font-bold text-slate-700 text-left bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    oninput="window._wizSetMeta('loans',${idx},'rate',this.value)">
-                <span class="text-[9px] text-slate-400 font-bold whitespace-nowrap">% ריבית</span>
-            </div>
-            <div class="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-2 py-1">
-                <input type="number" inputmode="numeric" value="${item.months || ''}" placeholder="0"
-                    class="no-spin w-10 text-xs font-bold text-slate-700 text-left bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    oninput="window._wizSetMeta('loans',${idx},'months',this.value)">
-                <span class="text-[9px] text-slate-400 font-bold whitespace-nowrap">חודשים</span>
+            <div class="flex gap-1.5">
+                <div class="flex-1 flex flex-col">
+                    <span class="text-[9px] text-slate-400 font-bold mb-0.5 px-1">ריבית שנתית</span>
+                    <div class="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-2 py-1.5">
+                        <input type="number" inputmode="decimal" value="${item.rate || ''}" placeholder="0"
+                            class="no-spin flex-1 min-w-0 w-0 text-xs font-bold text-slate-700 text-right bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            oninput="window._wizSetMeta('loans',${idx},'rate',this.value)">
+                        <span class="text-[9px] text-slate-400 font-bold flex-shrink-0">%</span>
+                    </div>
+                </div>
+                <div class="flex-1 flex flex-col">
+                    <span class="text-[9px] text-slate-400 font-bold mb-0.5 px-1">חודשים שנותרו</span>
+                    <div class="flex items-center bg-white rounded-lg border border-slate-200 px-2 py-1.5">
+                        <input type="number" inputmode="numeric" value="${item.months || ''}" placeholder="0"
+                            class="no-spin flex-1 min-w-0 w-0 text-xs font-bold text-slate-700 text-right bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            oninput="window._wizSetMeta('loans',${idx},'months',this.value)">
+                    </div>
+                </div>
             </div>`;
 
         wrap.appendChild(mainRow);
@@ -9891,8 +9993,10 @@
 
         try {
             setLoading(true, true);
-            // Delete existing and insert fresh, get back IDs for meta saving
-            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN);
+            // Delete budget category rows only — preserve savings/loan meta (type='system' with __savings_meta__ / __loan_meta__ prefix)
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).neq('type', 'system');
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN)
+                .in('category_name', ['__g4__', '__start_date__', '__future_g4__', '__future_start_date__']);
             const { data: insertedRows } = await sbClient.from('budget_settings').insert(rows).select('id, category_name, type');
 
             // Save savings meta (balance, yield) for each savings item that has them
