@@ -6144,11 +6144,23 @@
 
         const aiBtn = document.getElementById('budgetAiBtn');
         if (aiBtn) {
-            if (state.budget.startDate && state.currentView === 'main') {
+            // Use first transaction date (same as showBudgetRecommendation) for daysPassed calculation
+            let aiBtnStartDate = null;
+            const nonAdjTxs = state.transactions.filter(t => !t.isAdjustment);
+            if (nonAdjTxs.length > 0) {
+                const sorted = [...nonAdjTxs].sort((a, b) =>
+                    new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
+                );
+                const fp = sorted[0].date.split('/');
+                if (fp.length === 3) aiBtnStartDate = new Date(parseInt(fp[2]), parseInt(fp[1]) - 1, parseInt(fp[0]));
+            }
+            if (!aiBtnStartDate && state.budget.startDate) {
                 const parts = state.budget.startDate.split('/');
-                const startDate = new Date(parts[2], parts[1]-1, parts[0]);
+                if (parts.length === 3) aiBtnStartDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+            }
+            if (aiBtnStartDate && state.balance !== 0) {
                 const today = new Date(); today.setHours(0,0,0,0);
-                const daysPassed = Math.floor((today - startDate) / (1000*3600*24));
+                const daysPassed = Math.floor((today - aiBtnStartDate) / (1000*3600*24));
                 const threshold = dailyVal * 7;
                 aiBtn.classList.toggle('hidden', !(daysPassed >= 30 && Math.abs(state.balance) > threshold));
             } else {
