@@ -617,7 +617,7 @@
             <i class="fa-solid fa-wallet text-lg"></i>
             <span class="nav-text">תקציב</span>
         </button>
-        <button onclick="window.openAddExpenseModal()" class="btn-fab">
+        <button onclick="window.openAddExpenseModalWithContext()" class="btn-fab">
             <i class="fa-solid fa-plus"></i>
         </button>
         <button id="navAnnual" onclick="window.setNav('annual')" class="nav-btn">
@@ -984,9 +984,15 @@
                         <input type="hidden" id="txTypeInput" value="expense">
                     </div>
                 </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">על מה?</label>
-                    <input type="text" id="nameInput" placeholder="מה קנית?" required class="input-field w-full px-4 py-3 rounded-xl">
+                <div class="grid grid-cols-[1fr_115px] gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">על מה?</label>
+                        <input type="text" id="nameInput" placeholder="מה קנית?" required class="input-field w-full px-4 py-0 rounded-xl h-[48px] flex items-center">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תאריך</label>
+                        <input type="text" id="addExpenseDateInput" placeholder="dd/mm/yyyy" class="appearance-none bg-white border border-slate-200 w-full px-2 py-0 rounded-xl text-[11px] font-bold text-slate-700 h-[48px] leading-[48px] text-center outline-none">
+                    </div>
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סוג הוצאה</label>
@@ -1103,10 +1109,10 @@
 
     <!-- Split Row Modal -->
     <div id="splitRowOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
-        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-            <h3 class="text-lg font-bold text-slate-900 mb-6 text-center">פיצול הוצאה</h3>
-            <div class="space-y-4">
-                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-2">
+        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
+            <h3 class="text-lg font-bold text-slate-900 pt-6 px-6 pb-4 text-center flex-shrink-0">פיצול הוצאה</h3>
+            <div class="space-y-3 overflow-y-auto px-6 pb-2 flex-1">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">סכום מקורי</p>
                     <p class="text-sm font-bold text-slate-800">₪ <span id="splitOriginalAmount">0</span></p>
                 </div>
@@ -1118,10 +1124,23 @@
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">שם לחלק המפוצל</label>
                     <input type="text" id="splitNameInput" placeholder="למשל: טיפ, חומרי ניקוי" class="input-field w-full px-4 py-3 rounded-xl">
                 </div>
-                <div class="flex gap-2 pt-2">
-                    <button id="splitConfirmBtn" onclick="window.submitSplit()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl">בצע פיצול</button>
-                    <button onclick="window.closeSplitModal()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl">ביטול</button>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סוג הוצאה</label>
+                    <div class="flex bg-slate-100 p-1 rounded-xl mb-2">
+                        <button type="button" id="splitCatTypeCurrentBtn" onclick="window.setSplitCategoryType('current')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
+                        <button type="button" id="splitCatTypeFixedBtn" onclick="window.setSplitCategoryType('fixed')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
+                        <button type="button" id="splitCatTypePlannedBtn" onclick="window.setSplitCategoryType('planned')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">מתוכנן</button>
+                    </div>
+                    <input type="hidden" id="splitCategoryTypeInput" value="current">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">קטגוריה</label>
+                    <div id="splitCategoryPicker" class="space-y-1"></div>
+                    <input type="hidden" id="splitCategoryNameInput" value="שוטף">
+                    <input type="hidden" id="splitExpCategoryIdInput" value="">
                 </div>
+            </div>
+            <div class="flex gap-2 px-6 py-4 flex-shrink-0 border-t border-slate-100">
+                <button id="splitConfirmBtn" onclick="window.submitSplit()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl">בצע פיצול</button>
+                <button onclick="window.closeSplitModal()" class="flex-1 bg-slate-100 text-slate-700 py-3 rounded-xl">ביטול</button>
             </div>
         </div>
     </div>
@@ -2603,6 +2622,7 @@
                 }).then(({ error }) => { if (error) console.warn('update_daily_budget sync:', error); });
             }
 
+            state.isDirty = false;
             renderBudget();
             if (isManual) window.showToast('תקציב סונכרן', 'check');
         } catch (e) {
@@ -2860,6 +2880,9 @@
 
             setTimeout(async () => {
                 window.closeImportModal();
+                // Clear stale transactions so fetchBudgetData uses the budget start date
+                // (not old transaction dates) when syncing update_daily_budget
+                state.transactions = [];
                 await window.fetchBudgetData();
                 await window.fetchTransactionsOnly();
                 window.showToast('הייבוא הושלם', 'check');
@@ -2934,6 +2957,18 @@
         try {
             // הוסף תנועה ישירות לטבלה
             const now = new Date();
+            const dateInp = document.getElementById('addExpenseDateInput');
+            let created_at = now.toISOString();
+            if (dateInp && dateInp.value) {
+                const parts = dateInp.value.split('/');
+                if (parts.length === 3) {
+                    const tzOffset = now.getTimezoneOffset();
+                    const sign = tzOffset <= 0 ? '+' : '-';
+                    const absOff = Math.abs(tzOffset);
+                    const tzStr = `${sign}${String(Math.floor(absOff/60)).padStart(2,'0')}:${String(absOff%60).padStart(2,'0')}`;
+                    created_at = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00${tzStr}`;
+                }
+            }
             const { error: insertErr } = await sbClient
                 .from('transactions')
                 .insert({ 
@@ -2942,7 +2977,7 @@
                     category, 
                     expense_category_id: expInp?.value || null,
                     user_token: USER_TOKEN, 
-                    created_at: now.toISOString() 
+                    created_at
                 });
             if (insertErr) throw insertErr;
 
@@ -2950,13 +2985,17 @@
             const newBalance = await fetchBalance();
 
             // עדכן state מיד (optimistic)
-            const day = String(now.getDate()).padStart(2,'0');
-            const mon = String(now.getMonth()+1).padStart(2,'0');
+            let txDate;
+            if (dateInp && dateInp.value && dateInp.value.split('/').length === 3) {
+                txDate = dateInp.value; // already in dd/mm/yyyy
+            } else {
+                txDate = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
+            }
             const newTx = {
                 id: `temp_${Date.now()}`,
                 row: `temp_${Date.now()}`,
                 name, amount,
-                date: `${day}/${mon}/${now.getFullYear()}`,
+                date: txDate,
                 time: now.toLocaleTimeString('he-IL'),
                 tag: category !== 'שוטף' ? category : null,
                 expense_category_id: expInp?.value || null
@@ -3011,28 +3050,24 @@
         setLoading(true, true);
         try {
             const updateData = { name, amount, category, expense_category_id };
-            let isoDateVal = '';
             if (dateVal) {
                 const parts = dateVal.split('/');
                 if (parts.length === 3) {
-                    isoDateVal = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-                } else {
-                    isoDateVal = dateVal;
-                }
-            }
-            if (isoDateVal) {
-                const origTx = state.transactions.find(t => t.row === state.pendingActionRow.row);
-                let timeStr = '12:00:00';
-                if (origTx) {
-                    const timeParts = (origTx.time || '').match(/(\d+):(\d+)/);
-                    if (timeParts) {
-                        let h = parseInt(timeParts[1]);
-                        if ((origTx.time || '').includes('PM') && h < 12) h += 12;
-                        if ((origTx.time || '').includes('AM') && h === 12) h = 0;
-                        timeStr = `${String(h).padStart(2,'0')}:${timeParts[2]}:00`;
+                    const isoDateVal = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+                    const origTx = state.transactions.find(t => t.row === state.pendingActionRow.row);
+                    const origDateISO = origTx ? (() => {
+                        const dp = origTx.date.split('/');
+                        return dp.length === 3 ? `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}` : '';
+                    })() : '';
+                    // Only update created_at if the date actually changed — prevents timezone-induced day shifts
+                    if (isoDateVal !== origDateISO) {
+                        const tzOffset = new Date().getTimezoneOffset();
+                        const sign = tzOffset <= 0 ? '+' : '-';
+                        const absOff = Math.abs(tzOffset);
+                        const tzStr = `${sign}${String(Math.floor(absOff/60)).padStart(2,'0')}:${String(absOff%60).padStart(2,'0')}`;
+                        updateData.created_at = `${isoDateVal}T12:00:00${tzStr}`;
                     }
                 }
-                updateData.created_at = `${isoDateVal}T${timeStr}`;
             }
 
             const { error } = await sbClient
@@ -3127,6 +3162,8 @@
         const originalAmount = safeParseFloat(state.pendingActionRow.amount);
         if (splitAmountActual <= 0 || splitAmountActual >= originalAmount) return alert('סכום לא תקין');
         const splitName = nInp ? nInp.value.trim() || 'מפוצל' : 'מפוצל';
+        const splitCategory = document.getElementById('splitCategoryNameInput')?.value || 'שוטף';
+        const splitExpCatId = document.getElementById('splitExpCategoryIdInput')?.value || null;
         setLoading(true, true);
         window.closeSplitModal();
         try {
@@ -3137,12 +3174,15 @@
                 .eq('id', state.pendingActionRow.row)
                 .eq('user_token', USER_TOKEN);
             if (updateError) throw updateError;
-            // Insert split row
+            // Insert split row with selected category
             const origTx = state.transactions.find(t => t.row === state.pendingActionRow.row);
-            const created_at = origTx ? `${origTx.date.split('/').reverse().join('-')}T${origTx.time}` : new Date().toISOString();
+            const origDateParts = origTx ? origTx.date.split('/') : null;
+            const created_at = origDateParts && origDateParts.length === 3
+                ? `${origDateParts[2]}-${origDateParts[1].padStart(2,'0')}-${origDateParts[0].padStart(2,'0')}T12:00:00`
+                : new Date().toISOString();
             const { error: insertError } = await sbClient
                 .from('transactions')
-                .insert({ name: splitName, amount: splitAmountActual, category: 'שוטף', created_at, user_token: USER_TOKEN });
+                .insert({ name: splitName, amount: splitAmountActual, category: splitCategory, expense_category_id: splitExpCatId || null, created_at, user_token: USER_TOKEN });
             if (insertError) throw insertError;
             await window.fetchTransactionsOnly();
             window.showToast('פוצל', 'check');
@@ -3792,8 +3832,38 @@
             if (rpcErr) throw rpcErr;
 
             state.isDirty = true;
+            // Load updated dailyBudgetHistory first so calculateClientSideBalance is accurate
             await window.fetchBudgetData();
             await window.fetchTransactionsOnly(false);
+
+            // For 'month' mode only: compute exact adjustment via server-vs-client balance diff
+            if (mode === 'month' && startDateISO) {
+                const serverBalance  = await fetchBalance();
+                const correctBalance = window.calculateClientSideBalance
+                    ? window.calculateClientSideBalance()
+                    : serverBalance;
+                const adjAmount = Math.round(serverBalance - correctBalance);
+
+                if (adjAmount !== 0) {
+                    const oldDailyFmt = Math.round(oldDailyBudget).toLocaleString();
+                    const newDailyFmt = Math.round(dailyBudget).toLocaleString();
+                    const adjName = `שינוי תקציב יומי: ₪${oldDailyFmt} ← ₪${newDailyFmt}`;
+                    const tzOffset = new Date().getTimezoneOffset();
+                    const sign = tzOffset <= 0 ? '+' : '-';
+                    const absOff = Math.abs(tzOffset);
+                    const tzStr = `${sign}${String(Math.floor(absOff/60)).padStart(2,'0')}:${String(absOff%60).padStart(2,'0')}`;
+                    const adjCreatedAt = `${startDateISO}T00:01:00${tzStr}`;
+                    await sbClient.from('transactions').insert({
+                        name: adjName,
+                        amount: adjAmount,
+                        category: 'איזון עדכון תקציב',
+                        user_token: USER_TOKEN,
+                        created_at: adjCreatedAt
+                    });
+                    // Reload so the new adjustment appears in the list
+                    await window.fetchTransactionsOnly(false);
+                }
+            }
             
             // השבת כפתור העדכון עד שיוקלד ערך חדש
             const g4Btn = document.getElementById('g4UpdateBtn');
@@ -5805,7 +5875,16 @@
         const navMap = { main: 'navHome', budget: 'navBudget', annual: 'navAnnual', stats: 'navStats' };
         if (navMap[view]) document.getElementById(navMap[view]).classList.add('active');
         updateNavigationUI();
-        if (view === 'annual') window.fetchAnnualData();
+        if (view === 'annual') {
+            // Only fetch if data is missing or dirty; otherwise just re-render with existing data
+            const hasTransactions = state.transactions.length > 0;
+            const hasBudget = state.budget.annual.length > 0 || state.budget.fixed.length > 0 || state.budget.incomes.length > 0;
+            if (state.isDirty || !hasTransactions || !hasBudget) {
+                window.fetchAnnualData();
+            } else {
+                renderAnnualView();
+            }
+        }
         else if (view === 'budget') { state.budgetMode = 'active'; if (state.isDirty || state.budget.incomes.length === 0) window.fetchBudgetData(); else renderBudget(); }
         else if (view === 'stats') window.updateStats(true);
         else render();
@@ -6090,7 +6169,7 @@
             : txsAfterDate;
 
         const filteredTxs = txsForFilter.filter(tx => {
-            if (tx.isAdjustment) return state.mainViewFilter === 'all' || state.mainViewFilter === 'planned';
+            if (tx.isAdjustment) return true; // Always show budget adjustment transactions
             
             // Filter by type
             const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
@@ -6335,7 +6414,30 @@
             const isFutureEmpty = b.incomes.length === 0 && b.fixed.length === 0 && b.annual.length === 0;
             if (copyBanner) copyBanner.classList.toggle('hidden', !isFutureEmpty);
             if (futureDateContainer) futureDateContainer.classList.remove('hidden');
-            if (futureDateInp) futureDateInp.value = b.startDate || '';
+            if (futureDateInp) {
+                if (b.startDate) {
+                    futureDateInp.value = b.startDate;
+                } else {
+                    // Default: 1 year from the active budget start (first transaction date)
+                    let defaultDate = '';
+                    const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                    if (state.transactions.length > 0) {
+                        const sorted = [...state.transactions].sort((a, bx) =>
+                            new Date(a.date.split('/').reverse().join('-')) - new Date(bx.date.split('/').reverse().join('-'))
+                        );
+                        const fp = sorted[0].date.split('/');
+                        if (fp.length === 3) {
+                            defaultDate = toISO(new Date(parseInt(fp[2]) + 1, parseInt(fp[1]) - 1, parseInt(fp[0])));
+                        }
+                    } else if (state.budget.startDate) {
+                        const sp = state.budget.startDate.split('/');
+                        if (sp.length === 3) {
+                            defaultDate = toISO(new Date(parseInt(sp[2]) + 1, parseInt(sp[1]) - 1, parseInt(sp[0])));
+                        }
+                    }
+                    futureDateInp.value = defaultDate;
+                }
+            }
             
             const futureActions = document.getElementById('futureBudgetActions');
             if (futureActions) {
@@ -6465,7 +6567,7 @@
                                 <div class="flex-1 min-w-0">
                                     <span class="text-xs font-semibold text-slate-700 block leading-tight">${item.category_name || ''}</span>
                                     ${hasDetails ? `<div class="flex items-center gap-2 mt-1 flex-wrap">
-                                        ${balance > 0 ? `<span class="text-[10px] font-bold text-purple-600 ltr-num">₪${Math.round(balance).toLocaleString()}</span>` : ''}
+                                        ${balance > 0 ? `<span class="text-[10px] font-bold text-purple-600 ltr-num">יתרה ₪${Math.round(balance).toLocaleString()}</span>` : ''}
                                         ${yieldPct > 0 ? `<span class="text-[10px] text-slate-400 font-semibold">${yieldPct}% שנתי</span>` : ''}
                                     </div>` : ''}
                                 </div>
@@ -6493,7 +6595,7 @@
                                 <div class="flex-1 min-w-0">
                                     <span class="text-xs font-semibold text-slate-700 block leading-tight">${item.category_name || ''}</span>
                                     ${hasDetails ? `<div class="flex items-center gap-2 mt-1 flex-wrap">
-                                        ${balance > 0 ? `<span class="text-[10px] font-bold text-slate-600 ltr-num">₪${Math.round(balance).toLocaleString()}</span>` : ''}
+                                        ${balance > 0 ? `<span class="text-[10px] font-bold text-slate-700 ltr-num">יתרה ₪${Math.round(balance).toLocaleString()}</span>` : ''}
                                         ${months > 0 ? `<span class="text-[10px] text-slate-400 font-semibold">${months} חודשים</span>` : ''}
                                         ${rate > 0 ? `<span class="text-[10px] text-slate-400 font-semibold">${rate}% ריבית</span>` : ''}
                                     </div>` : ''}
@@ -6538,8 +6640,24 @@
                 const annualGroupHtml = type === 'annual'
                     ? `<span class="text-[9px] font-bold text-slate-400 ltr-num ml-1">(שנתי ${Math.round(formatDisplayAmount(group.totalValue)).toLocaleString()})</span>`
                     : '';
+                // For savings/loan groups: show total balance of items in the group
+                let groupBalanceHtml = '';
+                if (type === 'savings' || type === 'loan') {
+                    const metaMap = type === 'savings' ? (state.budget.savingsMeta || {}) : (state.budget.loanMeta || {});
+                    const totalBalance = group.items.reduce((sum, item) => {
+                        const meta = metaMap[item.id || item.category_name] || {};
+                        return sum + (meta.balance || 0);
+                    }, 0);
+                    if (totalBalance > 0) {
+                        const balColor = type === 'savings' ? '#7c3aed' : '#475569';
+                        groupBalanceHtml = `<span class="ltr-num" style="color:${balColor}">יתרה ₪${Math.round(totalBalance).toLocaleString()}</span>`;
+                    }
+                }
                 header.innerHTML = `
-                    <span class="font-bold text-slate-800 text-xs flex-1 text-right">${group.name}</span>
+                    <div class="flex-1 min-w-0 text-right">
+                        <span class="font-bold text-slate-800 text-xs">${group.name}</span>
+                        ${groupBalanceHtml ? `<div class="text-[10px] font-semibold leading-tight">${groupBalanceHtml}</div>` : ''}
+                    </div>
                     <div class="flex items-center gap-1 mx-2">
                         <button onclick="event.stopPropagation(); window.initParentGroupModal('${type}', '${group.name.replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="text-slate-300 p-1"><i class="fa-solid fa-pen text-[10px]"></i></button>
                         <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform p-1 ${isCollapsed ? '-rotate-90' : ''}"></i>
@@ -7626,6 +7744,47 @@
         row.classList.toggle('row-active');
     };
 
+    window.setSplitCategoryType = function(type) {
+        const catTypeInp = document.getElementById('splitCategoryTypeInput');
+        if (catTypeInp) catTypeInp.value = type; // Must be set BEFORE calling populateCategoryPicker
+        ['current','fixed','planned'].forEach(t => {
+            const btn = document.getElementById(`splitCatType${t.charAt(0).toUpperCase()+t.slice(1)}Btn`);
+            if (btn) {
+                btn.className = `flex-1 py-2 text-[10px] font-bold rounded-lg transition-all ${t === type ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400'}`;
+            }
+        });
+        const catNameInp = document.getElementById('splitCategoryNameInput');
+        const catIdInp = document.getElementById('splitExpCategoryIdInput');
+        if (catNameInp) catNameInp.value = type === 'current' ? 'שוטף' : '';
+        if (catIdInp) catIdInp.value = '';
+        // Call local populateCategoryPicker (not window.populateCategoryPicker which doesn't exist)
+        populateCategoryPicker({
+            pickerId: 'splitCategoryPicker',
+            selectId: 'splitCategoryNameInput',
+            expCatInputId: 'splitExpCategoryIdInput',
+            typeInputId: 'splitCategoryTypeInput',
+            currentTag: null,
+            currentCatId: null,
+            forceOpen: true,
+            onPopulate: (tag, catId) => {
+                const catNameInp2 = document.getElementById('splitCategoryNameInput');
+                const catIdInp2 = document.getElementById('splitExpCategoryIdInput');
+                if (catNameInp2 && tag) catNameInp2.value = tag;
+                if (catIdInp2 && catId) catIdInp2.value = catId;
+                populateCategoryPicker({
+                    pickerId: 'splitCategoryPicker',
+                    selectId: 'splitCategoryNameInput',
+                    expCatInputId: 'splitExpCategoryIdInput',
+                    typeInputId: 'splitCategoryTypeInput',
+                    currentTag: tag,
+                    currentCatId: catId,
+                    forceOpen: false,
+                    onPopulate: () => {}
+                });
+            }
+        });
+    };
+
     window.initSplitRow = (row) => {
         const tx = state.transactions.find(t => t.row === row || t.row === String(row));
         if (!tx) return;
@@ -7634,6 +7793,7 @@
         if (origEl) origEl.innerText = safeParseFloat(tx.amount).toLocaleString();
         const sInp = document.getElementById('splitValueInput'), nInp = document.getElementById('splitNameInput');
         if (sInp) sInp.value = ''; if (nInp) nInp.value = '';
+        window.setSplitCategoryType('current');
         const o = document.getElementById('splitRowOverlay');
         if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
     };
@@ -7870,9 +8030,22 @@
     // RECOMMENDATION
     // =====================================================
     window.showBudgetRecommendation = function() {
-        if (!state.budget.startDate) return;
-        const startParts = state.budget.startDate.split('/');
-        const startDate = new Date(startParts[2], startParts[1]-1, startParts[0]);
+        // Use first transaction date as the reference start
+        let startDate;
+        if (state.transactions.length > 0) {
+            const sorted = [...state.transactions].filter(t => !t.isAdjustment).sort((a, b) =>
+                new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
+            );
+            if (sorted.length > 0) {
+                const fp = sorted[0].date.split('/');
+                startDate = new Date(parseInt(fp[2]), parseInt(fp[1]) - 1, parseInt(fp[0]));
+            }
+        }
+        if (!startDate && state.budget.startDate) {
+            const sp = state.budget.startDate.split('/');
+            startDate = new Date(parseInt(sp[2]), parseInt(sp[1]) - 1, parseInt(sp[0]));
+        }
+        if (!startDate) return;
         const today = new Date(); today.setHours(0,0,0,0);
         const daysPassed = Math.max(1, Math.floor((today - startDate) / (1000*3600*24)));
         const factor = daysPassed / 30;
@@ -7980,6 +8153,141 @@
             renderFixedCategoryStatsChart(fixedTxs);
         }
     };
+
+    let balanceLineChartInstance = null;
+
+    function renderBalanceLineChart(startDate, endDate, monthTxs) {
+        const ctx = document.getElementById('balanceLineChart');
+        if (!ctx) return;
+        if (balanceLineChartInstance) { balanceLineChartInstance.destroy(); balanceLineChartInstance = null; }
+
+        const dailyVal = (safeParseFloat(state.budget.g4) || 0) / 30;
+        const today = new Date(); today.setHours(0,0,0,0);
+
+        // Mirror the exact logic from the expenses page dailyBalanceMap:
+        // use only current (non-planned, non-fixed) transactions, work backwards from state.balance
+        const allCurrentTxsSorted = [...state.transactions]
+            .filter(tx => {
+                if (tx.isAdjustment) return false;
+                const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+                const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+                return !isPlanned && !isFixed;
+            })
+            .sort((a, b) => {
+                const da = parseLocalDate(a.date), db = parseLocalDate(b.date);
+                if (da.getTime() !== db.getTime()) return db - da; // newest first
+                return (b.row || 0) - (a.row || 0);
+            });
+
+        // Build dailyBalanceMap exactly like the expenses page
+        const dailyBalanceMap = {};
+        let currentDateLocal = new Date(today);
+        if (allCurrentTxsSorted.length > 0) {
+            const newestTxDate = parseLocalDate(allCurrentTxsSorted[0].date);
+            if (newestTxDate > currentDateLocal) currentDateLocal = new Date(newestTxDate);
+        }
+        let running = state.balance;
+        allCurrentTxsSorted.forEach(tx => {
+            const txDate = parseLocalDate(tx.date);
+            const diffMs = currentDateLocal - txDate;
+            const daysDiff = Math.floor(diffMs / (1000 * 3600 * 24));
+            if (daysDiff > 0) {
+                running -= daysDiff * dailyVal;
+                currentDateLocal = new Date(txDate);
+            }
+            if (dailyBalanceMap[tx.date] === undefined) {
+                dailyBalanceMap[tx.date] = running;
+            }
+            running += safeParseFloat(tx.amount);
+        });
+
+        // Now build the chart data for the selected month using the dailyBalanceMap.
+        // For days without transactions, interpolate from the nearest past known day
+        // (each day adds dailyVal to the balance going forward).
+        const labels = [];
+        const values = [];
+
+        // Collect all known dates sorted ascending
+        const knownDates = Object.keys(dailyBalanceMap)
+            .map(d => ({ d, t: parseLocalDate(d).getTime() }))
+            .sort((a, b) => a.t - b.t);
+
+        const cur = new Date(startDate);
+        while (cur <= endDate && cur <= today) {
+            const dd = `${String(cur.getDate()).padStart(2,'0')}/${String(cur.getMonth()+1).padStart(2,'0')}/${cur.getFullYear()}`;
+            let dayBalance;
+
+            if (dailyBalanceMap[dd] !== undefined) {
+                dayBalance = dailyBalanceMap[dd];
+            } else {
+                // Find nearest past known day
+                const curT = cur.getTime();
+                const pastEntry = [...knownDates].reverse().find(e => e.t < curT);
+                const futureEntry = knownDates.find(e => e.t > curT);
+
+                if (pastEntry) {
+                    const daysSince = Math.floor((curT - pastEntry.t) / (1000 * 3600 * 24));
+                    // Going forward: each day adds dailyVal
+                    dayBalance = dailyBalanceMap[pastEntry.d] + daysSince * dailyVal;
+                } else if (futureEntry) {
+                    const daysBefore = Math.floor((futureEntry.t - curT) / (1000 * 3600 * 24));
+                    // Going backward: each day removes dailyVal
+                    dayBalance = dailyBalanceMap[futureEntry.d] - daysBefore * dailyVal;
+                } else {
+                    dayBalance = state.balance;
+                }
+            }
+
+            labels.push(String(cur.getDate()));
+            values.push(Math.round(formatDisplayAmount(dayBalance)));
+            cur.setDate(cur.getDate() + 1);
+        }
+
+        if (labels.length === 0) return;
+
+        balanceLineChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'מאזן',
+                    data: values,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: values.length <= 15 ? 3 : 1,
+                    pointBackgroundColor: '#2563eb',
+                    fill: false,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `₪${ctx.parsed.y.toLocaleString()}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { font: { size: 10 }, color: '#94a3b8' },
+                        grid: { display: false }
+                    },
+                    y: {
+                        ticks: {
+                            font: { size: 10 }, color: '#94a3b8',
+                            callback: v => `₪${Math.round(v).toLocaleString()}`
+                        },
+                        grid: { color: '#f1f5f9' }
+                    }
+                }
+            }
+        });
+    }
 
     window.setStatsFilter = function(filter) {
         state.statsFilter = filter;
@@ -8773,6 +9081,98 @@
 
         renderLegend();
         renderTrendChart();
+
+        function renderBalanceTrendChart() {
+            const ctx = document.getElementById('catBalanceTrendChart');
+            if (!ctx) return;
+            if (window._catBalanceTrendChartInstance) {
+                window._catBalanceTrendChartInstance.destroy();
+                window._catBalanceTrendChartInstance = null;
+            }
+
+            const dailyVal = (safeParseFloat(state.budget.g4) || 0) / 30;
+            const today = new Date(); today.setHours(0,0,0,0);
+
+            // Use FORWARD calculation from day 1 so the first point is always ≈ daily_budget.
+            // Balance(day) = accumulated daily budget since start - current expenses up to that day.
+            // This avoids dependence on state.balance (which includes fixed/planned via get_balance).
+
+            // Determine start date = first transaction of any type
+            const allTxsSorted = [...state.transactions].sort((a, b) =>
+                parseLocalDate(a.date) - parseLocalDate(b.date));
+            if (allTxsSorted.length === 0) return;
+
+            const startDate = parseLocalDate(allTxsSorted[0].date);
+            startDate.setHours(0,0,0,0);
+
+            // Group current transactions by date for quick lookup
+            const currentExpByDate = {};
+            state.transactions.forEach(tx => {
+                if (tx.isAdjustment) return;
+                const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+                const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+                if (isPlanned || isFixed) return;
+                currentExpByDate[tx.date] = (currentExpByDate[tx.date] || 0) + safeParseFloat(tx.amount);
+            });
+
+            const labels = [];
+            const values = [];
+            const monthNames = ['ינ','פב','מר','אפ','מי','יו','יל','אג','סט','אק','נו','דצ'];
+
+            let runningBalance = 0;
+            const dayCur = new Date(startDate);
+            while (dayCur <= today) {
+                // Each day: add daily budget, subtract current expenses on this day
+                runningBalance += dailyVal;
+                const dd = `${String(dayCur.getDate()).padStart(2,'0')}/${String(dayCur.getMonth()+1).padStart(2,'0')}/${dayCur.getFullYear()}`;
+                runningBalance -= (currentExpByDate[dd] || 0);
+
+                const isFirstOfMonth = dayCur.getDate() === 1;
+                labels.push(isFirstOfMonth ? monthNames[dayCur.getMonth()] + " '" + String(dayCur.getFullYear()).slice(2) : '');
+                values.push(Math.round(formatDisplayAmount(runningBalance)));
+
+                dayCur.setDate(dayCur.getDate() + 1);
+            }
+
+            window._catBalanceTrendChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'מאזן',
+                        data: values,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: false,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: c => `₪${c.parsed.y.toLocaleString()}` } }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                font: { size: 9 }, color: '#94a3b8',
+                                callback: (val, idx) => labels[idx] || null,
+                                maxRotation: 0, autoSkip: false
+                            },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: { font: { size: 9 }, color: '#94a3b8', callback: v => `₪${Math.round(v).toLocaleString()}` },
+                            grid: { color: '#f1f5f9' }
+                        }
+                    }
+                }
+            });
+        }
 
         function renderTrendChart() {
             const trendCtx = document.getElementById('catStackedTrendChart');
@@ -10150,19 +10550,69 @@
         const o = document.getElementById('budgetHelpOverlay');
         if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
     };
-    window.openAddExpenseModal = () => {
+    window.openAddExpenseModal = (prefillType, prefillCatName, prefillCatId) => {
         try {
-            const eCat = document.getElementById('categoryNameInput');
-            if (eCat) eCat.value = 'שוטף';
-            const expInp = document.getElementById('expenseCategoryIdInput');
-            if (expInp) expInp.value = '';
             window.setTxType('expense');
-            window.setCategoryType('current'); // This will call populate and forceOpen
+            window.setCategoryType(prefillType || 'current');
+            // After setCategoryType populates the picker with no selection, re-populate with prefill
+            if (prefillCatName || prefillCatId) {
+                const isPlannedOrFixed = prefillType === 'planned' || prefillType === 'fixed';
+                window.populateAddExpenseCategoryPicker(
+                    isPlannedOrFixed ? prefillCatName : null,
+                    !isPlannedOrFixed ? prefillCatId : null,
+                    true
+                );
+            }
         } catch(e) { console.warn('picker init error:', e); }
+        // Initialize date picker with today's date
+        const dateInp = document.getElementById('addExpenseDateInput');
+        if (dateInp) {
+            const now = new Date();
+            const todayStr = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
+            // Always set the text value first (works without flatpickr)
+            dateInp.value = todayStr;
+            // Then try to attach/update flatpickr for a proper date picker UI
+            try {
+                if (dateInp._flatpickr) {
+                    dateInp._flatpickr.setDate(now, false);
+                } else {
+                    flatpickr(dateInp, { dateFormat: 'd/m/Y', maxDate: 'today', defaultDate: now });
+                }
+            } catch(e2) { /* flatpickr unavailable, plain text input is fine */ }
+        }
         const o = document.getElementById('addExpenseOverlay');
         if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
     };
     window.closeAddExpenseModal = () => { const o = document.getElementById('addExpenseOverlay'); if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); } };
+
+    window.openAddExpenseModalWithContext = () => {
+        // Derive prefill from current view filter and active category filter
+        let prefillType = null;
+        let prefillCatName = null;
+        let prefillCatId = null;
+        const filter = state.mainViewFilter;
+        if (filter === 'fixed') prefillType = 'fixed';
+        else if (filter === 'planned') prefillType = 'planned';
+        else if (filter === 'current') prefillType = 'current';
+
+        const catFilter = state.activeCategoryFilter;
+        if (catFilter && catFilter !== '__none__') {
+            if (catFilter.startsWith('budget:')) {
+                // planned/fixed category — set by tag
+                const annualItem = state.budget.annual.find(a => String(a.id) === catFilter.slice(7));
+                if (annualItem) { prefillType = 'planned'; prefillCatName = annualItem.category_name; }
+                const fixedItem = state.budget.fixed.find(f => String(f.id) === catFilter.slice(7));
+                if (fixedItem) { prefillType = 'fixed'; prefillCatName = fixedItem.category_name; }
+            } else if (catFilter.startsWith('group:')) {
+                // expense category group — no specific sub-category to prefill
+            } else {
+                // expense_category_id for current-type
+                const expCat = state.expenseCategories.find(c => String(c.id) === String(catFilter));
+                if (expCat) { prefillType = 'current'; prefillCatId = String(expCat.id); prefillCatName = expCat.name; }
+            }
+        }
+        window.openAddExpenseModal(prefillType, prefillCatName, prefillCatId);
+    };
     window.toggleUsefulInfo = function(id) {
         const el = document.getElementById(id + 'Content'), icon = document.getElementById(id + 'Icon');
         if (el) { el.classList.toggle('hidden'); if (icon) icon.style.transform = el.classList.contains('hidden') ? '' : 'rotate(180deg)'; }
