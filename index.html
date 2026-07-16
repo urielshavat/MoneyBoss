@@ -3593,7 +3593,7 @@
                         if (item.type && item.type.startsWith('future_')) qLegacy = '__future__:' + qLegacy;
                         await sbClient.from('budget_settings').update(updates).eq('user_token', USER_TOKEN).eq('category_name', qLegacy);
                     }
-                    if (renamed) {
+                    if (renamed && state.budgetMode !== 'future') {
                         const parentFromDbName = dbName.includes(' > ') ? dbName.split(' > ')[0].trim() : null;
                         await renameCategoryInTransactions(oldName, newName, item.parent_group || parentFromDbName);
                     }
@@ -3609,7 +3609,7 @@
                         state.budget.loanMeta[itemKey] = pendingLoanMeta;
                     }
                     await window.fetchBudgetData();
-                    if (renamed) await window.fetchTransactionsOnly();
+                    if (renamed && state.budgetMode !== 'future') await window.fetchTransactionsOnly();
                     window.showToast('עודכן', 'check');
                     return;
                 }
@@ -3618,8 +3618,8 @@
             const { error } = await query;
             if (error) throw error;
 
-            // If renamed, update all related transactions to the new category name
-            if (renamed) {
+            // If renamed in current budget, update related transactions — never for future budget
+            if (renamed && state.budgetMode !== 'future') {
                 const parentFromDbName = dbName.includes(' > ') ? dbName.split(' > ')[0].trim() : null;
                 await renameCategoryInTransactions(oldName, newName, item.parent_group || parentFromDbName);
             }
@@ -3637,7 +3637,7 @@
             }
 
             await window.fetchBudgetData();
-            if (renamed) await window.fetchTransactionsOnly();
+            if (renamed && state.budgetMode !== 'future') await window.fetchTransactionsOnly();
             window.showToast('עודכן', 'check');
         } catch (e) {
             console.error(e);
