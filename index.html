@@ -1203,10 +1203,10 @@
                 <!-- Savings-only: reminder settings -->
                 <div id="newCategoryReminderSection" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3">
                     <p class="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">תזכורת חודשית</p>
-                    <div class="flex items-center justify-between">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" id="newCategoryReminderEnabled" class="w-4 h-4 rounded accent-slate-700" onchange="window.toggleNewCategoryReminder()">
-                            <span class="text-xs font-bold text-slate-800">הפעל תזכורת</span>
+                    <div class="flex items-center justify-between gap-2">
+                        <label class="flex items-center gap-2 cursor-pointer min-w-0">
+                            <input type="checkbox" id="newCategoryReminderEnabled" class="w-4 h-4 rounded accent-slate-700 flex-shrink-0" onchange="window.toggleNewCategoryReminder()">
+                            <span id="newCategoryReminderLabel" class="text-xs font-bold text-slate-800 leading-snug">הפעל תזכורת</span>
                         </label>
                         <div id="newCategoryReminderDateWrap" class="hidden flex items-center gap-1.5">
                             <span class="text-[10px] text-slate-500">ב-</span>
@@ -1442,10 +1442,10 @@
                 <!-- Savings-only: reminder settings -->
                 <div id="budgetItemReminderSection" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3">
                     <p class="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">תזכורת חודשית</p>
-                    <div class="flex items-center justify-between">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" id="budgetItemReminderEnabled" class="w-4 h-4 rounded accent-slate-700" onchange="window.toggleBudgetItemReminder()">
-                            <span class="text-xs font-bold text-slate-800">הפעל תזכורת</span>
+                    <div class="flex items-center justify-between gap-2">
+                        <label class="flex items-center gap-2 cursor-pointer min-w-0">
+                            <input type="checkbox" id="budgetItemReminderEnabled" class="w-4 h-4 rounded accent-slate-700 flex-shrink-0" onchange="window.toggleBudgetItemReminder()">
+                            <span id="budgetItemReminderLabel" class="text-xs font-bold text-slate-800 leading-snug">הפעל תזכורת</span>
                         </label>
                         <div id="budgetItemReminderDateWrap" class="hidden flex items-center gap-1.5">
                             <span class="text-[10px] text-slate-500">ב-</span>
@@ -2433,7 +2433,7 @@
         
         const currentTxs = state.transactions.filter(tx => {
             const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-            const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+            const isFixed   = txIsFixedLike(tx);
             const isLegacyAdjustment = tx.isAdjustment || tx.category === 'איזון עדכון תקציב';
             return !isPlanned && !isFixed && !isLegacyAdjustment;
         });
@@ -2518,7 +2518,7 @@
                 const id = parts[1];
                 const field = parts[2];
                 if (!state.budget.savingsMeta[id]) state.budget.savingsMeta[id] = {};
-                state.budget.savingsMeta[id][field] = field === 'last_update'
+                state.budget.savingsMeta[id][field] = (field === 'last_update' || field === 'initial_date')
                     ? (r.parent_group || '')
                     : safeParseFloat(r.budget_amount);
             });
@@ -3014,6 +3014,13 @@
             window.closeAddExpenseModal();
             window.showToast(type === 'income' ? 'הכנסה נרשמה' : 'הוצאה נרשמה', 'check');
 
+            // If this expense is a savings deposit — update savings balance & dismiss reminder
+            const savingsItem = findSavingsByTag(category);
+            if (savingsItem && type === 'expense') {
+                await syncSavingsAfterDeposit(savingsItem, txDate);
+                if (state.currentView === 'budget') renderBudget();
+            }
+
             // רענן לקבלת ID אמיתי, ואז בדוק חריגה בקטגוריה מתוכננת
             setTimeout(async () => {
                 await window.fetchTransactionsOnly();
@@ -3077,6 +3084,11 @@
                 .eq('user_token', USER_TOKEN);
             if (error) throw error;
             await window.fetchTransactionsOnly();
+            const savingsItem = findSavingsByTag(category);
+            if (savingsItem) {
+                await syncSavingsAfterDeposit(savingsItem, dateVal || new Date().toLocaleDateString('en-GB'));
+                if (state.currentView === 'budget') renderBudget();
+            }
             window.showToast('עודכן', 'check');
         } catch (e) {
             console.error('saveRowEdit error:', e);
@@ -3097,10 +3109,22 @@
                 .eq('id', state.pendingActionRow.row)
                 .eq('user_token', USER_TOKEN);
             if (error) throw error;
+            const deletedTx = state.transactions.find(t => t.row === state.pendingActionRow.row);
             state.transactions = state.transactions.filter(t => t.row !== state.pendingActionRow.row);
             // Recalculate balance from DB after delete
             state.balance = await fetchBalance();
             localStorage.setItem('cached_balance', state.balance.toString());
+            if (deletedTx?.tag) {
+                const savingsItem = findSavingsByTag(deletedTx.tag);
+                if (savingsItem && isSavingsReminderEnabled(savingsItem)) {
+                    const meta = (state.budget.savingsMeta || {})[savingsItem.id] || {};
+                    const newBal = calculateDepositBasedSavingsBalance(savingsItem, meta);
+                    const updated = { ...meta, balance: newBal };
+                    state.budget.savingsMeta[savingsItem.id] = updated;
+                    window.saveSavingsMetaToDB(savingsItem.id, updated).catch(e => console.error(e));
+                    if (state.currentView === 'budget') renderBudget();
+                }
+            }
             render();
             window.showToast('נמחק', 'check');
         } catch (e) {
@@ -3217,11 +3241,16 @@
         if (isSavings) {
             const now = new Date();
             const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+            const bal = parseFloat((document.getElementById('newCategorySavingsBalance')?.value || '').replace(/,/g, '')) || 0;
             newSavingsMeta = {
-                balance: parseFloat((document.getElementById('newCategorySavingsBalance')?.value || '').replace(/,/g, '')) || 0,
+                balance: bal,
                 yield: parseFloat((document.getElementById('newCategorySavingsYield')?.value || '').replace(/,/g, '')) || 0,
                 last_update: currentMonth
             };
+            if (remEnabled) {
+                newSavingsMeta.initial_balance = bal;
+                newSavingsMeta.initial_date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+            }
         }
 
         // Capture loan extra fields
@@ -3332,6 +3361,12 @@
         if (remSection) {
             const hasReminder = baseType === 'savings' || baseType === 'fixed';
             remSection.classList.toggle('hidden', !hasReminder);
+            const remLabel = document.getElementById('budgetItemReminderLabel');
+            if (remLabel) {
+                remLabel.textContent = baseType === 'savings'
+                    ? 'הפעל תזכורת (אם ההפקדה לא אוטומטית)'
+                    : 'הפעל תזכורת';
+            }
             if (hasReminder) {
                 const remKey = `budget_reminder_${baseType}_${item.id || item.category_name}`;
                 const remEnabled = localStorage.getItem(remKey + '_enabled') === 'true';
@@ -3355,8 +3390,12 @@
                 const meta = (metaSource.savingsMeta || {})[id] || {};
                 const balInp = document.getElementById('budgetItemSavingsBalance');
                 const yldInp = document.getElementById('budgetItemSavingsYield');
-                if (balInp) balInp.value = meta.balance ? Math.round(meta.balance).toString() : '';
+                const remOn = isSavingsReminderEnabled(item);
+                const displayBal = remOn && meta.initial_balance != null ? meta.initial_balance : meta.balance;
+                if (balInp) balInp.value = displayBal ? Math.round(displayBal).toString() : '';
                 if (yldInp) yldInp.value = meta.yield ? meta.yield.toString() : '';
+                const balLabel = savSection.querySelector('label');
+                if (balLabel) balLabel.textContent = remOn ? 'יתרה התחלתית בחיסכון' : 'יתרה נוכחית בחיסכון';
             }
         }
 
@@ -3388,10 +3427,28 @@
         const dateWrap = document.getElementById('budgetItemReminderDateWrap');
         const enabled = chk?.checked || false;
         if (dateWrap) dateWrap.classList.toggle('hidden', !enabled);
-        const remKey = `budget_reminder_${(item.type || '').replace('future_', '')}_${item.id || item.category_name}`;
+        const baseType = (item.type || '').replace('future_', '');
+        const remKey = `budget_reminder_${baseType}_${item.id || item.category_name}`;
         localStorage.setItem(remKey + '_enabled', enabled ? 'true' : 'false');
         if (enabled && !localStorage.getItem(remKey + '_date')) {
             localStorage.setItem(remKey + '_date', '1');
+        }
+        // When enabling reminder on savings — snapshot current balance as initial
+        if (enabled && baseType === 'savings' && item.id) {
+            const now = new Date();
+            const meta = { ...((state.budget.savingsMeta || {})[item.id] || {}) };
+            const balInp = document.getElementById('budgetItemSavingsBalance');
+            const balFromInput = balInp ? (parseFloat((balInp.value || '').replace(/,/g, '')) || 0) : null;
+            const bal = balFromInput != null ? balFromInput : (meta.balance || 0);
+            meta.balance = bal;
+            meta.initial_balance = bal;
+            meta.initial_date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+            meta.last_update = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+            if (!state.budget.savingsMeta) state.budget.savingsMeta = {};
+            state.budget.savingsMeta[item.id] = meta;
+            window.saveSavingsMetaToDB(item.id, meta).catch(e => console.error(e));
+            const balLabel = document.querySelector('#budgetItemSavingsSection label');
+            if (balLabel && balLabel.textContent.includes('יתרה')) balLabel.textContent = 'יתרה התחלתית בחיסכון';
         }
         renderSavingsReminders();
     };
@@ -3412,6 +3469,44 @@
         if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
     };
 
+    /** Rename category on all matching transactions (short name + "parent > child" variants). */
+    async function renameCategoryInTransactions(oldName, newName, parentGroup) {
+        if (!sbClient || !USER_TOKEN || !oldName || !newName || oldName === newName) return;
+        const oldShort = oldName.trim();
+        const newShort = newName.trim();
+        const namesToReplace = new Set([oldShort]);
+        if (parentGroup) {
+            namesToReplace.add(`${parentGroup.trim()} > ${oldShort}`);
+        }
+        // Also cover cases where db stored full name without using parent_group field
+        for (const oldCat of namesToReplace) {
+            const { error } = await sbClient.from('transactions')
+                .update({ category: newShort })
+                .eq('user_token', USER_TOKEN)
+                .eq('category', oldCat);
+            if (error) console.error('renameCategoryInTransactions error:', oldCat, error);
+        }
+        // Optimistic in-memory update so UI matches immediately
+        state.transactions.forEach(tx => {
+            if (!tx.tag) return;
+            const t = tx.tag.trim();
+            if (t === oldShort || (parentGroup && t === `${parentGroup.trim()} > ${oldShort}`)) {
+                tx.tag = newShort;
+            }
+        });
+    }
+
+    /** After rename / edit: recompute deposit-based balance using current tags, then drop internal flags. */
+    function finalizeSavingsMetaForSave(item, meta, categoryName) {
+        if (!meta) return meta;
+        const forCalc = { ...item, category_name: categoryName || item.category_name };
+        if (meta._recalcDepositBalance) {
+            meta.balance = calculateDepositBasedSavingsBalance(forCalc, meta);
+            delete meta._recalcDepositBalance;
+        }
+        return meta;
+    }
+
     window.saveBudgetItemEdit = async function() {
         if (!sbClient || !state.pendingBudgetItem) return;
         const { dbName, item, itemId } = state.pendingBudgetItem;
@@ -3431,7 +3526,33 @@
             const newYld = parseFloat((yldInp?.value || '').replace(/,/g, '')) || 0;
             const now = new Date();
             const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-            pendingSavingsMeta = { balance: newBal, yield: newYld, last_update: currentMonth };
+            const existing = (state.budget.savingsMeta || {})[itemKey] || {};
+            const remOn = isSavingsReminderEnabled(item);
+
+            if (remOn) {
+                // Field shows initial_balance — only reset snapshot if user actually changed it
+                const prevInitial = existing.initial_balance != null ? existing.initial_balance : (existing.balance || 0);
+                const initialChanged = Math.round(newBal) !== Math.round(prevInitial || 0);
+                pendingSavingsMeta = {
+                    ...existing,
+                    yield: newYld,
+                    last_update: currentMonth
+                };
+                if (initialChanged) {
+                    pendingSavingsMeta.initial_balance = newBal;
+                    pendingSavingsMeta.initial_date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+                } else {
+                    pendingSavingsMeta.initial_balance = existing.initial_balance != null ? existing.initial_balance : newBal;
+                    if (!pendingSavingsMeta.initial_date) {
+                        pendingSavingsMeta.initial_date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+                    }
+                }
+                // balance will be recalculated from deposits after any rename (see below)
+                pendingSavingsMeta.balance = pendingSavingsMeta.initial_balance;
+                pendingSavingsMeta._recalcDepositBalance = true;
+            } else {
+                pendingSavingsMeta = { ...existing, balance: newBal, yield: newYld, last_update: currentMonth };
+            }
         }
         if (baseType === 'loan') {
             const balInp = document.getElementById('budgetItemLoanBalance');
@@ -3450,7 +3571,8 @@
         try {
             const updates = { budget_amount: state.isPrivacyMode ? denormalizeAmount(newAmt) : newAmt };
             const oldName = item.category_name.trim();
-            if (newName !== oldName) {
+            const renamed = newName !== oldName;
+            if (renamed) {
                 updates.category_name = (item.type && item.type.startsWith('future_')) ? '__future__:' + newName : newName;
             }
 
@@ -3463,7 +3585,7 @@
                 let qOldName = (item.type && item.type.startsWith('future_')) ? '__future__:' + oldName : oldName;
                 let q = sbClient.from('budget_settings').update(updates).eq('user_token', USER_TOKEN).eq('category_name', qOldName);
                 if (item.parent_group) q = q.eq('parent_group', item.parent_group);
-                const { error: e1, count: c1 } = await q.select('id');
+                const { error: e1 } = await q.select('id');
                 if (!e1) {
                     // also try full "parent > child" legacy format
                     if (item.parent_group) {
@@ -3471,15 +3593,23 @@
                         if (item.type && item.type.startsWith('future_')) qLegacy = '__future__:' + qLegacy;
                         await sbClient.from('budget_settings').update(updates).eq('user_token', USER_TOKEN).eq('category_name', qLegacy);
                     }
-                    // skip the general query below
-                    if (newName !== oldName) {
-                        await sbClient.from('transactions').update({ category: newName }).eq('category', oldName).eq('user_token', USER_TOKEN);
-                        const sep = dbName.indexOf(' > ');
-                        if (sep !== -1) {
-                            await sbClient.from('transactions').update({ category: newName }).eq('category', dbName).eq('user_token', USER_TOKEN);
-                        }
+                    if (renamed) {
+                        const parentFromDbName = dbName.includes(' > ') ? dbName.split(' > ')[0].trim() : null;
+                        await renameCategoryInTransactions(oldName, newName, item.parent_group || parentFromDbName);
+                    }
+                    if (pendingSavingsMeta && itemKey) {
+                        finalizeSavingsMetaForSave(item, pendingSavingsMeta, newName);
+                        await window.saveSavingsMetaToDB(itemKey, pendingSavingsMeta);
+                        if (!state.budget.savingsMeta) state.budget.savingsMeta = {};
+                        state.budget.savingsMeta[itemKey] = pendingSavingsMeta;
+                    }
+                    if (pendingLoanMeta && itemKey) {
+                        await window.saveLoanMetaToDB(itemKey, pendingLoanMeta);
+                        if (!state.budget.loanMeta) state.budget.loanMeta = {};
+                        state.budget.loanMeta[itemKey] = pendingLoanMeta;
                     }
                     await window.fetchBudgetData();
+                    if (renamed) await window.fetchTransactionsOnly();
                     window.showToast('עודכן', 'check');
                     return;
                 }
@@ -3488,19 +3618,14 @@
             const { error } = await query;
             if (error) throw error;
 
-            // If renamed, update transactions
-            if (newName !== oldName) {
-                await sbClient.from('transactions').update({ category: newName })
-                    .eq('category', oldName).eq('user_token', USER_TOKEN);
-                // Also update with parent prefix if it existed
-                const sep = dbName.indexOf(' > ');
-                if (sep !== -1) {
-                    await sbClient.from('transactions').update({ category: newName })
-                        .eq('category', dbName).eq('user_token', USER_TOKEN);
-                }
+            // If renamed, update all related transactions to the new category name
+            if (renamed) {
+                const parentFromDbName = dbName.includes(' > ') ? dbName.split(' > ')[0].trim() : null;
+                await renameCategoryInTransactions(oldName, newName, item.parent_group || parentFromDbName);
             }
             // Save savings/loan meta to DB
             if (pendingSavingsMeta && itemKey) {
+                finalizeSavingsMetaForSave(item, pendingSavingsMeta, newName);
                 await window.saveSavingsMetaToDB(itemKey, pendingSavingsMeta);
                 if (!state.budget.savingsMeta) state.budget.savingsMeta = {};
                 state.budget.savingsMeta[itemKey] = pendingSavingsMeta;
@@ -3512,6 +3637,7 @@
             }
 
             await window.fetchBudgetData();
+            if (renamed) await window.fetchTransactionsOnly();
             window.showToast('עודכן', 'check');
         } catch (e) {
             console.error(e);
@@ -3525,13 +3651,27 @@
         if (!sbClient || !USER_TOKEN) return;
         const now = new Date();
         const currentMonth = meta.last_update || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-        await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN)
-            .in('category_name', [`__savings_meta__:${id}:balance`, `__savings_meta__:${id}:yield`, `__savings_meta__:${id}:last_update`]);
-        await sbClient.from('budget_settings').insert([
+        const initialDate = meta.initial_date || '';
+        const rowsToDelete = [
+            `__savings_meta__:${id}:balance`,
+            `__savings_meta__:${id}:yield`,
+            `__savings_meta__:${id}:last_update`,
+            `__savings_meta__:${id}:initial_balance`,
+            `__savings_meta__:${id}:initial_date`
+        ];
+        await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('category_name', rowsToDelete);
+        const rows = [
             { category_name: `__savings_meta__:${id}:balance`, budget_amount: meta.balance || 0, type: 'system', user_token: USER_TOKEN },
             { category_name: `__savings_meta__:${id}:yield`, budget_amount: meta.yield || 0, type: 'system', user_token: USER_TOKEN },
             { category_name: `__savings_meta__:${id}:last_update`, budget_amount: 0, parent_group: currentMonth, type: 'system', user_token: USER_TOKEN }
-        ]);
+        ];
+        if (meta.initial_balance != null) {
+            rows.push({ category_name: `__savings_meta__:${id}:initial_balance`, budget_amount: meta.initial_balance || 0, type: 'system', user_token: USER_TOKEN });
+        }
+        if (initialDate) {
+            rows.push({ category_name: `__savings_meta__:${id}:initial_date`, budget_amount: 0, parent_group: initialDate, type: 'system', user_token: USER_TOKEN });
+        }
+        await sbClient.from('budget_settings').insert(rows);
     };
 
     window.saveLoanMetaToDB = async function(id, meta) {
@@ -4399,6 +4539,7 @@
             catsShown.push(...state.expenseCategories.map(c => ({ ...c, $type: 'current' })));
         } else if (filter === 'fixed') {
             catsShown.push(...state.budget.fixed.map(c => ({ ...c, $type: 'fixed' })));
+            catsShown.push(...(state.budget.savings || []).map(c => ({ ...c, $type: 'fixed', $isSavings: true })));
         } else if (filter === 'planned') {
             catsShown.push(...state.budget.annual.filter(c => safeParseFloat(c.budget_amount || 0) > 0).map(c => ({ ...c, $type: 'planned' })));
         }
@@ -4444,10 +4585,14 @@
                     totals['current:' + cid] = (totals['current:' + cid] || 0) + amt;
                 }
             } else {
-                // Check if it's fixed
+                // Check if it's fixed or savings deposit
                 const fixed = state.budget.fixed.find(f => tagMatchesCat(tx.tag, f));
+                const savings = !fixed ? (state.budget.savings || []).find(s => tagMatchesCat(tx.tag, s)) : null;
                 if (fixed && d >= monthStart && d <= monthEnd) {
                     const key = 'fixed:' + (fixed.id || fixed.category_name);
+                    totals[key] = (totals[key] || 0) + amt;
+                } else if (savings && d >= monthStart && d <= monthEnd) {
+                    const key = 'fixed:' + (savings.id || savings.category_name);
                     totals[key] = (totals[key] || 0) + amt;
                 } else {
                     // Check if it's planned
@@ -5988,7 +6133,7 @@
             const d = parseLocalDate(tx.date);
             if (d < cycleStart || d > cycleEnd) return acc;
             const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-            const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+            const isFixed   = txIsFixedLike(tx);
             if (!isPlanned && !isFixed) return acc + safeParseFloat(tx.amount);
             return acc;
         }, 0);
@@ -6181,11 +6326,14 @@
             : txsAfterDate;
 
         const filteredTxs = txsForFilter.filter(tx => {
-            if (tx.isAdjustment) return true; // Always show budget adjustment transactions
+            // Adjustment txs only in "שוטף" or "הכל"
+            if (tx.isAdjustment) {
+                return state.mainViewFilter === 'all' || state.mainViewFilter === 'current';
+            }
             
             // Filter by type
             const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-            const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+            const isFixed   = txIsFixedLike(tx);
             const isCurrent = !isPlanned && !isFixed;
 
             if (state.mainViewFilter === 'current' && !isCurrent) return false;
@@ -6198,14 +6346,14 @@
                 
                 if (state.activeCategoryFilter.startsWith('group:')) {
                     const groupName = state.activeCategoryFilter.slice(6);
-                    const allBudget = [...state.budget.fixed, ...state.budget.annual];
+                    const allBudget = [...state.budget.fixed, ...state.budget.annual, ...(state.budget.savings || [])];
                     const catsInGroup = allBudget.filter(b => b.parent_group === groupName);
                     return catsInGroup.some(cat => tagMatchesCat(tx.tag, cat));
                 }
 
                 if (state.activeCategoryFilter.startsWith('budget:')) {
                     const catId = state.activeCategoryFilter.slice(7);
-                    const allBudget = [...state.budget.fixed, ...state.budget.annual];
+                    const allBudget = [...state.budget.fixed, ...state.budget.annual, ...(state.budget.savings || [])];
                     const cat = allBudget.find(b => String(b.id || b.category_name) === catId);
                     return cat ? tagMatchesCat(tx.tag, cat) : false;
                 }
@@ -6232,7 +6380,7 @@
             const allTxsSorted = [...state.transactions]
                 .filter(tx => {
                     const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-                    const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+                    const isFixed   = txIsFixedLike(tx);
                     return !isPlanned && !isFixed;
                 })
                 .sort((a, b) => {
@@ -6727,6 +6875,119 @@
     // =====================================================
     // SAVINGS & LOAN AUTO-UPDATE (monthly compound / amortization)
     // =====================================================
+    function isSavingsReminderEnabled(item) {
+        if (!item) return false;
+        const id = item.id || item.category_name;
+        const remKey = `budget_reminder_savings_${id}`;
+        const legacyKey = `savings_reminder_${id}`;
+        return localStorage.getItem(remKey + '_enabled') === 'true' ||
+            localStorage.getItem(legacyKey + '_enabled') === 'true';
+    }
+
+    function txIsFixedLike(tx) {
+        if (!tx || !tx.tag) return false;
+        return (state.budget.fixed || []).some(f => tagMatchesCat(tx.tag, f)) ||
+            (state.budget.savings || []).some(s => tagMatchesCat(tx.tag, s));
+    }
+
+    function findSavingsByTag(tag) {
+        if (!tag) return null;
+        return (state.budget.savings || []).find(s => tagMatchesCat(tag, s)) || null;
+    }
+
+    function parseMetaDate(val) {
+        if (!val) return null;
+        if (val.includes('/')) return parseLocalDate(val);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+            const [y, m, d] = val.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        }
+        if (/^\d{4}-\d{2}$/.test(val)) {
+            const [y, m] = val.split('-').map(Number);
+            return new Date(y, m - 1, 1);
+        }
+        return null;
+    }
+
+    function toISODateLocal(d) {
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    /** Grow principal with daily compound interest from fromDate to toDate (inclusive start, exclusive end of day). */
+    function growWithYield(amount, annualYieldPct, fromDate, toDate) {
+        if (!amount || !fromDate || !toDate) return amount || 0;
+        const from = new Date(fromDate); from.setHours(0,0,0,0);
+        const to = new Date(toDate); to.setHours(0,0,0,0);
+        const days = Math.max(0, Math.floor((to - from) / (1000 * 3600 * 24)));
+        if (days === 0 || !annualYieldPct) return amount;
+        const dailyRate = annualYieldPct / 100 / 365;
+        return amount * Math.pow(1 + dailyRate, days);
+    }
+
+    /** Recalculate reminder-mode savings: initial balance + deposits, each grown by yield from its date. */
+    function calculateDepositBasedSavingsBalance(item, meta) {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const annualYield = meta.yield || 0;
+        const initialBalance = (meta.initial_balance != null) ? meta.initial_balance : (meta.balance || 0);
+        let initialDate = parseMetaDate(meta.initial_date);
+        if (!initialDate) {
+            initialDate = parseMetaDate(meta.last_update) || today;
+        }
+        let total = growWithYield(initialBalance, annualYield, initialDate, today);
+
+        (state.transactions || []).forEach(tx => {
+            if (tx.isAdjustment || !tx.tag || !tagMatchesCat(tx.tag, item)) return;
+            const amt = safeParseFloat(tx.amount);
+            if (amt <= 0) return; // only deposits (expenses) add to savings
+            const d = parseLocalDate(tx.date);
+            if (!d) return;
+            d.setHours(0,0,0,0);
+            // Deposits strictly after the initial snapshot date are added on top
+            if (d.getTime() <= initialDate.getTime()) return;
+            total += growWithYield(amt, annualYield, d, today);
+        });
+        return Math.round(total);
+    }
+
+    /** After a deposit expense is recorded for a reminder-mode savings, ensure same-day deposits count and refresh balance. */
+    async function syncSavingsAfterDeposit(item, depositDateStr) {
+        if (!item || !item.id || !isSavingsReminderEnabled(item)) return;
+        const id = item.id;
+        const meta = { ...((state.budget.savingsMeta || {})[id] || {}) };
+        const now = new Date();
+        if (meta.initial_balance == null) {
+            meta.initial_balance = meta.balance || 0;
+            meta.initial_date = meta.initial_date || toISODateLocal(now);
+        }
+        const depDate = parseLocalDate(depositDateStr) || now;
+        depDate.setHours(0,0,0,0);
+        let initialDate = parseMetaDate(meta.initial_date) || now;
+        initialDate.setHours(0,0,0,0);
+        // Allow same-day deposit to count: move snapshot date to day before deposit if needed
+        if (depDate.getTime() <= initialDate.getTime()) {
+            const prev = new Date(depDate);
+            prev.setDate(prev.getDate() - 1);
+            meta.initial_date = toISODateLocal(prev);
+        }
+        const newBalance = calculateDepositBasedSavingsBalance(item, meta);
+        const updatedMeta = {
+            ...meta,
+            balance: newBalance,
+            last_update: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
+        };
+        if (!state.budget.savingsMeta) state.budget.savingsMeta = {};
+        state.budget.savingsMeta[id] = updatedMeta;
+        try {
+            await window.saveSavingsMetaToDB(id, updatedMeta);
+        } catch (e) {
+            console.error('syncSavingsAfterDeposit error:', e);
+        }
+        // Dismiss reminder for this month
+        const monthKey = `${now.getFullYear()}-${now.getMonth()+1}`;
+        localStorage.setItem(`budget_dismissed_savings_${id}_${monthKey}`, 'true');
+        renderSavingsReminders();
+    }
+
     window.autoUpdateSavingsAndLoans = function(b) {
         if (!b) return;
         const now = new Date();
@@ -6739,6 +7000,31 @@
             const id = item.id;
             if (!id) return;
             const meta = savingsMeta[id] || {};
+            const reminderMode = isSavingsReminderEnabled(item);
+
+            if (reminderMode) {
+                // Deposit-based: balance grows only from recorded deposits + yield by deposit dates
+                if (meta.initial_balance == null && meta.balance != null) {
+                    // First time entering reminder mode without snapshot — treat current balance as initial
+                    meta.initial_balance = meta.balance;
+                    if (!meta.initial_date) meta.initial_date = toISODateLocal(now);
+                }
+                const newBalance = calculateDepositBasedSavingsBalance(item, meta);
+                const updatedMeta = {
+                    ...meta,
+                    balance: newBalance,
+                    initial_balance: meta.initial_balance != null ? meta.initial_balance : (meta.balance || 0),
+                    initial_date: meta.initial_date || toISODateLocal(now),
+                    last_update: currentMonth
+                };
+                const prev = Math.round(meta.balance || 0);
+                state.budget.savingsMeta[id] = updatedMeta;
+                if (prev !== newBalance || !savingsMeta[id]?.initial_date) {
+                    window.saveSavingsMetaToDB(id, updatedMeta).catch(e => console.error('savings meta save error:', e));
+                }
+                return;
+            }
+
             const lastUpdate = meta.last_update || '';
             if (!lastUpdate || lastUpdate >= currentMonth) return; // already up to date
 
@@ -6925,7 +7211,7 @@
                             <p class="text-[10px] text-${color}-600 font-semibold">₪${amount.toLocaleString()} לחודש</p>
                         </div>
                     </div>
-                    <button onclick="window.dismissBudgetReminder('${item._type}','${(item.id || item.category_name).toString().replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="bg-${color}-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl">${btnText}</button>
+                    <button onclick="window.dismissBudgetReminder('${item._type}','${(item.id || item.category_name).toString().replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="bg-${color}-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl">${isSav ? 'הפקד עכשיו' : btnText}</button>
                 </div>`;
             container.appendChild(banner);
         });
@@ -6934,7 +7220,12 @@
     window.dismissBudgetReminder = function(type, itemId) {
         if (type === 'savings') {
             const item = (state.budget.savings || []).find(i => (i.id || i.category_name).toString() === itemId.toString());
-            window.confirmSavingsDeposit(itemId, item?.category_name || itemId);
+            const name = item?.category_name || itemId;
+            // Open add-expense with fixed + savings category prefilled
+            window.openAddExpenseModal('fixed', name, null, `הפקדה לחסכון ${name}`);
+            const amt = safeParseFloat(item?.budget_amount);
+            const amtInp = document.getElementById('amountInput');
+            if (amtInp && amt > 0) amtInp.value = Math.round(amt).toString();
         } else if (type === 'fixed') {
             const item = (state.budget.fixed || []).find(i => (i.id || i.category_name).toString() === itemId.toString());
             window.confirmFixedPayment(itemId, item?.category_name || itemId);
@@ -7332,6 +7623,7 @@
 
         const activeAnnuals = state.budget.annual.filter(a => safeParseFloat(a.budget_amount) > 0);
         const activeFixed   = (state.budget.fixed || []).filter(f => safeParseFloat(f.budget_amount) > 0);
+        const activeSavings = (state.budget.savings || []);
         const ongoingCats   = state.expenseCategories || [];
 
         function getSpent(cat) {
@@ -7344,7 +7636,7 @@
 
         let selectedLabel = 'ללא';
         if (config.currentTag) {
-            const cat = [...activeAnnuals, ...activeFixed].find(c => c.category_name.trim() === config.currentTag.trim());
+            const cat = [...activeAnnuals, ...activeFixed, ...activeSavings].find(c => c.category_name.trim() === config.currentTag.trim());
             if (cat) selectedLabel = (cat.parent_group ? `${cat.parent_group} › ${cat.category_name}` : cat.category_name);
         } else if (config.currentCatId) {
             const cat = ongoingCats.find(c => c.id === config.currentCatId);
@@ -7356,7 +7648,7 @@
         // but user says if no categories in current/planned - hide)
         let hasCats = false;
         if (type === 'current') hasCats = ongoingCats.length > 0;
-        else if (type === 'fixed') hasCats = activeFixed.length > 0;
+        else if (type === 'fixed') hasCats = activeFixed.length > 0 || activeSavings.length > 0;
         else if (type === 'planned') hasCats = activeAnnuals.length > 0;
 
         const container = picker.parentElement;
@@ -7430,16 +7722,21 @@
             activeFixed.forEach(cat => {
                 if (cat.parent_group) { (groups[cat.parent_group] = groups[cat.parent_group] || []).push(cat); } else standalone.push(cat);
             });
+            const savingsGroups = {}; const savingsStandalone = [];
+            activeSavings.forEach(cat => {
+                if (cat.parent_group) { (savingsGroups[cat.parent_group] = savingsGroups[cat.parent_group] || []).push(cat); } else savingsStandalone.push(cat);
+            });
 
-            if (activeFixed.length === 0) {
+            if (activeFixed.length === 0 && activeSavings.length === 0) {
                 const p = document.createElement('p'); p.className = 'text-[10px] text-slate-400 text-center py-5';
                 p.textContent = 'אין קטגוריות קבועות'; expanded.appendChild(p);
             } else {
-                function makeFixedItem(cat, isChild = false) {
+                function makeFixedItem(cat, isChild = false, isSavings = false) {
                     const isSelected = config.currentTag && config.currentTag.trim() === cat.category_name.trim();
                     const btn = document.createElement('button'); btn.type = 'button';
                     btn.className = `w-full flex items-center px-4 py-2.5 text-right transition-colors border-b border-slate-50 flex-shrink-0 ${isChild ? 'pr-7' : ''} ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`;
-                    btn.innerHTML = `<span class="text-xs font-bold ${isSelected ? 'text-blue-700' : 'text-slate-700'}">${isSelected ? '✓ ' : ''}${cat.category_name}</span>`;
+                    const badge = isSavings ? `<span class="text-[9px] font-bold text-purple-500 mr-2">חיסכון</span>` : '';
+                    btn.innerHTML = `<span class="text-xs font-bold ${isSelected ? 'text-blue-700' : 'text-slate-700'}">${isSelected ? '✓ ' : ''}${cat.category_name}</span>${badge}`;
                     btn.onclick = () => {
                         if (eCat) eCat.value = cat.category_name;
                         if (expInp) expInp.value = '';
@@ -7452,9 +7749,24 @@
                     header.className = 'px-4 py-1.5 text-[9px] font-bold text-slate-400 bg-slate-50/50 border-b border-slate-50 flex-shrink-0';
                     header.textContent = parentName;
                     expanded.appendChild(header);
-                    cats.forEach(cat => expanded.appendChild(makeFixedItem(cat, true)));
+                    cats.forEach(cat => expanded.appendChild(makeFixedItem(cat, true, false)));
                 });
-                standalone.forEach(cat => expanded.appendChild(makeFixedItem(cat)));
+                standalone.forEach(cat => expanded.appendChild(makeFixedItem(cat, false, false)));
+
+                if (activeSavings.length > 0) {
+                    const savHeader = document.createElement('div');
+                    savHeader.className = 'px-4 py-1.5 text-[9px] font-bold text-purple-500 bg-purple-50/50 border-b border-purple-50 flex-shrink-0';
+                    savHeader.textContent = 'חסכונות';
+                    expanded.appendChild(savHeader);
+                    Object.entries(savingsGroups).forEach(([parentName, cats]) => {
+                        const header = document.createElement('div');
+                        header.className = 'px-4 py-1.5 text-[9px] font-bold text-purple-400 bg-purple-50/30 border-b border-purple-50 flex-shrink-0 pr-7';
+                        header.textContent = parentName;
+                        expanded.appendChild(header);
+                        cats.forEach(cat => expanded.appendChild(makeFixedItem(cat, true, true)));
+                    });
+                    savingsStandalone.forEach(cat => expanded.appendChild(makeFixedItem(cat, false, true)));
+                }
             }
         } else if (type === 'planned') {
             const groups = {}; const standalone = [];
@@ -7708,7 +8020,7 @@
 
         // Determine initial type for picker
         const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-        const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+        const isFixed   = txIsFixedLike(tx);
         
         let initialType = 'current';
         if (isPlanned) initialType = 'planned';
@@ -7854,6 +8166,12 @@
         if (remSection) {
             const hasReminder = type === 'savings' || type === 'fixed';
             remSection.classList.toggle('hidden', !hasReminder);
+            const remLabel = document.getElementById('newCategoryReminderLabel');
+            if (remLabel) {
+                remLabel.textContent = type === 'savings'
+                    ? 'הפעל תזכורת (אם ההפקדה לא אוטומטית)'
+                    : 'הפעל תזכורת';
+            }
             if (hasReminder) {
                 const chk = document.getElementById('newCategoryReminderEnabled');
                 if (chk) chk.checked = false;
@@ -7873,6 +8191,8 @@
                 const y = document.getElementById('newCategorySavingsYield');
                 if (b) b.value = '';
                 if (y) y.value = '';
+                const balLabel = savingsSection.querySelector('label');
+                if (balLabel) balLabel.textContent = 'יתרה נוכחית בחיסכון';
             }
         }
 
@@ -7903,6 +8223,13 @@
         const chk = document.getElementById('newCategoryReminderEnabled');
         const dateWrap = document.getElementById('newCategoryReminderDateWrap');
         if (dateWrap) dateWrap.classList.toggle('hidden', !chk?.checked);
+        if (state.pendingAddType === 'savings') {
+            const savingsSection = document.getElementById('newCategorySavingsSection');
+            const balLabel = savingsSection?.querySelector('label');
+            if (balLabel) {
+                balLabel.textContent = chk?.checked ? 'יתרה התחלתית בחיסכון' : 'יתרה נוכחית בחיסכון';
+            }
+        }
     };
 
     window.closeNewCategoryModal = () => { const o = document.getElementById('newCategoryOverlay'); if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); } };
@@ -8134,6 +8461,8 @@
         });
         const income = state.budget.incomes.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
         const fixed = state.budget.fixed.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        const savings = (state.budget.savings || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        const loans = (state.budget.loans || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
         const annualCatNames = new Set();
         state.budget.annual.forEach(a => {
             const short = (a.category_name||'').trim();
@@ -8142,7 +8471,14 @@
         });
         const planned = filteredTxs.reduce((s, tx) => tx.tag && annualCatNames.has(tagToShortName(tx.tag)) ? s + safeParseFloat(tx.amount) : s, 0);
         const current = filteredTxs.reduce((s, tx) => !tx.tag ? s + safeParseFloat(tx.amount) : s, 0);
-        renderStatsChart(formatDisplayAmount(income), formatDisplayAmount(fixed), formatDisplayAmount(planned), formatDisplayAmount(current));
+        renderStatsChart(
+            formatDisplayAmount(income),
+            formatDisplayAmount(fixed),
+            formatDisplayAmount(planned),
+            formatDisplayAmount(current),
+            formatDisplayAmount(savings),
+            formatDisplayAmount(loans)
+        );
 
         updateStatsFilterUI();
 
@@ -8161,7 +8497,7 @@
             const plannedTxs = filteredTxs.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.annual.some(a => a.category_name === tx.tag));
             renderPlannedCategoryStatsChart(plannedTxs);
         } else if (state.statsFilter === 'fixed') {
-            const fixedTxs = filteredTxs.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f)));
+            const fixedTxs = filteredTxs.filter(tx => !!tx.tag && !tx.isAdjustment && txIsFixedLike(tx));
             renderFixedCategoryStatsChart(fixedTxs);
         }
     };
@@ -8182,7 +8518,7 @@
             .filter(tx => {
                 if (tx.isAdjustment) return false;
                 const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-                const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+                const isFixed   = txIsFixedLike(tx);
                 return !isPlanned && !isFixed;
             })
             .sort((a, b) => {
@@ -8422,7 +8758,10 @@
     let _plannedTrendHidden = new Set();
 
     function renderFixedCategoryStatsChart(txs) {
-        const fixedItems = (state.budget && state.budget.fixed) ? state.budget.fixed.filter(f => safeParseFloat(f.budget_amount) > 0) : [];
+        const fixedItems = [
+            ...((state.budget && state.budget.fixed) ? state.budget.fixed.filter(f => safeParseFloat(f.budget_amount) > 0) : []),
+            ...((state.budget && state.budget.savings) ? state.budget.savings : [])
+        ];
         const card = document.getElementById('fixedCatStatsCard');
         if (!card) return;
         
@@ -8441,7 +8780,8 @@
         const totals = {};
         txs.forEach(tx => {
             if (tx.tag) {
-                const foundFixed = state.budget.fixed.find(f => tagMatchesCat(tx.tag, f));
+                const foundFixed = state.budget.fixed.find(f => tagMatchesCat(tx.tag, f))
+                    || (state.budget.savings || []).find(s => tagMatchesCat(tx.tag, s));
                 if (foundFixed) {
                     const key = foundFixed.parent_group || foundFixed.category_name;
                     totals[key] = (totals[key] || 0) + safeParseFloat(tx.amount);
@@ -8539,7 +8879,7 @@
             if (!trendCtx) return;
             const months = getTrendMonths();
             if (months.length === 0) return;
-            const allTxs = state.transactions.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f)));
+            const allTxs = state.transactions.filter(tx => !!tx.tag && !tx.isAdjustment && txIsFixedLike(tx));
             const datasets = [];
 
             // Group fixed items by parent_group or keep as standalone
@@ -9122,7 +9462,7 @@
             state.transactions.forEach(tx => {
                 if (tx.isAdjustment) return;
                 const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-                const isFixed   = !!tx.tag && state.budget.fixed.some(f => tagMatchesCat(tx.tag, f));
+                const isFixed   = txIsFixedLike(tx);
                 if (isPlanned || isFixed) return;
                 currentExpByDate[tx.date] = (currentExpByDate[tx.date] || 0) + safeParseFloat(tx.amount);
             });
@@ -9358,9 +9698,8 @@
         }
     }
 
-    function renderStatsChart(income, fixed, planned, current) {
+    function renderStatsChart(income, fixed, planned, current, savings = 0, loans = 0) {
         const ctx = document.getElementById('statsChart').getContext('2d');
-        const totalExpenses = fixed + planned + current;
         if (statsChartInstance) statsChartInstance.destroy();
         statsChartInstance = new Chart(ctx, {
             type: 'bar',
@@ -9370,7 +9709,9 @@
                     { label: 'הכנסות', data: [income, 0], backgroundColor: '#10b981', borderRadius: 8, borderWidth: 0 },
                     { label: 'הוצאות קבועות', data: [0, fixed], backgroundColor: '#ef4444', borderRadius: 0, borderWidth: 0 },
                     { label: 'הוצאות מתוכננות', data: [0, planned], backgroundColor: '#f97316', borderRadius: 0, borderWidth: 0 },
-                    { label: 'הוצאות שוטפות', data: [0, current], backgroundColor: '#3b82f6', borderRadius: 8, borderWidth: 0 }
+                    { label: 'הוצאות שוטפות', data: [0, current], backgroundColor: '#3b82f6', borderRadius: 0, borderWidth: 0 },
+                    { label: 'חסכונות', data: [0, savings], backgroundColor: '#9333ea', borderRadius: 0, borderWidth: 0 },
+                    { label: 'הלוואות', data: [0, loans], backgroundColor: '#475569', borderRadius: 8, borderWidth: 0 }
                 ]
             },
             options: {
@@ -9411,7 +9752,8 @@
                     const yPos0 = y.getPixelForValue(incomeVal) - 5;
                     if (incomeVal > 0) ctx.fillText('₪' + Math.round(incomeVal).toLocaleString(), xPos0, yPos0);
 
-                    const expenseVal = data.datasets[1].data[1] + data.datasets[2].data[1] + data.datasets[3].data[1];
+                    let expenseVal = 0;
+                    for (let i = 1; i < data.datasets.length; i++) expenseVal += data.datasets[i].data[1] || 0;
                     const xPos1 = x.getPixelForValue(1);
                     const yPos1 = y.getPixelForValue(expenseVal) - 5;
                     if (expenseVal > 0) ctx.fillText('₪' + Math.round(expenseVal).toLocaleString(), xPos1, yPos1);
@@ -9424,7 +9766,9 @@
         const breakdown = [
             { label: 'הוצאות קבועות', val: fixed, color: '#ef4444' },
             { label: 'הוצאות מתוכננות', val: planned, color: '#f97316' },
-            { label: 'הוצאות שוטפות', val: current, color: '#3b82f6' }
+            { label: 'הוצאות שוטפות', val: current, color: '#3b82f6' },
+            { label: 'חסכונות', val: savings, color: '#9333ea' },
+            { label: 'הלוואות', val: loans, color: '#475569' }
         ];
         legend.innerHTML = `
             <div class="space-y-4 w-full">
@@ -10562,7 +10906,7 @@
         const o = document.getElementById('budgetHelpOverlay');
         if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
     };
-    window.openAddExpenseModal = (prefillType, prefillCatName, prefillCatId) => {
+    window.openAddExpenseModal = (prefillType, prefillCatName, prefillCatId, prefillName) => {
         try {
             window.setTxType('expense');
             window.setCategoryType(prefillType || 'current');
@@ -10576,6 +10920,8 @@
                 );
             }
         } catch(e) { console.warn('picker init error:', e); }
+        const nameInp = document.getElementById('nameInput');
+        if (nameInp) nameInp.value = prefillName || '';
         // Initialize date picker with today's date
         const dateInp = document.getElementById('addExpenseDateInput');
         if (dateInp) {
@@ -10610,11 +10956,13 @@
         const catFilter = state.activeCategoryFilter;
         if (catFilter && catFilter !== '__none__') {
             if (catFilter.startsWith('budget:')) {
-                // planned/fixed category — set by tag
+                // planned/fixed/savings category — set by tag
                 const annualItem = state.budget.annual.find(a => String(a.id) === catFilter.slice(7));
                 if (annualItem) { prefillType = 'planned'; prefillCatName = annualItem.category_name; }
                 const fixedItem = state.budget.fixed.find(f => String(f.id) === catFilter.slice(7));
                 if (fixedItem) { prefillType = 'fixed'; prefillCatName = fixedItem.category_name; }
+                const savingsItem = (state.budget.savings || []).find(s => String(s.id) === catFilter.slice(7));
+                if (savingsItem) { prefillType = 'fixed'; prefillCatName = savingsItem.category_name; }
             } else if (catFilter.startsWith('group:')) {
                 // expense category group — no specific sub-category to prefill
             } else {
