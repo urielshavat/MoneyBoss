@@ -1219,9 +1219,16 @@
                 <div id="newCategorySavingsSection" class="hidden space-y-2 bg-purple-50 border border-purple-100 rounded-xl p-3">
                     <p class="text-[10px] font-bold text-purple-600 uppercase tracking-wider">פרטי חיסכון</p>
                     <div>
-                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">יתרה נוכחית בחיסכון</label>
+                        <div class="flex items-center justify-between mb-1 mr-1">
+                            <label id="newCategorySavingsBalanceLabel" class="block text-[10px] font-bold text-slate-400 uppercase">יתרה נוכחית בחיסכון</label>
+                            <div class="flex bg-slate-100 p-0.5 rounded-lg">
+                                <button type="button" id="newCategoryCurrencyIlsBtn" onclick="window.setNewCategorySavingsCurrency('ILS')" class="px-2 py-0.5 text-[10px] font-bold rounded-md bg-white text-slate-700 shadow-sm">₪</button>
+                                <button type="button" id="newCategoryCurrencyUsdBtn" onclick="window.setNewCategorySavingsCurrency('USD')" class="px-2 py-0.5 text-[10px] font-bold rounded-md text-slate-400">$</button>
+                            </div>
+                            <input type="hidden" id="newCategorySavingsCurrency" value="ILS">
+                        </div>
                         <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
-                            <span class="text-slate-400 font-bold text-sm">₪</span>
+                            <span id="newCategorySavingsCurrencySymbol" class="text-slate-400 font-bold text-sm">₪</span>
                             <input type="text" inputmode="decimal" id="newCategorySavingsBalance" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
                         </div>
                     </div>
@@ -1458,9 +1465,16 @@
                 <div id="budgetItemSavingsSection" class="hidden space-y-2 bg-purple-50 border border-purple-100 rounded-xl p-3">
                     <p class="text-[10px] font-bold text-purple-600 uppercase tracking-wider">פרטי חיסכון</p>
                     <div>
-                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">יתרה נוכחית בחיסכון</label>
+                        <div class="flex items-center justify-between mb-1 mr-1">
+                            <label id="budgetItemSavingsBalanceLabel" class="block text-[10px] font-bold text-slate-400 uppercase">יתרה נוכחית בחיסכון</label>
+                            <div class="flex bg-slate-100 p-0.5 rounded-lg">
+                                <button type="button" id="budgetItemCurrencyIlsBtn" onclick="window.setBudgetItemSavingsCurrency('ILS')" class="px-2 py-0.5 text-[10px] font-bold rounded-md bg-white text-slate-700 shadow-sm">₪</button>
+                                <button type="button" id="budgetItemCurrencyUsdBtn" onclick="window.setBudgetItemSavingsCurrency('USD')" class="px-2 py-0.5 text-[10px] font-bold rounded-md text-slate-400">$</button>
+                            </div>
+                            <input type="hidden" id="budgetItemSavingsCurrency" value="ILS">
+                        </div>
                         <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
-                            <span class="text-slate-400 font-bold text-sm">₪</span>
+                            <span id="budgetItemSavingsCurrencySymbol" class="text-slate-400 font-bold text-sm">₪</span>
                             <input type="text" inputmode="decimal" id="budgetItemSavingsBalance" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
                         </div>
                     </div>
@@ -2203,6 +2217,10 @@
         categoriesCollapsed: localStorage.getItem('categoriesCollapsed') === 'true'
     };
 
+    // Feature flag: show virtual "תקציב יומי" income entries in transaction list (Phase 1, no DB changes)
+    // Set to false to revert to the old display behavior
+    window.FEATURE_NEW_BUDGET_DISPLAY = true;
+
     // =====================================================
     // PRIVACY / DISPLAY
     // =====================================================
@@ -2435,11 +2453,189 @@
             const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
             const isFixed   = txIsFixedLike(tx);
             const isLegacyAdjustment = tx.isAdjustment || tx.category === 'איזון עדכון תקציב';
-            return !isPlanned && !isFixed && !isLegacyAdjustment;
+            // Phase 2: exclude budget markers — their contribution is already in calculateAccumulatedBudget
+            const isBudgetMarker = tx.name === 'תקציב יומי' || (tx.name && tx.name.startsWith('שינוי תקציב יומי'));
+            return !isPlanned && !isFixed && !isLegacyAdjustment && !isBudgetMarker;
         });
         
         const sumTxs = currentTxs.reduce((sum, tx) => sum + safeParseFloat(tx.amount), 0);
         return accumulated - sumTxs;
+    };
+
+    // Computes virtual "תקציב יומי" income entries for the transaction list display.
+    // These are never stored in DB — they exist only in the UI render pass.
+    // For each date that has שוטף transactions, we calculate how many days of daily budget
+    // accumulated since the previous expense date (or since the budget start date).
+    // If today has no expenses, a virtual entry for today is generated instead.
+    window.computeVirtualBudgetEntries = function(relevantTxs) {
+        if (!window.FEATURE_NEW_BUDGET_DISPLAY) return [];
+
+        const history = state.budget.dailyBudgetHistory || [];
+        if (history.length === 0) return [];
+
+        // Helper: sum daily budgets from startDateStr (inclusive) to endDateStr (inclusive).
+        // Uses calculateAccumulatedBudget for efficiency (segment-based, not day-by-day).
+        function accumulateBudget(startDateStr, endDateStr) {
+            const start = new Date(startDateStr);
+            const end   = new Date(endDateStr);
+            start.setHours(0,0,0,0);
+            end.setHours(0,0,0,0);
+            if (end < start) return 0;
+            const dayBeforeStart = new Date(start.getTime() - 24*3600*1000);
+            return window.calculateAccumulatedBudget(end) - window.calculateAccumulatedBudget(dayBeforeStart);
+        }
+
+        // Helper: convert dd/mm/yyyy → yyyy-mm-dd ISO string
+        function toISO(ddmmyyyy) {
+            const p = ddmmyyyy.split('/');
+            return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+        }
+
+        // Helper: convert Date → dd/mm/yyyy
+        function toDDMMYYYY(d) {
+            return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+        }
+
+        // Helper: convert Date → yyyy-mm-dd
+        function dateToISO(d) {
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+
+        // Determine budget start date (the earliest history entry)
+        const sortedHistory = [...history].sort((a,b) => a.startDate.localeCompare(b.startDate));
+        const budgetStartISO = sortedHistory[0].startDate; // e.g. "2024-01-01"
+
+        // Collect unique expense dates from relevant (שוטף) transactions, sorted ascending
+        const expenseDateSet = new Set();
+        relevantTxs.forEach(tx => {
+            if (!tx.isVirtual) expenseDateSet.add(toISO(tx.date));
+        });
+        const expenseDatesISO = [...expenseDateSet].sort(); // ascending
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayISO = dateToISO(today);
+
+        const virtualEntries = [];
+
+        // The "previous day" boundary before the first expense is the day before startDate
+        if (expenseDatesISO.length === 0) {
+            // No expenses at all — show today's single day budget
+            const todayBudget = window.getDailyBudgetForDate(today);
+            if (todayBudget > 0) {
+                virtualEntries.push({
+                    id:  'virtual_budget_' + toDDMMYYYY(today),
+                    row: 'virtual_budget_' + toDDMMYYYY(today),
+                    name: 'תקציב יומי',
+                    amount: -todayBudget,
+                    date: toDDMMYYYY(today),
+                    isVirtual: true
+                });
+            }
+            return virtualEntries;
+        }
+
+        // For the FIRST expense ever, the virtual budget is exactly 1 day (the expense date itself).
+        // For subsequent expenses, accumulate from (previous expense date + 1) to (this expense date).
+        const firstExpISO = expenseDatesISO[0];
+        let prevDateISO = firstExpISO; // will be overridden for first iteration below
+
+        // For each date that has expenses: accumulate budget from (prevDate+1) to (thisDate)
+        let isFirst = true;
+        for (const expISO of expenseDatesISO) {
+            let effectiveFrom;
+            if (isFirst) {
+                // First expense: only that one day's budget
+                effectiveFrom = expISO;
+                isFirst = false;
+            } else {
+                const fromISO = (() => {
+                    const d = new Date(prevDateISO);
+                    d.setDate(d.getDate() + 1);
+                    return dateToISO(d);
+                })();
+                effectiveFrom = fromISO;
+            }
+            const accum = accumulateBudget(effectiveFrom, expISO);
+            if (accum > 0) {
+                const expDate = new Date(expISO);
+                virtualEntries.push({
+                    id:  'virtual_budget_' + toDDMMYYYY(expDate),
+                    row: 'virtual_budget_' + toDDMMYYYY(expDate),
+                    name: 'תקציב יומי',
+                    amount: -accum,
+                    date: toDDMMYYYY(expDate),
+                    isVirtual: true
+                });
+            }
+            prevDateISO = expISO;
+        }
+
+        // Handle today: if today has no expenses, accumulate from (lastExpenseDate+1) to today
+        const lastExpISO = expenseDatesISO[expenseDatesISO.length - 1];
+        if (lastExpISO < todayISO) {
+            const fromISO = (() => {
+                const d = new Date(lastExpISO);
+                d.setDate(d.getDate() + 1);
+                return dateToISO(d);
+            })();
+            const accum = accumulateBudget(fromISO, todayISO);
+            if (accum > 0) {
+                virtualEntries.push({
+                    id:  'virtual_budget_' + toDDMMYYYY(today),
+                    row: 'virtual_budget_' + toDDMMYYYY(today),
+                    name: 'תקציב יומי',
+                    amount: -accum,
+                    date: toDDMMYYYY(today),
+                    isVirtual: true
+                });
+            }
+        }
+
+        return virtualEntries;
+    };
+
+    // Returns virtual budget-change marker entries (no amount) for each transition in
+    // dailyBudgetHistory. Each marker shows "תקציב יומי שונה מ-₪X ל-₪Y" on the first day
+    // of the new budget period. Only markers whose date falls within [oldestDateISO, todayISO]
+    // are returned — so they stay within the visible date range.
+    window.computeBudgetChangeMarkers = function(oldestVisibleDateISO) {
+        if (!window.FEATURE_NEW_BUDGET_DISPLAY) return [];
+
+        const history = state.budget.dailyBudgetHistory || [];
+        if (history.length < 2) return []; // need at least 2 periods for a change
+
+        const sorted = [...history].sort((a,b) => a.startDate.localeCompare(b.startDate));
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const todayISO = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+        const markers = [];
+        for (let i = 1; i < sorted.length; i++) {
+            const prev = sorted[i - 1];
+            const curr = sorted[i];
+            if (curr.startDate > todayISO) continue; // future change, don't show yet
+            if (curr.startDate < oldestVisibleDateISO) continue; // outside visible range
+            if (Math.round(prev.dailyBudget) === Math.round(curr.dailyBudget)) continue; // no real change
+
+            const startDate = new Date(curr.startDate);
+            const ddmmyyyy = `${String(startDate.getDate()).padStart(2,'0')}/${String(startDate.getMonth()+1).padStart(2,'0')}/${startDate.getFullYear()}`;
+
+            const prevFmt = Math.round(prev.dailyBudget).toLocaleString();
+            const currFmt = Math.round(curr.dailyBudget).toLocaleString();
+
+            markers.push({
+                id:  'virtual_change_' + ddmmyyyy,
+                row: 'virtual_change_' + ddmmyyyy,
+                name: `תקציב יומי שונה: ${prevFmt} ← ${currFmt}`,
+                amount: 0,
+                date: ddmmyyyy,
+                isVirtual: true,
+                isVirtualMarker: true
+            });
+        }
+        return markers;
     };
 
     window.fetchBudgetData = async function(isManual = false) {
@@ -2518,7 +2714,7 @@
                 const id = parts[1];
                 const field = parts[2];
                 if (!state.budget.savingsMeta[id]) state.budget.savingsMeta[id] = {};
-                state.budget.savingsMeta[id][field] = (field === 'last_update' || field === 'initial_date')
+                state.budget.savingsMeta[id][field] = (field === 'last_update' || field === 'initial_date' || field === 'currency')
                     ? (r.parent_group || '')
                     : safeParseFloat(r.budget_amount);
             });
@@ -2969,6 +3165,28 @@
                     created_at = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00${tzStr}`;
                 }
             }
+            // Phase 2: if no "תקציב יומי" marker exists yet, create one before the first expense
+            if (window.FEATURE_NEW_BUDGET_DISPLAY) {
+                const hasBudgetMarker = state.transactions.some(t => t.name === 'תקציב יומי');
+                if (!hasBudgetMarker) {
+                    const dailyBudget = (safeParseFloat(state.budget.g4) || 0) / 30;
+                    if (dailyBudget > 0) {
+                        const markerDateISO = created_at.split('T')[0]; // YYYY-MM-DD from the expense date
+                        const tzOffset = now.getTimezoneOffset();
+                        const sign = tzOffset <= 0 ? '+' : '-';
+                        const absOff = Math.abs(tzOffset);
+                        const tzStr = `${sign}${String(Math.floor(absOff/60)).padStart(2,'0')}:${String(absOff%60).padStart(2,'0')}`;
+                        await sbClient.from('transactions').insert({
+                            name: 'תקציב יומי',
+                            amount: -dailyBudget,
+                            category: 'שוטף',
+                            user_token: USER_TOKEN,
+                            created_at: `${markerDateISO}T00:00:00${tzStr}`
+                        });
+                    }
+                }
+            }
+
             const { error: insertErr } = await sbClient
                 .from('transactions')
                 .insert({ 
@@ -3242,10 +3460,12 @@
             const now = new Date();
             const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
             const bal = parseFloat((document.getElementById('newCategorySavingsBalance')?.value || '').replace(/,/g, '')) || 0;
+            const currency = (document.getElementById('newCategorySavingsCurrency')?.value === 'USD') ? 'USD' : 'ILS';
             newSavingsMeta = {
                 balance: bal,
                 yield: parseFloat((document.getElementById('newCategorySavingsYield')?.value || '').replace(/,/g, '')) || 0,
-                last_update: currentMonth
+                last_update: currentMonth,
+                currency
             };
             if (remEnabled) {
                 newSavingsMeta.initial_balance = bal;
@@ -3394,8 +3614,9 @@
                 const displayBal = remOn && meta.initial_balance != null ? meta.initial_balance : meta.balance;
                 if (balInp) balInp.value = displayBal ? Math.round(displayBal).toString() : '';
                 if (yldInp) yldInp.value = meta.yield ? meta.yield.toString() : '';
-                const balLabel = savSection.querySelector('label');
+                const balLabel = document.getElementById('budgetItemSavingsBalanceLabel') || savSection.querySelector('label');
                 if (balLabel) balLabel.textContent = remOn ? 'יתרה התחלתית בחיסכון' : 'יתרה נוכחית בחיסכון';
+                window.setBudgetItemSavingsCurrency(meta.currency === 'USD' ? 'USD' : 'ILS');
             }
         }
 
@@ -3447,8 +3668,8 @@
             if (!state.budget.savingsMeta) state.budget.savingsMeta = {};
             state.budget.savingsMeta[item.id] = meta;
             window.saveSavingsMetaToDB(item.id, meta).catch(e => console.error(e));
-            const balLabel = document.querySelector('#budgetItemSavingsSection label');
-            if (balLabel && balLabel.textContent.includes('יתרה')) balLabel.textContent = 'יתרה התחלתית בחיסכון';
+            const balLabel = document.getElementById('budgetItemSavingsBalanceLabel');
+            if (balLabel) balLabel.textContent = 'יתרה התחלתית בחיסכון';
         }
         renderSavingsReminders();
     };
@@ -3524,6 +3745,7 @@
             const yldInp = document.getElementById('budgetItemSavingsYield');
             const newBal = parseFloat((balInp?.value || '').replace(/,/g, '')) || 0;
             const newYld = parseFloat((yldInp?.value || '').replace(/,/g, '')) || 0;
+            const currency = (document.getElementById('budgetItemSavingsCurrency')?.value === 'USD') ? 'USD' : 'ILS';
             const now = new Date();
             const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
             const existing = (state.budget.savingsMeta || {})[itemKey] || {};
@@ -3536,6 +3758,7 @@
                 pendingSavingsMeta = {
                     ...existing,
                     yield: newYld,
+                    currency,
                     last_update: currentMonth
                 };
                 if (initialChanged) {
@@ -3551,7 +3774,7 @@
                 pendingSavingsMeta.balance = pendingSavingsMeta.initial_balance;
                 pendingSavingsMeta._recalcDepositBalance = true;
             } else {
-                pendingSavingsMeta = { ...existing, balance: newBal, yield: newYld, last_update: currentMonth };
+                pendingSavingsMeta = { ...existing, balance: newBal, yield: newYld, currency, last_update: currentMonth };
             }
         }
         if (baseType === 'loan') {
@@ -3652,18 +3875,21 @@
         const now = new Date();
         const currentMonth = meta.last_update || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
         const initialDate = meta.initial_date || '';
+        const currency = (meta.currency === 'USD') ? 'USD' : 'ILS';
         const rowsToDelete = [
             `__savings_meta__:${id}:balance`,
             `__savings_meta__:${id}:yield`,
             `__savings_meta__:${id}:last_update`,
             `__savings_meta__:${id}:initial_balance`,
-            `__savings_meta__:${id}:initial_date`
+            `__savings_meta__:${id}:initial_date`,
+            `__savings_meta__:${id}:currency`
         ];
         await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('category_name', rowsToDelete);
         const rows = [
             { category_name: `__savings_meta__:${id}:balance`, budget_amount: meta.balance || 0, type: 'system', user_token: USER_TOKEN },
             { category_name: `__savings_meta__:${id}:yield`, budget_amount: meta.yield || 0, type: 'system', user_token: USER_TOKEN },
-            { category_name: `__savings_meta__:${id}:last_update`, budget_amount: 0, parent_group: currentMonth, type: 'system', user_token: USER_TOKEN }
+            { category_name: `__savings_meta__:${id}:last_update`, budget_amount: 0, parent_group: currentMonth, type: 'system', user_token: USER_TOKEN },
+            { category_name: `__savings_meta__:${id}:currency`, budget_amount: 0, parent_group: currency, type: 'system', user_token: USER_TOKEN }
         ];
         if (meta.initial_balance != null) {
             rows.push({ category_name: `__savings_meta__:${id}:initial_balance`, budget_amount: meta.initial_balance || 0, type: 'system', user_token: USER_TOKEN });
@@ -3923,6 +4149,14 @@
                     user_token: USER_TOKEN
                 });
 
+                // Phase 2: update the "תקציב יומי" marker transaction amount and start date
+                if (window.FEATURE_NEW_BUDGET_DISPLAY) {
+                    await sbClient.from('transactions')
+                        .update({ amount: -dailyBudget, created_at: startDateISO + 'T00:00:00+00:00' })
+                        .eq('user_token', USER_TOKEN)
+                        .eq('name', 'תקציב יומי');
+                }
+
             } else if (mode === 'month') {
                 const fromDate = selVal ? new Date(selVal) : new Date();
                 fromDate.setHours(0,0,0,0);
@@ -3957,6 +4191,25 @@
                 });
 
                 startDateISO = historyStartDate;
+
+                // Phase 2: insert/update a "שינוי תקציב יומי" marker transaction for this month
+                if (window.FEATURE_NEW_BUDGET_DISPLAY && Math.round(oldDailyBudget) !== Math.round(dailyBudget)) {
+                    const changeName = `שינוי תקציב יומי מ-${Math.round(oldDailyBudget)} ל-${Math.round(dailyBudget)}`;
+                    const changeCreatedAt = historyStartDate + 'T00:00:00+00:00';
+                    // Delete any existing change marker for this same month (avoid duplicates)
+                    await sbClient.from('transactions')
+                        .delete()
+                        .eq('user_token', USER_TOKEN)
+                        .eq('created_at', changeCreatedAt)
+                        .like('name', 'שינוי תקציב יומי%');
+                    await sbClient.from('transactions').insert({
+                        name: changeName,
+                        amount: -dailyBudget,
+                        category: 'שוטף',
+                        user_token: USER_TOKEN,
+                        created_at: changeCreatedAt
+                    });
+                }
             }
 
             // שמור g4 ב-budget_settings
@@ -3976,8 +4229,10 @@
             await window.fetchBudgetData();
             await window.fetchTransactionsOnly(false);
 
-            // For 'month' mode only: compute exact adjustment via server-vs-client balance diff
-            if (mode === 'month' && startDateISO) {
+            // When the new budget display is active, the virtual "תקציב יומי" entries already
+            // reflect multi-period budget history correctly. The old adjustment transaction is
+            // not needed and should not be created.
+            if (!window.FEATURE_NEW_BUDGET_DISPLAY && mode === 'month' && startDateISO) {
                 const serverBalance  = await fetchBalance();
                 const correctBalance = window.calculateClientSideBalance
                     ? window.calculateClientSideBalance()
@@ -4003,6 +4258,14 @@
                     // Reload so the new adjustment appears in the list
                     await window.fetchTransactionsOnly(false);
                 }
+            }
+
+            // When the new display is active, use the client-side balance (which correctly
+            // accounts for multi-period budget history) for the header balance display,
+            // since the server RPC still uses a single-rate formula.
+            if (window.FEATURE_NEW_BUDGET_DISPLAY && window.calculateClientSideBalance) {
+                state.balance = window.calculateClientSideBalance();
+                localStorage.setItem('cached_balance', state.balance.toString());
             }
             
             // השבת כפתור העדכון עד שיוקלד ערך חדש
@@ -6375,6 +6638,67 @@
             grouped[tx.date].total += safeParseFloat(tx.amount);
         });
 
+        // Inject virtual "תקציב יומי" income entries (Phase 1 — frontend only, no DB).
+        // Only active in the default paginated view (not when a date range filter is applied).
+        if (window.FEATURE_NEW_BUDGET_DISPLAY && state.mainViewFilter === 'current' && !searchQ && !state.activeCategoryFilter && useDatePagination) {
+            // Use all שוטף (current) transactions for accumulation calculation — not just the paginated view
+            const allCurrentTxs = state.transactions.filter(tx => {
+                if (tx.isVirtual) return false;
+                const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+                const isFixed   = txIsFixedLike(tx);
+                return !isPlanned && !isFixed;
+            });
+            const virtualEntries = window.computeVirtualBudgetEntries(allCurrentTxs);
+
+            // Determine today's date string for the "no expenses today" case
+            const _todayForVirtual = new Date();
+            const _todayStrForVirtual = `${String(_todayForVirtual.getDate()).padStart(2,'0')}/${String(_todayForVirtual.getMonth()+1).padStart(2,'0')}/${_todayForVirtual.getFullYear()}`;
+
+            virtualEntries.forEach(vTx => {
+                // Only inject virtual entries for dates already shown in the paginated list,
+                // PLUS today's entry if today has no real expenses (that date group is new).
+                const dateAlreadyInGroup = !!grouped[vTx.date];
+                const isTodayNoExpenses = vTx.date === _todayStrForVirtual && !dateAlreadyInGroup;
+                if (!dateAlreadyInGroup && !isTodayNoExpenses) return;
+
+                // Skip if a real DB budget-marker transaction already covers this date
+                // (Phase 2: "תקציב יומי" / "שינוי תקציב יומי" transactions from migration)
+                const hasRealBudgetTx = grouped[vTx.date] && grouped[vTx.date].items.some(
+                    t => !t.isVirtual && (t.name === 'תקציב יומי' || (t.name && t.name.startsWith('שינוי תקציב יומי')))
+                );
+                if (hasRealBudgetTx) return;
+
+                if (!grouped[vTx.date]) {
+                    grouped[vTx.date] = { items: [], total: 0 };
+                }
+                // Insert virtual entry at the top of the day's list
+                grouped[vTx.date].items.unshift(vTx);
+                grouped[vTx.date].total += safeParseFloat(vTx.amount);
+            });
+
+            // Inject budget-change markers. Find oldest visible date to limit range.
+            const visibleDates = Object.keys(grouped);
+            if (visibleDates.length > 0) {
+                const oldestVisible = visibleDates
+                    .map(d => { const p = d.split('/'); return `${p[2]}-${p[1]}-${p[0]}`; })
+                    .sort()[0];
+                const markers = window.computeBudgetChangeMarkers(oldestVisible);
+                markers.forEach(marker => {
+                    // Skip if a real DB "שינוי תקציב יומי" transaction already exists on this date
+                    const hasRealChangeTx = grouped[marker.date] && grouped[marker.date].items.some(
+                        t => !t.isVirtual && t.name && t.name.startsWith('שינוי תקציב יומי')
+                    );
+                    if (hasRealChangeTx) return;
+
+                    if (!grouped[marker.date]) {
+                        grouped[marker.date] = { items: [], total: 0 };
+                    }
+                    // Marker goes at the very top of the day, before any budget entry
+                    grouped[marker.date].items.unshift(marker);
+                });
+            }
+        }
+
         const dailyBalanceMap = {};
         if (state.mainViewFilter === 'current') {
             const allTxsSorted = [...state.transactions]
@@ -6428,10 +6752,16 @@
                 const h = document.createElement('div');
                 h.className = 'sticky-header py-0.5 px-1 text-[9px] font-bold text-slate-400 flex justify-between tracking-wider border-b border-slate-100';
                 
-                let textContent = `₪${Math.round(formatDisplayAmount(g.total)).toLocaleString()}`;
-                if (state.mainViewFilter === 'current') {
+                // Negate g.total for display: expenses are stored as positive, income as negative.
+                // Negating means: net expense shows as negative, net saving shows as positive.
+                const displayTotal = -Math.round(formatDisplayAmount(g.total));
+                const sign = displayTotal >= 0 ? '+' : '';
+                // If the group contains only virtual markers (amount=0), suppress the total number
+                const onlyMarkers = g.items.every(t => t.isVirtualMarker);
+                let textContent = onlyMarkers ? '' : `${sign}₪${displayTotal.toLocaleString()}`;
+                if (!onlyMarkers && state.mainViewFilter === 'current') {
                     const dailyBal = dailyBalanceMap[date] !== undefined ? dailyBalanceMap[date] : state.balance;
-                    textContent = `₪${Math.round(formatDisplayAmount(g.total)).toLocaleString()} | ₪${Math.round(formatDisplayAmount(dailyBal)).toLocaleString()}`;
+                    textContent = `${sign}₪${displayTotal.toLocaleString()} | ₪${Math.round(formatDisplayAmount(dailyBal)).toLocaleString()}`;
                 }
                 
                 h.innerHTML = `<span>${date}</span><span class="ltr-num">${textContent}</span>`;
@@ -6450,6 +6780,45 @@
 
     function createTransactionEl(tx, hideDate = true, hideTag = false) {
         const d = document.createElement('div');
+
+        // Budget-change marker — shown at the top of the first day of a new budget period
+        if (tx.isVirtualMarker) {
+            d.className = 'bg-white compact-tx rounded-xl shadow-sm transition-colors';
+            d.dataset.txRow = tx.row;
+            d.innerHTML = `
+                <div class="tx-inner">
+                    <div class="w-4 h-4 flex items-center justify-center flex-shrink-0 ml-1">
+                        <i class="fa-solid fa-arrows-rotate text-[9px] text-slate-400"></i>
+                    </div>
+                    <div class="flex-1">
+                        <span class="text-slate-500 text-xs">${tx.name}</span>
+                    </div>
+                    <button class="p-1 invisible" aria-hidden="true" tabindex="-1"><i class="fa-solid fa-ellipsis-vertical text-[10px]"></i></button>
+                </div>`;
+            return d;
+        }
+
+        // Virtual "תקציב יומי" income entry — render as read-only row (white bg, no edit button)
+        if (tx.isVirtual) {
+            d.className = 'bg-white compact-tx rounded-xl shadow-sm transition-colors';
+            d.dataset.txRow = tx.row;
+            const displayAmt = Math.round(Math.abs(formatDisplayAmount(safeParseFloat(tx.amount))));
+            d.innerHTML = `
+                <div class="tx-inner">
+                    <div class="w-4 h-4 flex items-center justify-center flex-shrink-0 ml-1">
+                        <i class="fa-solid fa-coins text-[9px] text-green-400"></i>
+                    </div>
+                    <div class="flex-1">
+                        <span class="text-green-700 text-xs">${tx.name}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="text-green-500 text-xs ltr-num">+${displayAmt.toLocaleString()}</div>
+                        <button class="p-1 invisible" aria-hidden="true" tabindex="-1"><i class="fa-solid fa-ellipsis-vertical text-[10px]"></i></button>
+                    </div>
+                </div>`;
+            return d;
+        }
+
         const isSelectMode = state.activeCategoryFilter === '__none__';
 
         d.className = `bg-white compact-tx rounded-xl shadow-sm transition-colors`;
@@ -6518,7 +6887,7 @@
                     ${!hideDate ? `<span class="text-[8px] text-slate-400 font-bold">${tx.date}</span>` : ''}
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="${colorClass} text-xs ltr-num">₪${Math.round(Math.abs(formatDisplayAmount(amountValue))).toLocaleString()}</div>
+                    <div class="${colorClass} text-xs ltr-num">${isNegative ? '+' : '-'}${Math.round(Math.abs(formatDisplayAmount(amountValue))).toLocaleString()}</div>
                     ${isSelectMode
                         ? ''
                         : `<button onclick="window.initEditRow('${tx.row}')" class="p-1"><i class="fa-solid fa-ellipsis-vertical text-[10px] text-slate-300"></i></button>`
@@ -6637,10 +7006,10 @@
         setEl('sectionTotal_savings', fmt(formatDisplayAmount(savTotal)));
         setEl('sectionTotal_loan', fmt(formatDisplayAmount(loanTotal)));
 
-        // Section balance totals (sum of current balances from meta)
+        // Section balance totals (sum of current balances from meta, USD converted to ILS)
         const savingsBalanceTotal = (b.savings || []).reduce((sum, item) => {
             const meta = (state.budget.savingsMeta || {})[item.id] || {};
-            return sum + (meta.balance || 0);
+            return sum + savingsBalanceInIls(meta);
         }, 0);
         const loanBalanceTotal = (b.loans || []).reduce((sum, item) => {
             const meta = (state.budget.loanMeta || {})[item.id] || {};
@@ -6648,6 +7017,20 @@
         }, 0);
         setEl('sectionBalance_savings', savingsBalanceTotal > 0 ? ` (סה"כ יתרה ₪${Math.round(savingsBalanceTotal).toLocaleString()})` : '');
         setEl('sectionBalance_loan', loanBalanceTotal > 0 ? ` (סה"כ יתרה ₪${Math.round(loanBalanceTotal).toLocaleString()})` : '');
+
+        // Refresh USD rate in background if any savings are in USD
+        const hasUsdSavings = (b.savings || []).some(item => {
+            const meta = (state.budget.savingsMeta || {})[item.id] || {};
+            return meta.currency === 'USD';
+        });
+        if (hasUsdSavings) {
+            const prevRate = getUsdIlsRateSync();
+            ensureUsdIlsRate(true).then(rate => {
+                if (rate && Math.abs(rate - prevRate) > 0.001 && state.currentView === 'budget') {
+                    renderBudget();
+                }
+            }).catch(() => {});
+        }
         const rem = state.isPrivacyMode ? (20000 - formatDisplayAmount(fixTotal) - formatDisplayAmount(annMTotal) - formatDisplayAmount(savTotal) - formatDisplayAmount(loanTotal)) : (incTotal - fixTotal - annMTotal - savTotal - loanTotal);
         setEl('summaryRemaining', Math.round(rem).toLocaleString());
         const g4El = document.getElementById('g4Input');
@@ -6720,14 +7103,18 @@
                         const meta = (state.budget.savingsMeta || {})[id] || {};
                         const balance = meta.balance || 0;
                         const yieldPct = meta.yield || 0;
+                        const currency = meta.currency === 'USD' ? 'USD' : 'ILS';
                         const hasDetails = balance > 0 || yieldPct > 0;
+                        const balanceHtml = balance > 0
+                            ? `<span class="text-[10px] font-bold text-purple-600 ltr-num">${formatSavingsBalanceDisplay(balance, currency)}</span>`
+                            : '';
                         div.className = `bg-white px-3 py-2.5 rounded-xl shadow-sm gap-2 ${isChild ? 'ml-4 border-r-2 border-slate-100 rounded-r-none' : ''}`;
                         div.innerHTML = `
                             <div class="flex justify-between items-start">
                                 <div class="flex-1 min-w-0">
                                     <span class="text-xs font-semibold text-slate-700 block leading-tight">${item.category_name || ''}</span>
                                     ${hasDetails ? `<div class="flex items-center gap-2 mt-1 flex-wrap">
-                                        ${balance > 0 ? `<span class="text-[10px] font-bold text-purple-600 ltr-num">יתרה ₪${Math.round(balance).toLocaleString()}</span>` : ''}
+                                        ${balanceHtml}
                                         ${yieldPct > 0 ? `<span class="text-[10px] text-slate-400 font-semibold">${yieldPct}% שנתי</span>` : ''}
                                     </div>` : ''}
                                 </div>
@@ -6806,7 +7193,7 @@
                     const metaMap = type === 'savings' ? (state.budget.savingsMeta || {}) : (state.budget.loanMeta || {});
                     const totalBalance = group.items.reduce((sum, item) => {
                         const meta = metaMap[item.id || item.category_name] || {};
-                        return sum + (meta.balance || 0);
+                        return sum + (type === 'savings' ? savingsBalanceInIls(meta) : (meta.balance || 0));
                     }, 0);
                     if (totalBalance > 0) {
                         const balColor = type === 'savings' ? '#7c3aed' : '#475569';
@@ -6895,6 +7282,133 @@
         return (state.budget.savings || []).find(s => tagMatchesCat(tag, s)) || null;
     }
 
+    // ---- USD/ILS rate for savings display ----
+    // Bank of Israel has no CORS headers in browsers, so we use a CORS-friendly
+    // live feed and keep BOI as a best-effort primary when available.
+    let _usdIlsRate = null;
+    let _usdIlsRateFetchedAt = 0;
+    const USD_RATE_FALLBACK = 3.0; // only if all live sources fail
+    const USD_RATE_CACHE_MS = 60 * 60 * 1000; // 1 hour
+
+    function _saveUsdRate(rate, src) {
+        const now = Date.now();
+        _usdIlsRate = rate;
+        _usdIlsRateFetchedAt = now;
+        localStorage.setItem('usd_ils_rate', String(rate));
+        localStorage.setItem('usd_ils_rate_at', String(now));
+        localStorage.setItem('usd_ils_rate_src', src);
+        return rate;
+    }
+
+    async function _fetchUsdIlsFromBoi() {
+        const res = await fetch('https://www.boi.org.il/PublicApi/GetExchangeRates');
+        if (!res.ok) return null;
+        const data = await res.json();
+        const usd = (data.exchangeRates || []).find(r => r.key === 'USD');
+        const rate = usd ? safeParseFloat(usd.currentExchangeRate) : 0;
+        return rate > 0 ? rate : null;
+    }
+
+    async function _fetchUsdIlsFromFloatrates() {
+        // Mid-market daily rates, CORS-enabled — close to Google / BOI
+        const res = await fetch('https://www.floatrates.com/daily/usd.json');
+        if (!res.ok) return null;
+        const data = await res.json();
+        const rate = safeParseFloat(data?.ils?.rate);
+        return rate > 0 ? rate : null;
+    }
+
+    async function _fetchUsdIlsFromCdn() {
+        // fawazahmed0 currency-api via jsDelivr — CORS * (backup)
+        const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json');
+        if (!res.ok) return null;
+        const data = await res.json();
+        const rate = safeParseFloat(data?.usd?.ils);
+        return rate > 0 ? rate : null;
+    }
+
+    async function ensureUsdIlsRate(force = false) {
+        const now = Date.now();
+        if (!force && _usdIlsRate && (now - _usdIlsRateFetchedAt) < USD_RATE_CACHE_MS) return _usdIlsRate;
+        try {
+            const cached = localStorage.getItem('usd_ils_rate');
+            const cachedAt = parseInt(localStorage.getItem('usd_ils_rate_at') || '0', 10);
+            const cachedSrc = localStorage.getItem('usd_ils_rate_src') || '';
+            const trustedSrc = cachedSrc === 'boi' || cachedSrc === 'floatrates';
+            if (!force && cached && trustedSrc && (now - cachedAt) < USD_RATE_CACHE_MS) {
+                _usdIlsRate = parseFloat(cached);
+                _usdIlsRateFetchedAt = cachedAt;
+                return _usdIlsRate;
+            }
+
+            // Prefer BOI → FloatRates (Google-like) → CDN backup
+            let rate = null;
+            try { rate = await _fetchUsdIlsFromBoi(); } catch (_) { /* CORS expected in browsers */ }
+            if (rate) return _saveUsdRate(rate, 'boi');
+
+            try { rate = await _fetchUsdIlsFromFloatrates(); } catch (_) {}
+            if (rate) return _saveUsdRate(rate, 'floatrates');
+
+            rate = await _fetchUsdIlsFromCdn();
+            if (rate) return _saveUsdRate(rate, 'cdn');
+        } catch (e) {
+            console.warn('USD/ILS rate fetch failed:', e);
+        }
+        if (!_usdIlsRate) {
+            const cached = parseFloat(localStorage.getItem('usd_ils_rate') || '');
+            const cachedSrc = localStorage.getItem('usd_ils_rate_src') || '';
+            const trustedSrc = cachedSrc === 'boi' || cachedSrc === 'floatrates' || cachedSrc === 'cdn';
+            _usdIlsRate = (cached > 0 && trustedSrc) ? cached : USD_RATE_FALLBACK;
+            _usdIlsRateFetchedAt = now;
+        }
+        return _usdIlsRate;
+    }
+
+    function getUsdIlsRateSync() {
+        if (_usdIlsRate) return _usdIlsRate;
+        const cached = parseFloat(localStorage.getItem('usd_ils_rate') || '');
+        const cachedSrc = localStorage.getItem('usd_ils_rate_src') || '';
+        const trustedSrc = cachedSrc === 'boi' || cachedSrc === 'floatrates' || cachedSrc === 'cdn';
+        return (cached > 0 && trustedSrc) ? cached : USD_RATE_FALLBACK;
+    }
+
+    function formatSavingsBalanceDisplay(balance, currency) {
+        const bal = Math.round(balance || 0);
+        if (!bal) return '';
+        if (currency === 'USD') {
+            const ils = Math.round(bal * getUsdIlsRateSync());
+            return `יתרה $${bal.toLocaleString()} <span class="text-purple-600 font-bold">(₪${ils.toLocaleString()})</span>`;
+        }
+        return `יתרה ₪${bal.toLocaleString()}`;
+    }
+
+    function savingsBalanceInIls(meta) {
+        const bal = meta.balance || 0;
+        if ((meta.currency || 'ILS') === 'USD') return bal * getUsdIlsRateSync();
+        return bal;
+    }
+
+    function applySavingsCurrencyToggle(prefix, currency) {
+        const cur = currency === 'USD' ? 'USD' : 'ILS';
+        const hidden = document.getElementById(prefix + 'SavingsCurrency');
+        if (hidden) hidden.value = cur;
+        const sym = document.getElementById(prefix + 'SavingsCurrencySymbol');
+        if (sym) sym.textContent = cur === 'USD' ? '$' : '₪';
+        const ilsBtn = document.getElementById(prefix + 'CurrencyIlsBtn');
+        const usdBtn = document.getElementById(prefix + 'CurrencyUsdBtn');
+        if (ilsBtn && usdBtn) {
+            ilsBtn.className = `px-2 py-0.5 text-[10px] font-bold rounded-md ${cur === 'ILS' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400'}`;
+            usdBtn.className = `px-2 py-0.5 text-[10px] font-bold rounded-md ${cur === 'USD' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400'}`;
+        }
+    }
+
+    window.setNewCategorySavingsCurrency = function(currency) {
+        applySavingsCurrencyToggle('newCategory', currency);
+    };
+    window.setBudgetItemSavingsCurrency = function(currency) {
+        applySavingsCurrencyToggle('budgetItem', currency);
+    };
+
     function parseMetaDate(val) {
         if (!val) return null;
         if (val.includes('/')) return parseLocalDate(val);
@@ -6934,11 +7448,15 @@
             initialDate = parseMetaDate(meta.last_update) || today;
         }
         let total = growWithYield(initialBalance, annualYield, initialDate, today);
+        const isUsd = (meta.currency || 'ILS') === 'USD';
+        const usdRate = isUsd ? getUsdIlsRateSync() : 1;
 
         (state.transactions || []).forEach(tx => {
             if (tx.isAdjustment || !tx.tag || !tagMatchesCat(tx.tag, item)) return;
-            const amt = safeParseFloat(tx.amount);
+            let amt = safeParseFloat(tx.amount);
             if (amt <= 0) return; // only deposits (expenses) add to savings
+            // Deposits are recorded in ILS — convert to USD if savings currency is USD
+            if (isUsd && usdRate > 0) amt = amt / usdRate;
             const d = parseLocalDate(tx.date);
             if (!d) return;
             d.setHours(0,0,0,0);
@@ -8191,8 +8709,9 @@
                 const y = document.getElementById('newCategorySavingsYield');
                 if (b) b.value = '';
                 if (y) y.value = '';
-                const balLabel = savingsSection.querySelector('label');
+                const balLabel = document.getElementById('newCategorySavingsBalanceLabel');
                 if (balLabel) balLabel.textContent = 'יתרה נוכחית בחיסכון';
+                window.setNewCategorySavingsCurrency('ILS');
             }
         }
 
@@ -8224,8 +8743,7 @@
         const dateWrap = document.getElementById('newCategoryReminderDateWrap');
         if (dateWrap) dateWrap.classList.toggle('hidden', !chk?.checked);
         if (state.pendingAddType === 'savings') {
-            const savingsSection = document.getElementById('newCategorySavingsSection');
-            const balLabel = savingsSection?.querySelector('label');
+            const balLabel = document.getElementById('newCategorySavingsBalanceLabel');
             if (balLabel) {
                 balLabel.textContent = chk?.checked ? 'יתרה התחלתית בחיסכון' : 'יתרה נוכחית בחיסכון';
             }
@@ -10997,6 +11515,9 @@
     // INIT
     // =====================================================
     document.addEventListener('DOMContentLoaded', () => {
+        // Prefetch USD/ILS rate early (for USD savings display)
+        ensureUsdIlsRate(true).catch(() => {});
+
         // Initialize flatpickr on transaction edit date input
         if (typeof flatpickr !== 'undefined') {
             flatpickr("#editRowDate", {
