@@ -232,6 +232,19 @@
                 </div>
             </div>
 
+            <!-- Daily Balance Chart Card -->
+            <div id="balanceChartCard" class="hidden bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-3 px-3 pt-2.5 pb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">מאזן יומי</p>
+                    <button onclick="window.toggleBalanceChart()" class="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 transition-colors">
+                        <i class="fa-solid fa-xmark text-[9px]"></i>
+                    </button>
+                </div>
+                <div class="relative" style="height:130px">
+                    <canvas id="mainBalanceLineChart"></canvas>
+                </div>
+            </div>
+
             <!-- Unified Stats & Categories Card -->
             <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-4">
                 <header>
@@ -6507,6 +6520,8 @@
                 const balColor = balVal < 0 ? 'text-red-500' : 'text-slate-900';
                 const balUnitColor = balVal < 0 ? 'text-red-400' : 'text-slate-400';
                 const balClickable = isNegativeBal ? `onclick="window.toggleBalanceDays()" style="cursor:pointer" title="${showDays ? 'לחץ לחזרה למאזן' : 'לחץ לראות כמה ימים'}"` : '';
+                const chartCardVisible = !document.getElementById('balanceChartCard')?.classList.contains('hidden');
+                const chartBtnActiveClass = chartCardVisible ? 'bg-blue-100 text-blue-500' : 'bg-slate-100 text-slate-400';
 
                 headerRow.innerHTML = `
                     <!-- Daily Budget (Left in Current) -->
@@ -6519,7 +6534,12 @@
                     </div>
                     <!-- Balance (Center in Current) -->
                     <div class="flex-1 flex flex-col items-center border-l border-slate-50 px-1">
-                        <p class="text-slate-400 text-[9px] font-bold uppercase tracking-widest mb-1">מאזן נוכחי</p>
+                        <div class="flex items-center gap-1 mb-1">
+                            <p class="text-slate-400 text-[9px] font-bold uppercase tracking-widest">מאזן נוכחי</p>
+                            <button onclick="window.toggleBalanceChart()" id="balanceChartToggleBtn" class="w-4 h-4 flex items-center justify-center rounded ${chartBtnActiveClass} hover:bg-blue-100 hover:text-blue-500 transition-colors" title="הצג גרף">
+                                <i class="fa-solid fa-chart-line text-[8px]"></i>
+                            </button>
+                        </div>
                         <div id="balanceDisplayCell" class="flex items-baseline gap-1 select-none ${isNegativeBal ? 'cursor-pointer active:opacity-70 transition-opacity' : ''}" ${balClickable}>
                             <span class="text-xl font-black ${balColor} ltr-num">${balDispNum}</span>
                             <span class="text-xs ${balUnitColor} font-bold">${balDispUnit}</span>
@@ -6776,6 +6796,11 @@
         }
         const lmBtn = document.getElementById('loadMoreBtn');
         if (lmBtn) lmBtn.classList.toggle('hidden', !useDatePagination || !!searchQ || state.displayedTransactionsCount >= filteredTxs.length || filteredTxs.length === 0);
+
+        // Refresh balance chart if the card is visible
+        if (!document.getElementById('balanceChartCard')?.classList.contains('hidden')) {
+            renderMainBalanceChart();
+        }
     }
 
     function createTransactionEl(tx, hideDate = true, hideTag = false) {
@@ -7777,7 +7802,16 @@
             btns[filter].classList.add('bg-white', 'text-slate-700', 'shadow-sm');
             btns[filter].classList.remove('text-slate-400');
         }
-        
+
+        // Hide balance chart when switching away from שוטף
+        if (filter !== 'current') {
+            const card = document.getElementById('balanceChartCard');
+            if (card && !card.classList.contains('hidden')) {
+                card.classList.add('hidden');
+                if (mainBalanceChartInstance) { mainBalanceChartInstance.destroy(); mainBalanceChartInstance = null; }
+            }
+        }
+
         render();
     };
 
@@ -9154,6 +9188,349 @@
             }
         });
     }
+
+    // =====================================================
+    // MAIN VIEW DAILY BALANCE CHART
+    // =====================================================
+    let mainBalanceChartInstance = null;
+    let _mainChartHitIdx = null;
+    let _mainChartClickHandler = null;
+
+    function renderMainBalanceChart() {
+        const ctx = document.getElementById('mainBalanceLineChart');
+        if (!ctx) return;
+        if (mainBalanceChartInstance) { mainBalanceChartInstance.destroy(); mainBalanceChartInstance = null; }
+
+        const dailyVal = (safeParseFloat(state.budget.g4) || 0) / 30;
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+
+        // Build dailyBalanceMap from all current (non-planned, non-fixed) transactions
+        const allCurrentTxsSorted = [...state.transactions]
+            .filter(tx => {
+                if (tx.isAdjustment) return false;
+                const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+                const isFixed = txIsFixedLike(tx);
+                return !isPlanned && !isFixed;
+            })
+            .sort((a, b) => {
+                const da = parseLocalDate(a.date), db = parseLocalDate(b.date);
+                if (da.getTime() !== db.getTime()) return db - da;
+                return (b.row || 0) - (a.row || 0);
+            });
+
+        const dailyBalanceMap = {};
+        let currentDateLocal = new Date(today);
+        if (allCurrentTxsSorted.length > 0) {
+            const newestTxDate = parseLocalDate(allCurrentTxsSorted[0].date);
+            if (newestTxDate > currentDateLocal) currentDateLocal = new Date(newestTxDate);
+        }
+        let running = state.balance;
+        allCurrentTxsSorted.forEach(tx => {
+            const txDate = parseLocalDate(tx.date);
+            const diffMs = currentDateLocal - txDate;
+            const daysDiff = Math.floor(diffMs / (1000 * 3600 * 24));
+            if (daysDiff > 0) {
+                running -= daysDiff * dailyVal;
+                currentDateLocal = new Date(txDate);
+            }
+            if (dailyBalanceMap[tx.date] === undefined) dailyBalanceMap[tx.date] = running;
+            running += safeParseFloat(tx.amount);
+        });
+
+        // Determine display date range from current dateFilter
+        const startDay = state.budget.cycleStartDay || 1;
+        const type = (state.dateFilter && state.dateFilter.type) || 'last30';
+        let startDate, endDate;
+
+        if (type === 'currentMonth' || type === 'last30') {
+            const cycle = getCurrentCycleDates(today, startDay);
+            startDate = cycle.startDate;
+            endDate = new Date(Math.min(today.getTime(), cycle.endDate.getTime()));
+        } else if (type === 'prevMonth') {
+            const { startDate: curStart } = getCurrentCycleDates(today, startDay);
+            const prevDate = new Date(curStart.getTime() - 1);
+            const cycle = getCurrentCycleDates(prevDate, startDay);
+            startDate = cycle.startDate;
+            endDate = cycle.endDate;
+        } else if (type === 'last3Months') {
+            const { endDate: ed } = getCurrentCycleDates(today, startDay);
+            const { startDate: m1 } = getCurrentCycleDates(today, startDay);
+            const { startDate: m2 } = getCurrentCycleDates(new Date(m1.getTime() - 1), startDay);
+            const { startDate: m3 } = getCurrentCycleDates(new Date(m2.getTime() - 1), startDay);
+            startDate = m3;
+            endDate = new Date(Math.min(today.getTime(), ed.getTime()));
+        } else if (type === 'specificMonth') {
+            if (!state.dateFilterMonth) {
+                startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                endDate = today;
+            } else {
+                const [year, month] = state.dateFilterMonth.split('-').map(Number);
+                const daysInMon = new Date(year, month, 0).getDate();
+                const sd = Math.min(startDay, daysInMon);
+                startDate = new Date(year, month - 1, sd, 0, 0, 0, 0);
+                const ny = month === 12 ? year + 1 : year;
+                const nm = month === 12 ? 1 : month + 1;
+                let cycleEnd = new Date(ny, nm - 1, Math.min(startDay, new Date(ny, nm, 0).getDate()), 0, 0, 0, 0);
+                cycleEnd.setMilliseconds(-1);
+                endDate = new Date(Math.min(today.getTime(), cycleEnd.getTime()));
+            }
+        } else if (type === 'dateRange') {
+            const fromVal = state.dateFilterFrom;
+            const toVal = state.dateFilterTo;
+            if (fromVal) { const p = fromVal.split('-'); startDate = new Date(+p[0], +p[1] - 1, +p[2]); }
+            else startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            if (toVal) { const p = toVal.split('-'); endDate = new Date(+p[0], +p[1] - 1, +p[2]); }
+            else endDate = today;
+            endDate = new Date(Math.min(today.getTime(), endDate.getTime()));
+        } else if (type === 'all') {
+            if (allCurrentTxsSorted.length > 0) {
+                startDate = parseLocalDate(allCurrentTxsSorted[allCurrentTxsSorted.length - 1].date);
+            } else {
+                startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            }
+            endDate = today;
+        } else {
+            const cycle = getCurrentCycleDates(today, startDay);
+            startDate = cycle.startDate;
+            endDate = today;
+        }
+
+        // Build chart data
+        const totalDays = Math.round((endDate - startDate) / (1000 * 3600 * 24)) + 1;
+        const labels = [];
+        const values = [];
+        const knownDates = Object.keys(dailyBalanceMap)
+            .map(d => ({ d, t: parseLocalDate(d).getTime() }))
+            .sort((a, b) => a.t - b.t);
+
+        const fullDates = [];
+        const cur = new Date(startDate);
+        while (cur <= endDate && cur <= today) {
+            const dd = `${String(cur.getDate()).padStart(2, '0')}/${String(cur.getMonth() + 1).padStart(2, '0')}/${cur.getFullYear()}`;
+            let dayBalance;
+            if (dailyBalanceMap[dd] !== undefined) {
+                dayBalance = dailyBalanceMap[dd];
+            } else {
+                const curT = cur.getTime();
+                const pastEntry = [...knownDates].reverse().find(e => e.t < curT);
+                const futureEntry = knownDates.find(e => e.t > curT);
+                if (pastEntry) {
+                    const daysSince = Math.floor((curT - pastEntry.t) / (1000 * 3600 * 24));
+                    dayBalance = dailyBalanceMap[pastEntry.d] + daysSince * dailyVal;
+                } else if (futureEntry) {
+                    const daysBefore = Math.floor((futureEntry.t - curT) / (1000 * 3600 * 24));
+                    dayBalance = dailyBalanceMap[futureEntry.d] - daysBefore * dailyVal;
+                } else {
+                    dayBalance = state.balance;
+                }
+            }
+            labels.push(`${cur.getDate()}/${cur.getMonth() + 1}`);
+            fullDates.push(dd);
+            values.push(Math.round(formatDisplayAmount(dayBalance)));
+            cur.setDate(cur.getDate() + 1);
+        }
+
+        if (labels.length === 0) return;
+
+        // Reset crosshair index on fresh render
+        _mainChartHitIdx = null;
+
+        // Attach pointer/touch handlers (remove previous to avoid duplicates)
+        if (_mainChartClickHandler) {
+            ctx.removeEventListener('click',     _mainChartClickHandler);
+            ctx.removeEventListener('touchstart', _mainChartClickHandler);
+            ctx.removeEventListener('touchmove',  _mainChartClickHandler);
+            _mainChartClickHandler = null;
+        }
+
+        function hitFromEvent(event) {
+            if (!mainBalanceChartInstance) return;
+            // Normalise touch vs mouse into a synthetic event Chart.js can use
+            const nativeEvent = event.touches ? event.touches[0] : event;
+            const pts = mainBalanceChartInstance.getElementsAtEventForMode(nativeEvent, 'index', { intersect: false }, true);
+            if (pts.length > 0) {
+                _mainChartHitIdx = pts[0].index;
+                mainBalanceChartInstance.update('none');
+            }
+        }
+
+        function onTouch(event) {
+            event.preventDefault(); // stop page scroll while dragging on chart
+            hitFromEvent(event);
+        }
+
+        function onMouseLeave() {
+            _mainChartHitIdx = null;
+            if (mainBalanceChartInstance) mainBalanceChartInstance.update('none');
+        }
+
+        _mainChartClickHandler = hitFromEvent;
+        ctx.addEventListener('click',      _mainChartClickHandler);
+        ctx.addEventListener('mousemove',  _mainChartClickHandler);
+        ctx.addEventListener('mouseleave', onMouseLeave);
+        ctx.addEventListener('touchstart', onTouch, { passive: false });
+        ctx.addEventListener('touchmove',  onTouch, { passive: false });
+
+        const minY = Math.min(0, ...values);
+        const maxY = Math.max(0, ...values);
+        const pad  = (maxY - minY) * 0.08 || 100;
+
+        mainBalanceChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'מאזן',
+                    data: values,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    fill: false,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: { padding: { left: 0, right: 0, top: 4, bottom: 0 } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                },
+                scales: {
+                    x: {
+                        ticks: { font: { size: 9 }, color: '#94a3b8', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 },
+                        grid: { display: false }
+                    },
+                    y: {
+                        position: 'left',
+                        min: minY - pad,
+                        max: maxY + pad,
+                        ticks: { font: { size: 9 }, color: '#94a3b8', callback: v => { const n = Math.round(v); return n < 0 ? `${Math.abs(n).toLocaleString()}-₪` : `₪${n.toLocaleString()}`; } },
+                        grid: { color: '#f1f5f9' }
+                    }
+                }
+            },
+            plugins: [
+                {
+                    id: 'zeroLine',
+                    afterDraw(chart) {
+                        const { ctx: c, chartArea, scales } = chart;
+                        if (!scales.y) return;
+                        const yZero = scales.y.getPixelForValue(0);
+                        if (yZero < chartArea.top || yZero > chartArea.bottom) return;
+                        c.save();
+                        c.beginPath();
+                        c.moveTo(chartArea.left, yZero);
+                        c.lineTo(chartArea.right, yZero);
+                        c.lineWidth = 1.5;
+                        c.strokeStyle = '#ef4444';
+                        c.setLineDash([4, 3]);
+                        c.stroke();
+                        c.setLineDash([]);
+                        c.restore();
+                    }
+                },
+                {
+                    id: 'vLine',
+                    afterDraw(chart) {
+                        if (_mainChartHitIdx === null) return;
+                        const { ctx: c, chartArea, scales, data } = chart;
+                        const idx = _mainChartHitIdx;
+                        if (idx < 0 || idx >= data.labels.length) return;
+                        const x = scales.x.getPixelForValue(idx);
+                        const val = data.datasets[0].data[idx];
+                        const y = scales.y.getPixelForValue(val);
+                        if (x < chartArea.left || x > chartArea.right) return;
+
+                        c.save();
+
+                        // Vertical crosshair line
+                        c.beginPath();
+                        c.moveTo(x, chartArea.top);
+                        c.lineTo(x, chartArea.bottom);
+                        c.lineWidth = 1;
+                        c.strokeStyle = 'rgba(100,116,139,0.55)';
+                        c.setLineDash([3, 3]);
+                        c.stroke();
+                        c.setLineDash([]);
+
+                        // Dot on the line
+                        c.beginPath();
+                        c.arc(x, y, 4, 0, Math.PI * 2);
+                        c.fillStyle = val >= 0 ? '#2563eb' : '#ef4444';
+                        c.fill();
+                        c.strokeStyle = '#fff';
+                        c.lineWidth = 1.5;
+                        c.stroke();
+
+                        // Tooltip box
+                        const dateStr = fullDates[idx] || data.labels[idx];
+                        const valStr  = val < 0 ? `${Math.abs(val).toLocaleString()}-₪` : `₪${val.toLocaleString()}`;
+                        c.font = '10px Assistant, sans-serif';
+                        const tw1 = c.measureText(dateStr).width;
+                        c.font = 'bold 12px Assistant, sans-serif';
+                        const tw2 = c.measureText(valStr).width;
+                        const bw = Math.max(tw1, tw2) + 20;
+                        const bh = 40;
+                        let bx = x + 10;
+                        if (bx + bw > chartArea.right - 4) bx = x - bw - 10;
+                        const by = Math.max(chartArea.top + 4, Math.min(y - bh / 2, chartArea.bottom - bh - 4));
+                        const r = 5;
+
+                        c.fillStyle = 'rgba(15,23,42,0.88)';
+                        c.beginPath();
+                        c.moveTo(bx + r, by);
+                        c.lineTo(bx + bw - r, by);
+                        c.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
+                        c.lineTo(bx + bw, by + bh - r);
+                        c.quadraticCurveTo(bx + bw, by + bh, bx + bw - r, by + bh);
+                        c.lineTo(bx + r, by + bh);
+                        c.quadraticCurveTo(bx, by + bh, bx, by + bh - r);
+                        c.lineTo(bx, by + r);
+                        c.quadraticCurveTo(bx, by, bx + r, by);
+                        c.closePath();
+                        c.fill();
+
+                        c.textAlign = 'center';
+                        c.font = '10px Assistant, sans-serif';
+                        c.fillStyle = '#94a3b8';
+                        c.fillText(dateStr, bx + bw / 2, by + 15);
+                        c.font = 'bold 12px Assistant, sans-serif';
+                        c.fillStyle = val >= 0 ? '#60a5fa' : '#f87171';
+                        c.fillText(valStr, bx + bw / 2, by + 30);
+
+                        c.restore();
+                    }
+                }
+            ]
+        });
+    }
+
+    window.toggleBalanceChart = function() {
+        const card = document.getElementById('balanceChartCard');
+        if (!card) return;
+        const isHidden = card.classList.contains('hidden');
+        card.classList.toggle('hidden', !isHidden);
+        if (isHidden) {
+            renderMainBalanceChart();
+        } else {
+            if (mainBalanceChartInstance) { mainBalanceChartInstance.destroy(); mainBalanceChartInstance = null; }
+        }
+        // Update toggle button active state
+        const btn = document.getElementById('balanceChartToggleBtn');
+        if (btn) {
+            if (isHidden) {
+                btn.classList.remove('bg-slate-100', 'text-slate-400');
+                btn.classList.add('bg-blue-100', 'text-blue-500');
+            } else {
+                btn.classList.remove('bg-blue-100', 'text-blue-500');
+                btn.classList.add('bg-slate-100', 'text-slate-400');
+            }
+        }
+    };
 
     window.setStatsFilter = function(filter) {
         state.statsFilter = filter;
