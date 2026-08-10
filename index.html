@@ -2548,18 +2548,33 @@
             return virtualEntries;
         }
 
-        // For the FIRST expense ever, the virtual budget is exactly 1 day (the expense date itself).
+        // For the FIRST שוטף expense, accumulate from the budget start date (which may be
+        // earlier than the first שוטף expense if the first transaction is "מתוכנן").
         // For subsequent expenses, accumulate from (previous expense date + 1) to (this expense date).
         const firstExpISO = expenseDatesISO[0];
         let prevDateISO = firstExpISO; // will be overridden for first iteration below
+
+        // Determine the actual start for the first entry: the later of budgetStartISO and
+        // the first transaction across ALL types (stored in state.budget.startDate as DD/MM/YYYY).
+        // This guards against stale DB records that have an incorrect (too-early) start date.
+        let actualBudgetStart = budgetStartISO;
+        if (state.budget.startDate) {
+            const sp = state.budget.startDate.split('/');
+            if (sp.length === 3) {
+                const stateStartISO = `${sp[2]}-${sp[1].padStart(2,'0')}-${sp[0].padStart(2,'0')}`;
+                // Use the later of the two: budget history entry vs actual first transaction
+                if (stateStartISO > actualBudgetStart) actualBudgetStart = stateStartISO;
+            }
+        }
 
         // For each date that has expenses: accumulate budget from (prevDate+1) to (thisDate)
         let isFirst = true;
         for (const expISO of expenseDatesISO) {
             let effectiveFrom;
             if (isFirst) {
-                // First expense: only that one day's budget
-                effectiveFrom = expISO;
+                // First expense: accumulate from the budget start date so days before
+                // the first שוטף expense (e.g. מתוכנן-only days) are counted here.
+                effectiveFrom = actualBudgetStart <= expISO ? actualBudgetStart : expISO;
                 isFirst = false;
             } else {
                 const fromISO = (() => {
@@ -3342,6 +3357,53 @@
             if (error) throw error;
             const deletedTx = state.transactions.find(t => t.row === state.pendingActionRow.row);
             state.transactions = state.transactions.filter(t => t.row !== state.pendingActionRow.row);
+
+            // Sync start date if the deleted transaction was the earliest one.
+            // Exclude system/marker transactions (תקציב יומי, שינוי תקציב יומי) which are
+            // present in state.transactions but not shown in the UI.
+            if (deletedTx) {
+                const isRealTx = t => !t.isVirtual &&
+                    t.name !== 'תקציב יומי' &&
+                    !(t.name && t.name.startsWith('שינוי תקציב יומי'));
+                const realTxs = state.transactions.filter(isRealTx);
+                const newFirst = realTxs.length > 0
+                    ? [...realTxs].sort((a, b) =>
+                        new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
+                      )[0]
+                    : null;
+                const newStartDate = newFirst ? newFirst.date : '';
+                const newStartISO = newFirst
+                    ? (() => { const p = newFirst.date.split('/'); return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`; })()
+                    : null;
+                const oldStartISO = state.budget.startDate
+                    ? state.budget.startDate.split('/').reverse().join('-')
+                    : null;
+                if (newStartISO !== oldStartISO) {
+                    state.budget.startDate = newStartDate;
+                    localStorage.setItem('cached_start_date', newStartDate);
+                    if (sbClient && newStartISO) {
+                        sbClient.from('budget_settings')
+                            .delete()
+                            .eq('user_token', USER_TOKEN)
+                            .eq('category_name', '__start_date__')
+                            .then(() => sbClient.from('budget_settings').insert({
+                                category_name: '__start_date__',
+                                budget_amount: 0,
+                                type: 'system',
+                                parent_group: newStartDate,
+                                user_token: USER_TOKEN
+                            }));
+                        if (state.budget.g4 > 0) {
+                            sbClient.rpc('update_daily_budget', {
+                                p_user_token:   USER_TOKEN,
+                                p_daily_budget: state.budget.g4 / 30,
+                                p_start_date:   newStartISO
+                            });
+                        }
+                    }
+                }
+            }
+
             // Recalculate balance from DB after delete
             state.balance = await fetchBalance();
             localStorage.setItem('cached_balance', state.balance.toString());
@@ -4095,11 +4157,11 @@
                 new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
             );
             const fp = sorted[0].date.split('/');
-            if (fp.length === 3) startDate = new Date(parseInt(fp[2]), parseInt(fp[1]) - 1, 1);
+            if (fp.length === 3) startDate = new Date(parseInt(fp[2]), parseInt(fp[1]) - 1, parseInt(fp[0]));
         }
         if (!startDate && state.budget.startDate) {
             const sp = state.budget.startDate.split('/');
-            if (sp.length === 3) startDate = new Date(parseInt(sp[2]), parseInt(sp[1]) - 1, 1);
+            if (sp.length === 3) startDate = new Date(parseInt(sp[2]), parseInt(sp[1]) - 1, parseInt(sp[0]));
         }
         if (!startDate) startDate = new Date();
 
@@ -4114,20 +4176,29 @@
             return;
         }
 
-        // בנה רשימת חודשים מתאריך ההתחלה עד עכשיו
+        // בנה רשימת חודשים מתאריך ההתחלה עד עכשיו.
+        // כולל רק חודשים שיום תחילת המחזור שלהם (cycleStartDay) כבר עבר.
         const fromMonthOpt = document.getElementById('fromMonthOption');
         fromMonthOpt.classList.remove('hidden');
         const sel = document.getElementById('fromMonthSelect');
         sel.innerHTML = '';
         const monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+        const cycleDay = state.budget.cycleStartDay || 1;
+        const today = new Date(); today.setHours(0, 0, 0, 0);
         for (let m = 0; m <= monthsElapsed; m++) {
             const d = new Date(startDate.getFullYear(), startDate.getMonth() + m, 1);
+            // The effective cycle-start date for this month option
+            const cycleStart = new Date(d.getFullYear(), d.getMonth(), cycleDay);
+            cycleStart.setHours(0, 0, 0, 0);
+            // Skip months whose budget cycle hasn't started yet
+            if (cycleStart > today) continue;
             const opt = document.createElement('option');
             opt.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
             opt.textContent = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-            if (m === monthsElapsed) opt.selected = true;
             sel.appendChild(opt);
         }
+        // Default selection: last available month
+        if (sel.options.length > 0) sel.options[sel.options.length - 1].selected = true;
 
         const o = document.getElementById('retroUpdateOverlay');
         o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10);
@@ -4150,7 +4221,7 @@
 
             if (mode === 'retro') {
                 const effectiveStart = startDate || new Date();
-                startDateISO = `${effectiveStart.getFullYear()}-${String(effectiveStart.getMonth()+1).padStart(2,'0')}-01`;
+                startDateISO = `${effectiveStart.getFullYear()}-${String(effectiveStart.getMonth()+1).padStart(2,'0')}-${String(effectiveStart.getDate()).padStart(2,'0')}`;
 
                 // Update/insert history starting at this retro start date
                 await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__daily_budget_history__:' + startDateISO);
@@ -4174,12 +4245,13 @@
                 const fromDate = selVal ? new Date(selVal) : new Date();
                 fromDate.setHours(0,0,0,0);
                 
-                const historyStartDate = `${fromDate.getFullYear()}-${String(fromDate.getMonth()+1).padStart(2,'0')}-01`;
+                const cycleDay = state.budget.cycleStartDay || 1;
+                const historyStartDate = `${fromDate.getFullYear()}-${String(fromDate.getMonth()+1).padStart(2,'0')}-${String(cycleDay).padStart(2,'0')}`;
 
                 // Save previous rate start date in history if it doesn't exist
                 let prevStartISO = '1970-01-01';
                 if (startDate) {
-                    prevStartISO = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-01`;
+                    prevStartISO = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`;
                 }
                 const existingPrev = (state.budget.dailyBudgetHistory || []).some(h => h.startDate === prevStartISO);
                 if (!existingPrev) {
@@ -9477,7 +9549,7 @@
                         const bh = 40;
                         let bx = x + 10;
                         if (bx + bw > chartArea.right - 4) bx = x - bw - 10;
-                        const by = Math.max(chartArea.top + 4, Math.min(y - bh / 2, chartArea.bottom - bh - 4));
+                        const by = chartArea.top + 4;
                         const r = 5;
 
                         c.fillStyle = 'rgba(15,23,42,0.88)';
