@@ -2525,6 +2525,7 @@
         });
         const expenseDatesISO = [...expenseDateSet].sort(); // ascending
 
+
         const today = new Date();
         today.setHours(0,0,0,0);
         const todayISO = dateToISO(today);
@@ -2567,17 +2568,28 @@
             }
         }
 
-        // For each date that has expenses: accumulate budget from (prevDate+1) to (thisDate)
+        // Helper: find the start date of the budget segment active on a given ISO date
+        function getActiveSegmentStart(isoDate) {
+            let segStart = sortedHistory[0].startDate;
+            for (const seg of sortedHistory) {
+                if (seg.startDate <= isoDate) segStart = seg.startDate;
+                else break;
+            }
+            return segStart;
+        }
+
+        // For each date that has expenses: accumulate budget from (prevDate+1) to (thisDate).
+        // The first expense date is the anchor — no budget accumulates before it.
         let isFirst = true;
         for (const expISO of expenseDatesISO) {
             let effectiveFrom;
+
             if (isFirst) {
-                // First expense: accumulate from the budget start date so days before
-                // the first שוטף expense (e.g. מתוכנן-only days) are counted here.
-                effectiveFrom = actualBudgetStart <= expISO ? actualBudgetStart : expISO;
+                // First expense sets the start: only count budget for that day itself.
+                effectiveFrom = expISO;
                 isFirst = false;
             } else {
-                const fromISO = (() => {
+                let fromISO = (() => {
                     const d = new Date(prevDateISO);
                     d.setDate(d.getDate() + 1);
                     return dateToISO(d);
@@ -2602,7 +2614,7 @@
         // Handle today: if today has no expenses, accumulate from (lastExpenseDate+1) to today
         const lastExpISO = expenseDatesISO[expenseDatesISO.length - 1];
         if (lastExpISO < todayISO) {
-            const fromISO = (() => {
+            let fromISO = (() => {
                 const d = new Date(lastExpISO);
                 d.setDate(d.getDate() + 1);
                 return dateToISO(d);
@@ -6731,8 +6743,8 @@
         });
 
         // Inject virtual "תקציב יומי" income entries (Phase 1 — frontend only, no DB).
-        // Only active in the default paginated view (not when a date range filter is applied).
-        if (window.FEATURE_NEW_BUDGET_DISPLAY && state.mainViewFilter === 'current' && !searchQ && !state.activeCategoryFilter && useDatePagination) {
+        // Active in any date view (pagination or date-range filter).
+        if (window.FEATURE_NEW_BUDGET_DISPLAY && state.mainViewFilter === 'current' && !searchQ && !state.activeCategoryFilter) {
             // Use all שוטף (current) transactions for accumulation calculation — not just the paginated view
             const allCurrentTxs = state.transactions.filter(tx => {
                 if (tx.isVirtual) return false;
@@ -6747,10 +6759,11 @@
             const _todayStrForVirtual = `${String(_todayForVirtual.getDate()).padStart(2,'0')}/${String(_todayForVirtual.getMonth()+1).padStart(2,'0')}/${_todayForVirtual.getFullYear()}`;
 
             virtualEntries.forEach(vTx => {
-                // Only inject virtual entries for dates already shown in the paginated list,
-                // PLUS today's entry if today has no real expenses (that date group is new).
+                // Only inject virtual entries for dates already shown in the list,
+                // PLUS today's entry if today has no real expenses (only in pagination mode,
+                // so we don't create a stray "today" group when viewing a past date range).
                 const dateAlreadyInGroup = !!grouped[vTx.date];
-                const isTodayNoExpenses = vTx.date === _todayStrForVirtual && !dateAlreadyInGroup;
+                const isTodayNoExpenses = useDatePagination && vTx.date === _todayStrForVirtual && !dateAlreadyInGroup;
                 if (!dateAlreadyInGroup && !isTodayNoExpenses) return;
 
                 // Skip if a real DB budget-marker transaction already covers this date
