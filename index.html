@@ -2289,8 +2289,20 @@
             if (txRes.error) throw txRes.error;
             state.transactions = (txRes.data || []).map(mapSupabaseTx);
             
+            // Keep the raw server balance for the mismatch check in cleanupDailyBudgetHistory
+            window._lastServerBalance = balance;
             state.balance = balance;
-            
+
+            // If dailyBudgetHistory is loaded and the clipped accumulated is positive,
+            // recalculate balance client-side so it uses the clipped accumulated.
+            // Guard: if accumulated = 0 (empty/fully-filtered history), keep the server balance.
+            if (window.calculateClientSideBalance && window.calculateAccumulatedBudget) {
+                const accToday = window.calculateAccumulatedBudget(new Date());
+                if (accToday > 0) {
+                    state.balance = window.calculateClientSideBalance();
+                }
+            }
+
             localStorage.setItem('expense_history', JSON.stringify(state.transactions));
             localStorage.setItem('cached_balance', state.balance.toString());
 
@@ -2314,6 +2326,10 @@
                         }).then(async ({ error }) => {
                             if (!error) {
                                 state.balance = await fetchBalance();
+                                if (window.calculateClientSideBalance && window.calculateAccumulatedBudget) {
+                                    const acc = window.calculateAccumulatedBudget(new Date());
+                                    if (acc > 0) state.balance = window.calculateClientSideBalance();
+                                }
                                 localStorage.setItem('cached_balance', state.balance.toString());
                                 render();
                             }
@@ -2322,6 +2338,8 @@
                 }
             }
 
+            // Allow cleanup to re-run if user manually refreshed
+            if (isManual) window._budgetHistoryCleanedUp = false;
             render();
             if (isManual) window.showToast('עודכן בהצלחה', 'check');
         } catch (e) {
@@ -2421,9 +2439,27 @@
     };
 
     window.calculateAccumulatedBudget = function(untilDate = new Date()) {
-        const history = state.budget.dailyBudgetHistory || [];
+        let history = state.budget.dailyBudgetHistory || [];
         if (history.length === 0) return 0;
-        
+
+        // Clip stale history entries that predate the user's current tracking period.
+        // Priority: use the "תקציב יומי" initial marker date (the true budget start),
+        // then fall back to state.budget.startDate.
+        let clipISO = null;
+        const initialMarkerTx = (state.transactions || []).find(tx => tx.name === 'תקציב יומי' && !tx.isVirtual);
+        if (initialMarkerTx && initialMarkerTx.date) {
+            const p = initialMarkerTx.date.split('/');
+            if (p.length === 3) clipISO = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+        }
+        if (!clipISO && state.budget.startDate) {
+            const sp = state.budget.startDate.split('/');
+            if (sp.length === 3) clipISO = `${sp[2]}-${sp[1].padStart(2,'0')}-${sp[0].padStart(2,'0')}`;
+        }
+        if (clipISO) {
+            const clipped = history.filter(h => h.startDate >= clipISO);
+            if (clipped.length > 0) history = clipped;
+        }
+
         const sorted = [...history].sort((a,b) => a.startDate.localeCompare(b.startDate));
         const target = new Date(untilDate);
         target.setHours(0,0,0,0);
@@ -2868,6 +2904,100 @@
         }
     };
 
+    // Removes dailyBudgetHistory entries that predate the current tracking period,
+    // and ensures an entry exists at the tracking start date.
+    // Only runs when the server balance (RPC) differs from the client-side balance,
+    // which means the history has stale entries inflating the accumulated budget.
+    window._budgetHistoryCleanedUp = false;
+    async function cleanupDailyBudgetHistory(serverBalance) {
+        if (window._budgetHistoryCleanedUp) return;
+        window._budgetHistoryCleanedUp = true;
+
+        if (!window.calculateAccumulatedBudget || !window.calculateClientSideBalance) return;
+        const history = state.budget.dailyBudgetHistory || [];
+        if (history.length === 0) return;
+
+        // Compare server balance vs client-side balance.
+        // If they match (within 1₪ rounding), history is clean — skip DB work entirely.
+        const acc = window.calculateAccumulatedBudget(new Date());
+        if (acc <= 0) return; // No valid history to work with
+        const clientBalance = window.calculateClientSideBalance();
+        if (Math.abs(clientBalance - serverBalance) < 1) return; // Already in sync
+
+        console.log(`[budgetHistory] Mismatch detected: server=₪${Math.round(serverBalance)}, client=₪${Math.round(clientBalance)} — checking for stale history`);
+
+        // Determine true tracking start: "תקציב יומי" marker date → state.budget.startDate
+        let clipISO = null;
+        const markerTx = (state.transactions || []).find(tx => tx.name === 'תקציב יומי' && !tx.isVirtual);
+        if (markerTx && markerTx.date) {
+            const p = markerTx.date.split('/');
+            if (p.length === 3) clipISO = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+        }
+        if (!clipISO && state.budget.startDate) {
+            const sp = state.budget.startDate.split('/');
+            if (sp.length === 3) clipISO = `${sp[2]}-${sp[1].padStart(2,'0')}-${sp[0].padStart(2,'0')}`;
+        }
+        if (!clipISO) return;
+
+        // Find entries that predate the tracking start
+        const stale = history.filter(h => h.startDate < clipISO);
+        if (stale.length === 0) {
+            // No stale history entries — the mismatch is caused by user_tokens.start_date
+            // being set to the budget-change date instead of the original tracking start.
+            // Fix it by updating start_date to the true tracking start (clipISO).
+            console.log(`[budgetHistory] No stale entries but mismatch — fixing user_tokens.start_date to ${clipISO}`);
+            await sbClient.rpc('update_daily_budget', {
+                p_user_token:   USER_TOKEN,
+                p_daily_budget: state.budget.g4 / 30,
+                p_start_date:   clipISO
+            });
+            // Re-check server balance to confirm the fix worked
+            const fixedServerBal = await fetchBalance();
+            window._lastServerBalance = fixedServerBal;
+            console.log(`[budgetHistory] After start_date fix: server=₪${Math.round(fixedServerBal)}, client=₪${Math.round(clientBalance)}`);
+            return;
+        }
+
+        console.log(`[budgetHistory] Removing ${stale.length} stale entries before ${clipISO}:`, stale.map(h => h.startDate));
+
+        // Delete stale rows from budget_settings
+        const staleKeys = stale.map(h => `__daily_budget_history__:${h.startDate}`);
+        const { error: delErr } = await sbClient.from('budget_settings')
+            .delete()
+            .eq('user_token', USER_TOKEN)
+            .in('category_name', staleKeys);
+        if (delErr) { console.warn('[budgetHistory] delete error:', delErr); return; }
+
+        // Update in-memory history
+        state.budget.dailyBudgetHistory = history.filter(h => h.startDate >= clipISO);
+
+        // Ensure there's at least one entry AT or AFTER clipISO
+        if (state.budget.dailyBudgetHistory.length === 0) {
+            // Use rate from most-recent stale entry (the rate active at clipISO)
+            const sortedStale = [...stale].sort((a, b) => a.startDate.localeCompare(b.startDate));
+            const rateAtClip = sortedStale[sortedStale.length - 1].dailyBudget;
+            const { error: insErr } = await sbClient.from('budget_settings').insert({
+                category_name: `__daily_budget_history__:${clipISO}`,
+                budget_amount: rateAtClip,
+                parent_group: clipISO,
+                type: 'system',
+                user_token: USER_TOKEN
+            });
+            if (!insErr) {
+                state.budget.dailyBudgetHistory = [{ startDate: clipISO, dailyBudget: rateAtClip }];
+                console.log(`[budgetHistory] Inserted missing entry at ${clipISO} rate=₪${rateAtClip}/day`);
+            }
+        }
+
+        // Recalculate balance with the clean history
+        const accClean = window.calculateAccumulatedBudget(new Date());
+        if (accClean > 0) {
+            state.balance = window.calculateClientSideBalance();
+            localStorage.setItem('cached_balance', state.balance.toString());
+            console.log(`[budgetHistory] Balance corrected: ₪${Math.round(serverBalance)} → ₪${Math.round(state.balance)}`);
+        }
+    }
+
     window.fetchData = async function() {
         if (!sbClient || !USER_TOKEN) return;
         setLoading(true);
@@ -2877,6 +3007,8 @@
             // before fetchTransactionsOnly calls calculateClientSideBalance
             await window.fetchBudgetData();
             await Promise.all([window.fetchTransactionsOnly(), window.fetchExpenseCategories()]);
+            // Clean up stale budget history entries only if server/client balance mismatch detected
+            await cleanupDailyBudgetHistory(window._lastServerBalance ?? state.balance);
             state.isDirty = false;
             render();
         } catch (e) {
@@ -3259,7 +3391,12 @@
                 expense_category_id: expInp?.value || null
             };
             state.transactions = [newTx, ...state.transactions];
-            state.balance = newBalance;
+            if (window.calculateClientSideBalance && window.calculateAccumulatedBudget) {
+                const accNow = window.calculateAccumulatedBudget(new Date());
+                state.balance = accNow > 0 ? window.calculateClientSideBalance() : newBalance;
+            } else {
+                state.balance = newBalance;
+            }
             localStorage.setItem('cached_balance', state.balance.toString());
 
             // Track add_expense (fire-and-forget)
@@ -4314,10 +4451,22 @@
             await sbClient.from('budget_settings').insert({ category_name: '__g4__', budget_amount: finalG4, type: 'system', user_token: USER_TOKEN });
 
             // עדכן daily_budget + start_date ב-user_tokens
+            // IMPORTANT: always pass the ORIGINAL tracking start date, not the budget-change date.
+            // user_tokens.start_date is the clip boundary used by get_balance to clip the history.
+            // If we pass historyStartDate (Aug 10) here, get_balance would only count days from
+            // Aug 10 at the new rate, ignoring all prior history — causing a severely wrong balance.
+            let originalStartISO = null;
+            if (startDate) {
+                originalStartISO = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`;
+            }
+            if (!originalStartISO && state.budget.startDate) {
+                const sp = state.budget.startDate.split('/');
+                if (sp.length === 3) originalStartISO = `${sp[2]}-${sp[1].padStart(2,'0')}-${sp[0].padStart(2,'0')}`;
+            }
             const { error: rpcErr } = await sbClient.rpc('update_daily_budget', {
                 p_user_token:   USER_TOKEN,
                 p_daily_budget: dailyBudget,
-                p_start_date:   startDateISO
+                p_start_date:   originalStartISO || startDateISO
             });
             if (rpcErr) throw rpcErr;
 
@@ -6810,7 +6959,9 @@
                 .filter(tx => {
                     const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
                     const isFixed   = txIsFixedLike(tx);
-                    return !isPlanned && !isFixed;
+                    // Exclude legacy adjustments — same set excluded by calculateClientSideBalance
+                    const isLegacyAdj = tx.isAdjustment || tx.category === 'איזון עדכון תקציב';
+                    return !isPlanned && !isFixed && !isLegacyAdj;
                 })
                 .sort((a, b) => {
                     const da = parseLocalDate(a.date);
@@ -6831,23 +6982,185 @@
                 }
             }
             
-            let running = state.balance;
+            // Use calculateClientSideBalance (clipped accumulated) as walk start,
+            // but only when accumulated > 0. If history is empty/fully filtered,
+            // fall back to state.balance (server RPC value) to avoid showing -X.
+            const _accToday = window.calculateAccumulatedBudget ? window.calculateAccumulatedBudget(new Date()) : 0;
+            const walkStartBalance = (_accToday > 0 && window.calculateClientSideBalance)
+                ? window.calculateClientSideBalance()
+                : state.balance;
+            let running = walkStartBalance;
+            window._dbgWalkLog = []; // for debug panel
+            window._dbgWalkStartBal = walkStartBalance;
+            window._dbgWalkToday = new Date(currentDateLocal);
             allTxsSorted.forEach(tx => {
                 const txDate = parseLocalDate(tx.date);
-                const diffMs = currentDateLocal - txDate;
-                const daysDiff = Math.floor(diffMs / (1000 * 3600 * 24));
                 
-                if (daysDiff > 0) {
-                    running -= daysDiff * dailyVal;
+                if (currentDateLocal > txDate) {
+                    // Use calculateAccumulatedBudget for gap: acc(A) - acc(B).
+                    // This mirrors the exact formula used to compute state.balance, so the
+                    // backward walk arrives at acc(firstTxDate) on the first day (= 42 for 09/06).
+                    const accFrom = window.calculateAccumulatedBudget ? window.calculateAccumulatedBudget(currentDateLocal) : 0;
+                    const accTo   = window.calculateAccumulatedBudget ? window.calculateAccumulatedBudget(txDate) : 0;
+                    const gapBudget = accFrom - accTo;
+                    window._dbgWalkLog.push({type:'gap', from: new Date(currentDateLocal), to: new Date(txDate), days: Math.round((currentDateLocal-txDate)/86400000), rate: '(acc)', subtracted: gapBudget});
+                    running -= gapBudget;
                     currentDateLocal = new Date(txDate);
                 }
                 
                 if (dailyBalanceMap[tx.date] === undefined) {
                     dailyBalanceMap[tx.date] = running;
                 }
-                running += safeParseFloat(tx.amount);
+
+                // Budget markers ("תקציב יומי" / "שינוי תקציב יומי …") are already
+                // factored into state.balance via calculateAccumulatedBudget — skip their amount.
+                const isBudgetMarker = tx.name === 'תקציב יומי' ||
+                                       (tx.name && tx.name.startsWith('שינוי תקציב יומי'));
+                if (isBudgetMarker) {
+                    window._dbgWalkLog.push({type:'marker', date: tx.date, name: tx.name, prevRate: '?', newRate: '?'});
+                } else {
+                    window._dbgWalkLog.push({type:'tx', date: tx.date, name: tx.name, amount: safeParseFloat(tx.amount), runningBefore: running});
+                    running += safeParseFloat(tx.amount);
+                }
             });
+
+            // Always include today in the map, even if there are no transactions today.
+            // balance(today) = walkStartBalance (= acc_clipped(today) - sumTxs).
+            const todayKeyForMap = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
+            if (dailyBalanceMap[todayKeyForMap] === undefined) {
+                dailyBalanceMap[todayKeyForMap] = walkStartBalance;
+            }
         }
+
+        // ===== DEBUG PANEL (disabled) =====
+        (function renderDebugPanel() { return;
+            let dbgEl = document.getElementById('debugBalanceLog');
+            if (!dbgEl) {
+                dbgEl = document.createElement('div');
+                dbgEl.id = 'debugBalanceLog';
+                dbgEl.style.cssText = 'position:fixed;top:8px;left:8px;right:8px;z-index:9999;background:#1e293b;color:#e2e8f0;font-family:monospace;font-size:11px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.5);max-height:70vh;overflow:hidden;direction:ltr;';
+                document.body.appendChild(dbgEl);
+            }
+            const today = new Date(); today.setHours(0,0,0,0);
+            const todayStr = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
+
+            // Build per-day expenses — same filter as the backward walk
+            const allForDebug = [...state.transactions]
+                .filter(tx => {
+                    if (tx.isVirtual) return false;
+                    const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+                    const isFixed   = txIsFixedLike(tx);
+                    const isLegacyAdj = tx.isAdjustment || tx.category === 'איזון עדכון תקציב';
+                    return !isPlanned && !isFixed && !isLegacyAdj;
+                })
+                .sort((a, b) => parseLocalDate(b.date) - parseLocalDate(a.date));
+
+            const expByDay = {};
+            allForDebug.forEach(tx => {
+                if (!expByDay[tx.date]) expByDay[tx.date] = [];
+                expByDay[tx.date].push({ name: tx.name, amount: safeParseFloat(tx.amount) });
+            });
+
+            const sortedDates = Object.keys(dailyBalanceMap).sort((a,b) => parseLocalDate(b) - parseLocalDate(a));
+
+            let rows = '';
+            sortedDates.forEach(date => {
+                const bal = Math.round(formatDisplayAmount(dailyBalanceMap[date]));
+                const color = bal >= 0 ? '#4ade80' : '#f87171';
+                const txsForDay = expByDay[date] || [];
+                const txStr = txsForDay.map(t => `${t.name}(${t.amount>0?'-':'+'}₪${Math.abs(Math.round(t.amount))})`).join(', ');
+                rows += `<tr><td style="padding:2px 6px;color:#94a3b8">${date === todayStr ? '★ '+date : date}</td><td style="padding:2px 6px;color:${color};text-align:right">₪${bal.toLocaleString()}</td><td style="padding:2px 6px;color:#cbd5e1">${txStr}</td></tr>`;
+            });
+
+            // Build walk trace rows
+            const walkLog = window._dbgWalkLog || [];
+            const todayDbg = window._dbgWalkToday;
+            const todayDbgStr = todayDbg ? `${String(todayDbg.getDate()).padStart(2,'0')}/${String(todayDbg.getMonth()+1).padStart(2,'0')}/${todayDbg.getFullYear()}` : '?';
+            let walkRows = '';
+            walkLog.forEach(e => {
+                if (e.type === 'gap') {
+                    const fmtD = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+                    walkRows += `<tr style="background:#1e3a5f"><td colspan="4" style="padding:2px 6px;color:#7dd3fc">📅 פער: ${fmtD(e.from)} → ${fmtD(e.to)} = ${e.days} ימים [acc-based] = -₪${Math.round(e.subtracted)}</td></tr>`;
+                } else if (e.type === 'marker') {
+                    walkRows += `<tr style="background:#2d1b69"><td colspan="4" style="padding:2px 6px;color:#c4b5fd">🔄 מרקר: ${e.name} | שיעור: ${e.prevRate}→${e.newRate}</td></tr>`;
+                } else {
+                    const sign = e.amount > 0 ? '-' : '+';
+                    walkRows += `<tr><td style="padding:2px 4px;color:#94a3b8;font-size:10px">${e.date}</td><td style="padding:2px 4px;color:#e2e8f0;font-size:10px">${e.name.substring(0,20)}</td><td style="padding:2px 4px;color:${e.amount>0?'#f87171':'#4ade80'};font-size:10px">${sign}₪${Math.abs(Math.round(e.amount))}</td><td style="padding:2px 4px;color:#64748b;font-size:10px">running→${Math.round(e.runningBefore+e.amount)}</td></tr>`;
+                }
+            });
+
+            // Build plain-text copy payload
+            const copyLines = [
+                `=== DEBUG: מאזן יומי | ${new Date().toLocaleString('he-IL')} ===`,
+                `יתרה: ₪${Math.round(state.balance)} | יומי: ₪${Math.round(dailyVal)} | startDate: ${state.budget.startDate||'?'}`,
+                `state.balance (client): ₪${Math.round(state.balance)} | get_balance (server): ₪${Math.round(window._lastServerBalance ?? NaN)} | walkStart: ₪${Math.round(window._dbgWalkStartBal)}`,
+                `txs: ${allForDebug.length} | map dates: ${sortedDates.length} | g4: ${state.budget.g4} | markerDate: ${(()=>{const m=(state.transactions||[]).find(t=>t.name==='תקציב יומי'&&!t.isVirtual);return m?m.date:'none';})()}`,
+                `rawHistory: ${JSON.stringify((state.budget.dailyBudgetHistory||[]).map(h=>({start:h.startDate,rate:Math.round(h.dailyBudget)})))}`,
+                `accumulated(today,clipped)=${Math.round(window.calculateAccumulatedBudget ? window.calculateAccumulatedBudget(new Date()) : -1)} | acc(firstDay)=${Math.round(window.calculateAccumulatedBudget && sortedDates.length ? window.calculateAccumulatedBudget(parseLocalDate(sortedDates[sortedDates.length-1])) : -1)}`,
+                '',
+                'תאריך\tמאזן\tהוצאות',
+                ...sortedDates.map(date => {
+                    const bal = Math.round(dailyBalanceMap[date]);
+                    const txsForDay = expByDay[date] || [];
+                    const txStr = txsForDay.map(t => `${t.name}(${t.amount>0?'-':'+'}₪${Math.abs(Math.round(t.amount))})`).join(', ');
+                    return `${date}\t₪${bal.toLocaleString()}\t${txStr}`;
+                }),
+                '',
+                `🚶 טרייס (${walkLog.length} צעדים):`,
+                ...walkLog.map(e => {
+                    if (e.type === 'gap') {
+                        const fmtD = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+                        return `📅 פער: ${fmtD(e.from)} → ${fmtD(e.to)} = ${e.days} ימים = -₪${Math.round(e.subtracted)}`;
+                    } else if (e.type === 'marker') {
+                        return `🔄 מרקר: ${e.name}`;
+                    } else {
+                        const sign = e.amount > 0 ? '-' : '+';
+                        return `${e.date}\t${e.name}\t${sign}₪${Math.abs(Math.round(e.amount))}\trunning→${Math.round(e.runningBefore+e.amount)}`;
+                    }
+                })
+            ].join('\n');
+
+            dbgEl.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#0f172a;border-radius:10px 10px 0 0;cursor:pointer" onclick="var b=this.parentElement.querySelector('#dbgBody');b.style.display=b.style.display==='none'?'block':'none'">
+                    <span style="font-weight:bold;color:#60a5fa">🔍 DEBUG: מאזן יומי</span>
+                    <span style="color:#64748b;font-size:10px">יתרה: ₪${Math.round(formatDisplayAmount(state.balance)).toLocaleString()} | יומי: ₪${Math.round(dailyVal)} | היום בקוד: ${todayDbgStr}</span>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <button id="dbgCopyBtn" onclick="event.stopPropagation();navigator.clipboard.writeText(document.getElementById('dbgCopyBtn').dataset.payload).then(()=>{this.textContent='✓ הועתק';setTimeout(()=>{this.textContent='📋 העתק'},2000)}).catch(()=>alert('שגיאה בהעתקה'))" style="color:#60a5fa;font-size:12px;background:#1e3a5f;border:1px solid #3b82f6;border-radius:6px;padding:2px 8px;cursor:pointer">📋 העתק</button>
+                        <button onclick="event.stopPropagation();document.getElementById('debugBalanceLog').remove()" style="color:#f87171;font-size:16px;background:none;border:none;cursor:pointer">✕</button>
+                    </div>
+                </div>
+                <div id="dbgBody" style="overflow-y:auto;max-height:60vh;padding:4px">
+                    <div style="padding:4px 8px;color:#fbbf24;font-size:10px;border-bottom:1px solid #334155">
+                        📊 מאזן יומי לכל תאריך:
+                    </div>
+                    <table style="width:100%;border-collapse:collapse">
+                        <thead><tr style="color:#60a5fa;border-bottom:1px solid #334155"><th style="padding:4px 6px;text-align:left">תאריך</th><th style="padding:4px 6px;text-align:right">מאזן</th><th style="padding:4px 6px;text-align:left">הוצאות</th></tr></thead>
+                        <tbody>${rows || '<tr><td colspan="3" style="padding:8px;color:#94a3b8">אין נתונים</td></tr>'}</tbody>
+                    </table>
+                    <div style="padding:4px 8px;color:#fbbf24;font-size:10px;border-top:1px solid #334155;margin-top:4px">
+                        🚶 טרייס הילוך אחורה (${walkLog.length} צעדים):
+                    </div>
+                    <table style="width:100%;border-collapse:collapse">
+                        <tbody>${walkRows || '<tr><td style="padding:8px;color:#94a3b8">אין טרייס</td></tr>'}</tbody>
+                    </table>
+                    <div style="padding:6px 8px;margin-top:4px;border-top:1px solid #334155;color:#94a3b8;font-size:10px">
+                        txs: ${allForDebug.length} | map dates: ${sortedDates.length} | g4: ${state.budget.g4} | dailyVal: ₪${dailyVal.toFixed(1)}/day | startDate: ${state.budget.startDate||'?'} | markerDate: ${(()=>{const m=(state.transactions||[]).find(t=>t.name==='תקציב יומי'&&!t.isVirtual);return m?m.date:'none';})()}
+                    </div>
+                    <div style="padding:6px 8px;border-top:1px solid #334155;color:#e2e8f0;font-size:10px">
+                        state.balance (client): ₪${Math.round(state.balance)} | get_balance (server): ₪${Math.round(window._lastServerBalance ?? NaN)} | walkStart: ₪${Math.round(window._dbgWalkStartBal)}
+                    </div>
+                    <div style="padding:6px 8px;border-top:1px solid #334155;color:#fbbf24;font-size:10px">
+                        📋 rawHistory (${(state.budget.dailyBudgetHistory||[]).length}): ${JSON.stringify((state.budget.dailyBudgetHistory||[]).map(h=>({start:h.startDate,rate:Math.round(h.dailyBudget)})))}
+                    </div>
+                    <div style="padding:6px 8px;border-top:1px solid #334155;color:#34d399;font-size:10px">
+                        💰 accumulated(today, clipped)=${Math.round(window.calculateAccumulatedBudget ? window.calculateAccumulatedBudget(new Date()) : -1)} | acc(firstDay)=${Math.round(window.calculateAccumulatedBudget && sortedDates.length ? window.calculateAccumulatedBudget(parseLocalDate(sortedDates[sortedDates.length-1])) : -1)}
+                    </div>
+                </div>`;
+            // Set copy payload on button after innerHTML is set (avoids escaping issues)
+            const copyBtn = document.getElementById('dbgCopyBtn');
+            if (copyBtn) copyBtn.dataset.payload = copyLines;
+        })();
+        // ===== END DEBUG PANEL =====
 
         const listEl = document.getElementById('transactionList');
         if (listEl) {
@@ -9153,10 +9466,10 @@
         // use only current (non-planned, non-fixed) transactions, work backwards from state.balance
         const allCurrentTxsSorted = [...state.transactions]
             .filter(tx => {
-                if (tx.isAdjustment) return false;
                 const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
                 const isFixed   = txIsFixedLike(tx);
-                return !isPlanned && !isFixed;
+                const isLegacyAdj = tx.isAdjustment || tx.category === 'איזון עדכון תקציב';
+                return !isPlanned && !isFixed && !isLegacyAdj;
             })
             .sort((a, b) => {
                 const da = parseLocalDate(a.date), db = parseLocalDate(b.date);
@@ -9164,26 +9477,34 @@
                 return (b.row || 0) - (a.row || 0);
             });
 
-        // Build dailyBalanceMap exactly like the expenses page
+        // Build dailyBalanceMap exactly like the expenses page (acc-based gaps).
         const dailyBalanceMap = {};
         let currentDateLocal = new Date(today);
         if (allCurrentTxsSorted.length > 0) {
             const newestTxDate = parseLocalDate(allCurrentTxsSorted[0].date);
             if (newestTxDate > currentDateLocal) currentDateLocal = new Date(newestTxDate);
         }
-        let running = state.balance;
+        const _chartAcc = window.calculateAccumulatedBudget ? window.calculateAccumulatedBudget(new Date()) : 0;
+        const chartStartBalance = (_chartAcc > 0 && window.calculateClientSideBalance)
+            ? window.calculateClientSideBalance()
+            : state.balance;
+        let running = chartStartBalance;
         allCurrentTxsSorted.forEach(tx => {
             const txDate = parseLocalDate(tx.date);
-            const diffMs = currentDateLocal - txDate;
-            const daysDiff = Math.floor(diffMs / (1000 * 3600 * 24));
-            if (daysDiff > 0) {
-                running -= daysDiff * dailyVal;
+            if (currentDateLocal > txDate) {
+                const accFrom = window.calculateAccumulatedBudget ? window.calculateAccumulatedBudget(currentDateLocal) : 0;
+                const accTo   = window.calculateAccumulatedBudget ? window.calculateAccumulatedBudget(txDate) : 0;
+                running -= accFrom - accTo;
                 currentDateLocal = new Date(txDate);
             }
             if (dailyBalanceMap[tx.date] === undefined) {
                 dailyBalanceMap[tx.date] = running;
             }
-            running += safeParseFloat(tx.amount);
+            const isBudgetMarker = tx.name === 'תקציב יומי' ||
+                                   (tx.name && tx.name.startsWith('שינוי תקציב יומי'));
+            if (!isBudgetMarker) {
+                running += safeParseFloat(tx.amount);
+            }
         });
 
         // Now build the chart data for the selected month using the dailyBalanceMap.
