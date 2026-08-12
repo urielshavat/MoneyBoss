@@ -2306,19 +2306,38 @@
             localStorage.setItem('expense_history', JSON.stringify(state.transactions));
             localStorage.setItem('cached_balance', state.balance.toString());
 
-            // סנכרן start_date תמיד — לפי התנועה הראשונה אם קיימת, אחרת השאר כפי שהוא
+            // סנכרן start_date לפי ההוצאה הראשונה — גובר על כל מקור אחר (ייבוא GAS, הגדרות ידניות וכו')
             if (state.transactions.length > 0) {
                 const sorted = [...state.transactions].sort((a, b) =>
                     new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
                 );
-                const fp = sorted[0].date.split('/');
+                const firstTxDate = sorted[0].date; // dd/mm/yyyy
+                const fp = firstTxDate.split('/');
                 if (fp.length === 3) {
                     const startDateISO = `${fp[2]}-${fp[1].padStart(2,'0')}-${fp[0].padStart(2,'0')}`;
-                    // עדכן רק אם start_date השתנה
-                    const currentStart = state.budget.startDate
-                        ? state.budget.startDate.split('/').reverse().join('-')
-                        : null;
-                    if (startDateISO !== currentStart) {
+                    // Compare using zero-padded ISO to avoid mismatches from unpadded stored values
+                    let currentStartISO = null;
+                    if (state.budget.startDate) {
+                        const csp = state.budget.startDate.split('/');
+                        if (csp.length === 3) currentStartISO = `${csp[2]}-${csp[1].padStart(2,'0')}-${csp[0].padStart(2,'0')}`;
+                    }
+                    if (startDateISO !== currentStartISO) {
+                        // Update in-memory startDate so calculateAccumulatedBudget clips from the right date
+                        state.budget.startDate = firstTxDate;
+                        localStorage.setItem('cached_start_date', firstTxDate);
+                        // Persist to budget_settings.__start_date__ so next load is already correct
+                        sbClient.from('budget_settings')
+                            .delete()
+                            .eq('user_token', USER_TOKEN)
+                            .eq('category_name', '__start_date__')
+                            .then(() => sbClient.from('budget_settings').insert({
+                                category_name: '__start_date__',
+                                budget_amount: 0,
+                                type: 'system',
+                                parent_group: firstTxDate,
+                                user_token: USER_TOKEN
+                            }));
+                        // Also sync user_tokens.start_date
                         sbClient.rpc('update_daily_budget', {
                             p_user_token:   USER_TOKEN,
                             p_daily_budget: state.budget.g4 / 30,
@@ -2443,21 +2462,39 @@
         if (history.length === 0) return 0;
 
         // Clip stale history entries that predate the user's current tracking period.
-        // Priority: use the "תקציב יומי" initial marker date (the true budget start),
-        // then fall back to state.budget.startDate.
+        // Priority: startDate (explicitly declared tracking start) → "תקציב יומי" marker date.
+        // startDate is more reliable because the marker is created when the user first opens
+        // the app, which may be later than when they actually started tracking expenses.
         let clipISO = null;
-        const initialMarkerTx = (state.transactions || []).find(tx => tx.name === 'תקציב יומי' && !tx.isVirtual);
-        if (initialMarkerTx && initialMarkerTx.date) {
-            const p = initialMarkerTx.date.split('/');
-            if (p.length === 3) clipISO = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
-        }
-        if (!clipISO && state.budget.startDate) {
+        if (state.budget.startDate) {
             const sp = state.budget.startDate.split('/');
             if (sp.length === 3) clipISO = `${sp[2]}-${sp[1].padStart(2,'0')}-${sp[0].padStart(2,'0')}`;
         }
+        if (!clipISO) {
+            const initialMarkerTx = (state.transactions || []).find(tx => tx.name === 'תקציב יומי' && !tx.isVirtual);
+            if (initialMarkerTx && initialMarkerTx.date) {
+                const p = initialMarkerTx.date.split('/');
+                if (p.length === 3) clipISO = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+            }
+        }
         if (clipISO) {
             const clipped = history.filter(h => h.startDate >= clipISO);
-            if (clipped.length > 0) history = clipped;
+            if (clipped.length > 0) {
+                history = clipped;
+            } else if (history.length > 0) {
+                // ALL entries predate the tracking start (e.g. a 1970-01-01 epoch entry).
+                // Synthesize a single entry at clipISO using the most-recent stale entry's rate.
+                const sortedStale = [...history].sort((a, b) => a.startDate.localeCompare(b.startDate));
+                const rateAtClip = sortedStale[sortedStale.length - 1].dailyBudget;
+                history = [{ startDate: clipISO, dailyBudget: rateAtClip }];
+            }
+            // If the earliest remaining entry starts AFTER clipISO, fill the gap by prepending
+            // a synthetic entry at clipISO. This handles users who added expenses before the
+            // budget was set up in the app (e.g. startDate=Jan 1, first history entry=Jul 26).
+            const sortedForGap = [...history].sort((a, b) => a.startDate.localeCompare(b.startDate));
+            if (sortedForGap.length > 0 && sortedForGap[0].startDate > clipISO) {
+                history = [{ startDate: clipISO, dailyBudget: sortedForGap[0].dailyBudget }, ...history];
+            }
         }
 
         const sorted = [...history].sort((a,b) => a.startDate.localeCompare(b.startDate));
@@ -2486,8 +2523,13 @@
                 }
             }
             
-            const diffMs = periodEnd.getTime() - currentStart.getTime();
-            const days = Math.max(0, Math.floor(diffMs / (1000*3600*24)) + 1);
+            // Use UTC-based arithmetic to avoid DST off-by-one errors.
+            // Local time arithmetic loses 1 hour on spring-forward day, causing Math.floor
+            // to undercount by 1 day for any period spanning an Israeli DST transition.
+            const diffDays = (Date.UTC(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate()) -
+                              Date.UTC(currentStart.getFullYear(), currentStart.getMonth(), currentStart.getDate()))
+                             / (1000 * 3600 * 24);
+            const days = Math.max(0, diffDays + 1);
             
             total += days * current.dailyBudget;
         }
@@ -2530,7 +2572,12 @@
             start.setHours(0,0,0,0);
             end.setHours(0,0,0,0);
             if (end < start) return 0;
-            const dayBeforeStart = new Date(start.getTime() - 24*3600*1000);
+            // Use calendar-based subtraction (setDate - 1) instead of subtracting 24h in ms.
+            // Subtracting 24 * 3600 * 1000 fails across DST boundaries: e.g. March 28 local
+            // midnight (UTC+3 summer) minus 24h lands at March 26 23:00 winter, which then
+            // rounds to March 26 — one day too early — causing an extra budget day to appear.
+            const dayBeforeStart = new Date(start);
+            dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
             return window.calculateAccumulatedBudget(end) - window.calculateAccumulatedBudget(dayBeforeStart);
         }
 
@@ -2904,10 +2951,10 @@
         }
     };
 
-    // Removes dailyBudgetHistory entries that predate the current tracking period,
-    // and ensures an entry exists at the tracking start date.
-    // Only runs when the server balance (RPC) differs from the client-side balance,
-    // which means the history has stale entries inflating the accumulated budget.
+    // Audits dailyBudgetHistory on every page load and fixes three classes of problems:
+    //  ① Stale entries (before the tracking start) — deleted from DB
+    //  ② Missing entry at tracking start (history starts later than startDate) — inserted in DB
+    //  ③ Wrong user_tokens.start_date (set to budget-change date instead of tracking start) — fixed
     window._budgetHistoryCleanedUp = false;
     async function cleanupDailyBudgetHistory(serverBalance) {
         if (window._budgetHistoryCleanedUp) return;
@@ -2917,79 +2964,89 @@
         const history = state.budget.dailyBudgetHistory || [];
         if (history.length === 0) return;
 
-        // Compare server balance vs client-side balance.
-        // If they match (within 1₪ rounding), history is clean — skip DB work entirely.
-        const acc = window.calculateAccumulatedBudget(new Date());
-        if (acc <= 0) return; // No valid history to work with
-        const clientBalance = window.calculateClientSideBalance();
-        if (Math.abs(clientBalance - serverBalance) < 1) return; // Already in sync
-
-        console.log(`[budgetHistory] Mismatch detected: server=₪${Math.round(serverBalance)}, client=₪${Math.round(clientBalance)} — checking for stale history`);
-
-        // Determine true tracking start: "תקציב יומי" marker date → state.budget.startDate
+        // Tracking start: startDate first (most reliable), fall back to marker date.
+        // startDate is more reliable because the budget marker is created when the user
+        // first opens the app, which may be later than when they started tracking.
         let clipISO = null;
-        const markerTx = (state.transactions || []).find(tx => tx.name === 'תקציב יומי' && !tx.isVirtual);
-        if (markerTx && markerTx.date) {
-            const p = markerTx.date.split('/');
-            if (p.length === 3) clipISO = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
-        }
-        if (!clipISO && state.budget.startDate) {
+        if (state.budget.startDate) {
             const sp = state.budget.startDate.split('/');
             if (sp.length === 3) clipISO = `${sp[2]}-${sp[1].padStart(2,'0')}-${sp[0].padStart(2,'0')}`;
         }
+        if (!clipISO) {
+            const markerTx = (state.transactions || []).find(tx => tx.name === 'תקציב יומי' && !tx.isVirtual);
+            if (markerTx && markerTx.date) {
+                const p = markerTx.date.split('/');
+                if (p.length === 3) clipISO = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+            }
+        }
         if (!clipISO) return;
 
-        // Find entries that predate the tracking start
+        let didChange = false;
+
+        // ① Remove stale entries (those that predate the tracking start).
+        //    Must run BEFORE the balance-mismatch check: when all entries are stale
+        //    (e.g. 1970-01-01 epoch entry), client and server agree on the wrong value,
+        //    so a balance comparison alone would not detect the problem.
         const stale = history.filter(h => h.startDate < clipISO);
-        if (stale.length === 0) {
-            // No stale history entries — the mismatch is caused by user_tokens.start_date
-            // being set to the budget-change date instead of the original tracking start.
-            // Fix it by updating start_date to the true tracking start (clipISO).
-            console.log(`[budgetHistory] No stale entries but mismatch — fixing user_tokens.start_date to ${clipISO}`);
-            await sbClient.rpc('update_daily_budget', {
-                p_user_token:   USER_TOKEN,
-                p_daily_budget: state.budget.g4 / 30,
-                p_start_date:   clipISO
-            });
-            // Re-check server balance to confirm the fix worked
-            const fixedServerBal = await fetchBalance();
-            window._lastServerBalance = fixedServerBal;
-            console.log(`[budgetHistory] After start_date fix: server=₪${Math.round(fixedServerBal)}, client=₪${Math.round(clientBalance)}`);
-            return;
+        if (stale.length > 0) {
+            console.log(`[budgetHistory] Removing ${stale.length} stale entries before ${clipISO}:`, stale.map(h => h.startDate));
+            const staleKeys = stale.map(h => `__daily_budget_history__:${h.startDate}`);
+            const { error: delErr } = await sbClient.from('budget_settings')
+                .delete()
+                .eq('user_token', USER_TOKEN)
+                .in('category_name', staleKeys);
+            if (delErr) { console.warn('[budgetHistory] delete error:', delErr); return; }
+            state.budget.dailyBudgetHistory = history.filter(h => h.startDate >= clipISO);
+            didChange = true;
         }
 
-        console.log(`[budgetHistory] Removing ${stale.length} stale entries before ${clipISO}:`, stale.map(h => h.startDate));
-
-        // Delete stale rows from budget_settings
-        const staleKeys = stale.map(h => `__daily_budget_history__:${h.startDate}`);
-        const { error: delErr } = await sbClient.from('budget_settings')
-            .delete()
-            .eq('user_token', USER_TOKEN)
-            .in('category_name', staleKeys);
-        if (delErr) { console.warn('[budgetHistory] delete error:', delErr); return; }
-
-        // Update in-memory history
-        state.budget.dailyBudgetHistory = history.filter(h => h.startDate >= clipISO);
-
-        // Ensure there's at least one entry AT or AFTER clipISO
-        if (state.budget.dailyBudgetHistory.length === 0) {
-            // Use rate from most-recent stale entry (the rate active at clipISO)
-            const sortedStale = [...stale].sort((a, b) => a.startDate.localeCompare(b.startDate));
-            const rateAtClip = sortedStale[sortedStale.length - 1].dailyBudget;
+        // ② Ensure an entry exists AT the tracking start date.
+        //    Covers two sub-cases:
+        //    a) All entries were stale → history is now empty → insert at clipISO
+        //    b) No stale entries but earliest entry is after clipISO → gap between
+        //       the declared startDate and when the budget was first configured in the app
+        //       (e.g. startDate=Jan 1, first history entry=Jul 26 → 6-month gap not counted)
+        const currentHistory = state.budget.dailyBudgetHistory || [];
+        const sortedCurrent = [...currentHistory].sort((a, b) => a.startDate.localeCompare(b.startDate));
+        if (sortedCurrent.length === 0 || sortedCurrent[0].startDate > clipISO) {
+            const rateForEntry = sortedCurrent.length > 0
+                ? sortedCurrent[0].dailyBudget
+                : (stale.length > 0
+                    ? [...stale].sort((a, b) => a.startDate.localeCompare(b.startDate)).at(-1).dailyBudget
+                    : state.budget.g4 / 30);
+            console.log(`[budgetHistory] Inserting missing entry at ${clipISO} rate=₪${rateForEntry}/day`);
             const { error: insErr } = await sbClient.from('budget_settings').insert({
                 category_name: `__daily_budget_history__:${clipISO}`,
-                budget_amount: rateAtClip,
+                budget_amount: rateForEntry,
                 parent_group: clipISO,
                 type: 'system',
                 user_token: USER_TOKEN
             });
             if (!insErr) {
-                state.budget.dailyBudgetHistory = [{ startDate: clipISO, dailyBudget: rateAtClip }];
-                console.log(`[budgetHistory] Inserted missing entry at ${clipISO} rate=₪${rateAtClip}/day`);
+                state.budget.dailyBudgetHistory = [{ startDate: clipISO, dailyBudget: rateForEntry }, ...currentHistory];
+                didChange = true;
             }
         }
 
-        // Recalculate balance with the clean history
+        if (!didChange) {
+            // History looks correct — check for wrong user_tokens.start_date (③)
+            const acc = window.calculateAccumulatedBudget(new Date());
+            if (acc <= 0) return;
+            const clientBalance = window.calculateClientSideBalance();
+            if (Math.abs(clientBalance - serverBalance) < 1) return; // Already in sync
+            console.log(`[budgetHistory] No history issue but mismatch — fixing user_tokens.start_date to ${clipISO}`);
+            await sbClient.rpc('update_daily_budget', {
+                p_user_token:   USER_TOKEN,
+                p_daily_budget: state.budget.g4 / 30,
+                p_start_date:   clipISO
+            });
+            const fixedBal = await fetchBalance();
+            window._lastServerBalance = fixedBal;
+            console.log(`[budgetHistory] After start_date fix: server=₪${Math.round(fixedBal)}`);
+            return;
+        }
+
+        // Recalculate balance with the corrected history
         const accClean = window.calculateAccumulatedBudget(new Date());
         if (accClean > 0) {
             state.balance = window.calculateClientSideBalance();
@@ -4368,9 +4425,32 @@
             const oldDailyBudget = oldG4 / 30;
             let startDateISO = null;
 
+            // Helper: delete all history entries and marker transactions AFTER a given ISO date cutoff.
+            // This ensures that choosing "apply from date X" wipes out any later rate changes.
+            const purgeHistoryAfter = async (cutoffISO) => {
+                const laterEntries = (state.budget.dailyBudgetHistory || []).filter(h => h.startDate > cutoffISO);
+                if (laterEntries.length > 0) {
+                    const laterKeys = laterEntries.map(h => `__daily_budget_history__:${h.startDate}`);
+                    await sbClient.from('budget_settings')
+                        .delete()
+                        .eq('user_token', USER_TOKEN)
+                        .in('category_name', laterKeys);
+                    console.log(`[updateG4Budget] Purged ${laterEntries.length} later history entries after ${cutoffISO}:`, laterEntries.map(h => h.startDate));
+                }
+                // Delete any "שינוי תקציב יומי" marker transactions strictly after the cutoff date
+                await sbClient.from('transactions')
+                    .delete()
+                    .eq('user_token', USER_TOKEN)
+                    .like('name', 'שינוי תקציב יומי%')
+                    .gt('created_at', cutoffISO + 'T23:59:59+00:00');
+            };
+
             if (mode === 'retro') {
                 const effectiveStart = startDate || new Date();
                 startDateISO = `${effectiveStart.getFullYear()}-${String(effectiveStart.getMonth()+1).padStart(2,'0')}-${String(effectiveStart.getDate()).padStart(2,'0')}`;
+
+                // Purge all history entries and markers that come AFTER the retro start date
+                await purgeHistoryAfter(startDateISO);
 
                 // Update/insert history starting at this retro start date
                 await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__daily_budget_history__:' + startDateISO);
@@ -4396,6 +4476,9 @@
                 
                 const cycleDay = state.budget.cycleStartDay || 1;
                 const historyStartDate = `${fromDate.getFullYear()}-${String(fromDate.getMonth()+1).padStart(2,'0')}-${String(cycleDay).padStart(2,'0')}`;
+
+                // Purge all history entries and markers that come AFTER the chosen month
+                await purgeHistoryAfter(historyStartDate);
 
                 // Save previous rate start date in history if it doesn't exist
                 let prevStartISO = '1970-01-01';
