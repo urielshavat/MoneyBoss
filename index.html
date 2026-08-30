@@ -15,7 +15,11 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/he.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap');
+        html { overflow-x: hidden; }
         body { font-family: 'Assistant', sans-serif; background-color: #f3f4f6; -webkit-tap-highlight-color: transparent; position: relative; min-height: 100vh; overflow-x: hidden; transition: font-size 0.2s; }
+        /* When loaded via admin iframe (?token= in URL), hide onboarding button */
+        body.has-url-token #onboardingBtn,
+        body.has-url-token #menuOnboardingBtn { display: none !important; }
         
         body.large-text { font-size: 1.1rem; }
         body.large-text .text-\[8px\] { font-size: 11px !important; }
@@ -42,9 +46,9 @@
         .name-input { background: transparent; border: none; width: 100%; font-weight: 600; color: #334155; padding: 1px 0; }
         .btn-sync { background: #eff6ff; color: #2563eb; font-size: 0.7rem; font-weight: 700; padding: 0.4rem 0.8rem; border-radius: 9999px; display: flex; align-items: center; gap: 0.4rem; transition: all 0.2s; }
         .ltr-num { direction: ltr; display: inline-block; }
-        .compact-tx { padding: 0.25rem 0.6rem !important; margin-bottom: 0.15rem !important; overflow: hidden; position: relative; }
+        .compact-tx { padding: 0.25rem 0.6rem !important; margin-bottom: 0.15rem !important; overflow: hidden; position: relative; -webkit-transform: translateZ(0); transform: translateZ(0); }
         .tx-inner { display: flex; align-items: center; width: 100%; transition: transform 0.3s ease; }
-        .tx-actions-panel { position: absolute; left: 0; top: 0; bottom: 0; width: 210px; background: #ffffff; display: flex; align-items: center; justify-content: space-around; transform: translateX(-100%); transition: transform 0.3s ease; padding-left: 8px; }
+        .tx-actions-panel { position: absolute; left: 0; top: 0; bottom: 0; width: 210px; background: #ffffff; display: flex; align-items: center; justify-content: space-around; transform: translateX(-100%); transition: transform 0.3s ease; padding-left: 8px; will-change: transform; }
         .row-active .tx-inner { transform: translateX(210px); }
         .row-active .tx-actions-panel { transform: translateX(0); }
         .action-btn { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: background 0.2s; }
@@ -174,7 +178,7 @@
     </div>
     <!-- ====================================================== -->
 
-    <div class="w-full max-w-md landscape:max-w-4xl lg:max-w-5xl xl:max-w-7xl bg-transparent flex flex-col min-h-screen pb-32" id="appRoot">
+    <div class="w-full max-w-md landscape:max-w-4xl lg:max-w-5xl xl:max-w-7xl bg-transparent flex flex-col min-h-screen pb-32 overflow-x-hidden" id="appRoot">
         <div class="flex justify-between items-center mb-4 px-1">
             <div class="flex items-center gap-2">
                 <button onclick="window.toggleHamburgerMenu()" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
@@ -183,6 +187,9 @@
                 <h1 id="pageTitle" class="text-xl font-bold text-slate-800 tracking-tight">הוצאות</h1>
                 <button id="budgetAiBtn" onclick="window.showBudgetRecommendation()" class="hidden w-6 h-6 rounded-full bg-amber-100 text-amber-600 text-xs font-bold flex items-center justify-center hover:bg-amber-200 transition-colors ai-pulse" title="המלצה">
                     <i class="fa-solid fa-lightbulb text-[10px]"></i>
+                </button>
+                <button id="healthCardBtn" onclick="window.openHealthCard()" class="hidden w-6 h-6 rounded-full bg-rose-100 text-rose-500 text-xs font-bold flex items-center justify-center hover:bg-rose-200 transition-colors" title="בריאות פיננסית">
+                    <i class="fa-solid fa-heart-pulse text-[10px]"></i>
                 </button>
                 <button id="budgetHelpBtn" onclick="window.openBudgetHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="איך למלא את התקציב">?</button>
                 <button id="mainHelpBtn" onclick="window.openMainHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="הסבר על הוצאות">?</button>
@@ -211,6 +218,15 @@
         </div>
 
         <div id="mainView" class="view-content">
+            <!-- Health alert banner for main view -->
+            <div id="mainHealthAlertBanner" class="hidden mb-3 cursor-pointer" onclick="window.openHealthCard()">
+                <div class="flex items-center gap-3 bg-amber-50 border border-amber-300 text-amber-800 font-bold text-xs px-4 py-3 rounded-2xl">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-500 flex-shrink-0"></i>
+                    <span id="mainHealthAlertText" class="flex-1">יש עניינים הדורשים תשומת לב</span>
+                    <i class="fa-solid fa-chevron-left text-amber-400 text-[10px]"></i>
+                </div>
+            </div>
+
             <!-- Search bar -->
             <div id="mainSearchBar" class="hidden mb-3 px-1">
                 <div class="flex items-center gap-2 bg-white rounded-xl shadow-sm border border-slate-200 px-3 py-2">
@@ -405,6 +421,30 @@
                     <button onclick="window.copyCurrentToFutureBudget()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg text-[10px] transition-colors">העתק עכשיו</button>
                 </div>
                 <p class="text-[10px] text-blue-800 leading-normal">התקציב העתידי שלך ריק כרגע. תוכל להעתיק את כל הקטגוריות והערכים מהתקציב הפעיל הנוכחי כדי להתחיל לערוך אותו בקלות, או להוסיף קטגוריות חדשות מאפס.</p>
+            </div>
+
+            <!-- Health Card — full details, collapsible -->
+            <div id="healthCard" class="hidden card p-4 mb-4 border border-slate-200">
+                <button type="button" onclick="window.toggleHealthCard()" class="w-full flex justify-between items-center mb-1">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-heart-pulse text-rose-500 text-sm"></i>
+                        <span class="text-slate-700 font-bold text-sm">בריאות פיננסית</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="healthScoreLabel" class="flex items-center gap-1 text-xs font-bold"></span>
+                        <i id="healthCardChevron" class="fa-solid fa-chevron-down text-slate-400 text-[10px] transition-transform duration-200"></i>
+                    </div>
+                </button>
+                <div id="healthCardBody" class="hidden pt-3">
+                    <div id="healthBudgetSection" class="mb-4">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">הגדרת תקציב</p>
+                        <div id="healthBudgetChecks" class="space-y-1.5"></div>
+                    </div>
+                    <div id="healthCurrentSection">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">מצב שוטף</p>
+                        <div id="healthCurrentChecks" class="space-y-1.5"></div>
+                    </div>
+                </div>
             </div>
 
             <div id="budgetSummary" class="card p-4 mb-4 border border-slate-200 bg-white shadow-sm">
@@ -3394,28 +3434,6 @@
                     created_at = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00${tzStr}`;
                 }
             }
-            // Phase 2: if no "תקציב יומי" marker exists yet, create one before the first expense
-            if (window.FEATURE_NEW_BUDGET_DISPLAY) {
-                const hasBudgetMarker = state.transactions.some(t => t.name === 'תקציב יומי');
-                if (!hasBudgetMarker) {
-                    const dailyBudget = (safeParseFloat(state.budget.g4) || 0) / 30;
-                    if (dailyBudget > 0) {
-                        const markerDateISO = created_at.split('T')[0]; // YYYY-MM-DD from the expense date
-                        const tzOffset = now.getTimezoneOffset();
-                        const sign = tzOffset <= 0 ? '+' : '-';
-                        const absOff = Math.abs(tzOffset);
-                        const tzStr = `${sign}${String(Math.floor(absOff/60)).padStart(2,'0')}:${String(absOff%60).padStart(2,'0')}`;
-                        await sbClient.from('transactions').insert({
-                            name: 'תקציב יומי',
-                            amount: -dailyBudget,
-                            category: 'שוטף',
-                            user_token: USER_TOKEN,
-                            created_at: `${markerDateISO}T00:00:00${tzStr}`
-                        });
-                    }
-                }
-            }
-
             const { error: insertErr } = await sbClient
                 .from('transactions')
                 .insert({ 
@@ -3428,10 +3446,7 @@
                 });
             if (insertErr) throw insertErr;
 
-            // קבל מאזן מעודכן מה-DB
-            const newBalance = await fetchBalance();
-
-            // עדכן state מיד (optimistic)
+            // עדכן state מיד (optimistic) — fetchTransactionsOnly יסנכרן מהשרת בעוד 800ms
             let txDate;
             if (dateInp && dateInp.value && dateInp.value.split('/').length === 3) {
                 txDate = dateInp.value; // already in dd/mm/yyyy
@@ -3450,9 +3465,9 @@
             state.transactions = [newTx, ...state.transactions];
             if (window.calculateClientSideBalance && window.calculateAccumulatedBudget) {
                 const accNow = window.calculateAccumulatedBudget(new Date());
-                state.balance = accNow > 0 ? window.calculateClientSideBalance() : newBalance;
+                state.balance = accNow > 0 ? window.calculateClientSideBalance() : state.balance - amount;
             } else {
-                state.balance = newBalance;
+                state.balance = state.balance - amount;
             }
             localStorage.setItem('cached_balance', state.balance.toString());
 
@@ -5253,7 +5268,7 @@
             });
 
             // Clean, tightly fitting width
-            labelsWidth = Math.ceil(maxCalcWidth);
+            labelsWidth = Math.min(Math.ceil(maxCalcWidth), 200);
         } else {
             const visibleCats = catsShown.filter(cat => {
                 if (filter === 'planned' || cat.$type === 'current') return true;
@@ -5336,7 +5351,7 @@
                 pRow.innerHTML = `
                     <div class="flex items-center gap-1 py-1 px-0 w-full cursor-pointer hover:bg-slate-50 transition-all font-hebrew" dir="rtl" onclick="window.toggleCategoryFilter('${filterId}')">
                         <!-- Right Part: Icon/Name (Order: Icon, then Name, then Chevron) -->
-                        <div class="flex items-center gap-1 flex-shrink-0" style="width: ${labelsWidth}px">
+                        <div class="flex items-center gap-1 flex-shrink-0 overflow-hidden" style="width: ${labelsWidth}px">
                             <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
                                 <i class="fa-solid fa-calendar-check text-[11px]" style="color:${color.hex}"></i>
                             </div>
@@ -5381,7 +5396,7 @@
                         cRow.dir = "rtl";
                         cRow.innerHTML = `
                             <!-- Right Part: Icon/Name/Actions -->
-                            <div class="flex items-center gap-1 flex-shrink-0" style="width: ${labelsWidth}px">
+                            <div class="flex items-center gap-1 flex-shrink-0 overflow-hidden" style="width: ${labelsWidth}px">
                                 <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
                                     <div class="w-1.5 h-1.5 rounded-full" style="background:${color.hex}"></div>
                                 </div>
@@ -5448,7 +5463,7 @@
                 
                 row.innerHTML = `
                     <!-- Right Part: Icon/Name/Actions -->
-                    <div class="flex items-center gap-1 flex-shrink-0" style="width: ${labelsWidth}px">
+                    <div class="flex items-center gap-1 flex-shrink-0 overflow-hidden" style="width: ${labelsWidth}px">
                         <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
                             <i class="fa-solid fa-calendar-check text-[11px]" style="color:${color.hex}"></i>
                         </div>
@@ -5541,7 +5556,7 @@
 
                 row.innerHTML = `
                     <!-- Right Part: Icon/Name -->
-                    <div class="flex items-center gap-1 flex-shrink-0" style="width: ${labelsWidth}px">
+                    <div class="flex items-center gap-1 flex-shrink-0 overflow-hidden" style="width: ${labelsWidth}px">
                         ${iconHtml}
                         <span class="text-[10px] sm:text-xs text-slate-700 whitespace-nowrap">${displayName}${hasBudget ? ` (₪${Math.round(budget).toLocaleString()})` : ''}</span>
                     </div>
@@ -5578,7 +5593,7 @@
             
             noneRow.innerHTML = `
                 <!-- Right: Icon/Name -->
-                <div class="flex items-center gap-1 flex-shrink-0 cursor-pointer" onclick="window.toggleCategoryFilter('__none__')" style="width: ${labelsWidth}px">
+                <div class="flex items-center gap-1 flex-shrink-0 overflow-hidden cursor-pointer" onclick="window.toggleCategoryFilter('__none__')" style="width: ${labelsWidth}px">
                     <div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
                         <i class="fa-solid fa-tag text-[11px] text-slate-400"></i>
                     </div>
@@ -6656,6 +6671,8 @@
             : 'fa-solid fa-calendar-days text-purple-500 w-4 text-center flex-shrink-0';
         const helpBtn = document.getElementById('budgetHelpBtn');
         if (helpBtn) helpBtn.classList.toggle('hidden', state.currentView !== 'budget');
+        const healthCardBtn = document.getElementById('healthCardBtn');
+        if (healthCardBtn) healthCardBtn.classList.toggle('hidden', state.currentView !== 'budget');
         const mainHelpBtn = document.getElementById('mainHelpBtn');
         if (mainHelpBtn) mainHelpBtn.classList.toggle('hidden', state.currentView !== 'main');
         const annualHelpBtn = document.getElementById('annualHelpBtn');
@@ -6707,6 +6724,7 @@
         if (state.currentView === 'annual') return renderAnnualView();
         if (state.currentView === 'budget') return;
         if (state.currentView !== 'main') return;
+        if (window.renderHealthCard) window.renderHealthCard();
 
         // --- Summary Stats Preparation ---
         const filter = state.mainViewFilter;
@@ -7497,6 +7515,9 @@
         const ctaEl = document.getElementById('budgetWizardCta');
         if (ctaEl) ctaEl.classList.toggle('hidden', isEmpty ? isFuture : true);
 
+        // Health card — only for active budget
+        if (!isFuture && window.renderHealthCard) window.renderHealthCard();
+
         const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
         setEl('summaryTotalIncome', state.isPrivacyMode ? '20,000' : Math.round(incTotal).toLocaleString());
         setEl('summaryTotalFixed', Math.round(formatDisplayAmount(fixTotal)).toLocaleString());
@@ -7806,15 +7827,6 @@
         return rate;
     }
 
-    async function _fetchUsdIlsFromBoi() {
-        const res = await fetch('https://www.boi.org.il/PublicApi/GetExchangeRates');
-        if (!res.ok) return null;
-        const data = await res.json();
-        const usd = (data.exchangeRates || []).find(r => r.key === 'USD');
-        const rate = usd ? safeParseFloat(usd.currentExchangeRate) : 0;
-        return rate > 0 ? rate : null;
-    }
-
     async function _fetchUsdIlsFromFloatrates() {
         // Mid-market daily rates, CORS-enabled — close to Google / BOI
         const res = await fetch('https://www.floatrates.com/daily/usd.json');
@@ -7840,18 +7852,15 @@
             const cached = localStorage.getItem('usd_ils_rate');
             const cachedAt = parseInt(localStorage.getItem('usd_ils_rate_at') || '0', 10);
             const cachedSrc = localStorage.getItem('usd_ils_rate_src') || '';
-            const trustedSrc = cachedSrc === 'boi' || cachedSrc === 'floatrates';
+            const trustedSrc = cachedSrc === 'floatrates';
             if (!force && cached && trustedSrc && (now - cachedAt) < USD_RATE_CACHE_MS) {
                 _usdIlsRate = parseFloat(cached);
                 _usdIlsRateFetchedAt = cachedAt;
                 return _usdIlsRate;
             }
 
-            // Prefer BOI → FloatRates (Google-like) → CDN backup
+            // Prefer FloatRates (Google-like) → CDN backup
             let rate = null;
-            try { rate = await _fetchUsdIlsFromBoi(); } catch (_) { /* CORS expected in browsers */ }
-            if (rate) return _saveUsdRate(rate, 'boi');
-
             try { rate = await _fetchUsdIlsFromFloatrates(); } catch (_) {}
             if (rate) return _saveUsdRate(rate, 'floatrates');
 
@@ -7863,7 +7872,7 @@
         if (!_usdIlsRate) {
             const cached = parseFloat(localStorage.getItem('usd_ils_rate') || '');
             const cachedSrc = localStorage.getItem('usd_ils_rate_src') || '';
-            const trustedSrc = cachedSrc === 'boi' || cachedSrc === 'floatrates' || cachedSrc === 'cdn';
+            const trustedSrc = cachedSrc === 'floatrates' || cachedSrc === 'cdn';
             _usdIlsRate = (cached > 0 && trustedSrc) ? cached : USD_RATE_FALLBACK;
             _usdIlsRateFetchedAt = now;
         }
@@ -7874,7 +7883,7 @@
         if (_usdIlsRate) return _usdIlsRate;
         const cached = parseFloat(localStorage.getItem('usd_ils_rate') || '');
         const cachedSrc = localStorage.getItem('usd_ils_rate_src') || '';
-        const trustedSrc = cachedSrc === 'boi' || cachedSrc === 'floatrates' || cachedSrc === 'cdn';
+        const trustedSrc = cachedSrc === 'floatrates' || cachedSrc === 'cdn';
         return (cached > 0 && trustedSrc) ? cached : USD_RATE_FALLBACK;
     }
 
@@ -9397,6 +9406,339 @@
         }
     };
     window.closeRetroUpdateModal = () => { const o = document.getElementById('retroUpdateOverlay'); if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); } };
+
+    // =====================================================
+    // FINANCIAL HEALTH CHECK
+    // =====================================================
+    window.computeHealthChecks = function() {
+        const dismissed = JSON.parse(localStorage.getItem('health_dismissed') || '[]');
+        const b = state.budget;
+        const g4 = safeParseFloat(b.g4) || 0;
+
+        const incTotal  = b.incomes.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        const fixTotal  = b.fixed.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        const annMTotal = b.annual.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0) / 12;
+        const savTotal  = (b.savings || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        const loanTotal = (b.loans || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        const remaining = incTotal - fixTotal - annMTotal - savTotal - loanTotal;
+
+        const checks = [];
+
+        // — Budget group —
+        checks.push({
+            id: 'no_incomes', group: 'budget',
+            label: 'לא הוגדרו הכנסות', labelOk: 'הוגדרו הכנסות',
+            severity: 'critical',
+            passed: b.incomes.length > 0,
+            tip: 'הוסף הכנסות חודשיות בתצוגת התקציב',
+            dismissable: false, dismissed: false,
+            instructions: 'עבור לתצוגת תקציב → הכנסות → הוסף הכנסה חדשה'
+        });
+        checks.push({
+            id: 'no_g4', group: 'budget',
+            label: 'לא הוגדר תקציב שוטף', labelOk: 'תקציב שוטף מוגדר',
+            severity: 'critical',
+            passed: g4 > 0,
+            tip: 'הגדר תקציב שוטף חודשי בתחתית תצוגת התקציב',
+            dismissable: false, dismissed: false,
+            instructions: 'בתצוגת תקציב, גלול למטה לשדה "תקציב שוטף" והזן את הסכום החודשי'
+        });
+        checks.push({
+            id: 'g4_exceeds_remaining', group: 'budget',
+            label: 'התקציב השוטף חורג מהיתרה הפנויה', labelOk: 'התקציב השוטף בגבולות היתרה',
+            severity: 'critical',
+            passed: !(g4 > 0 && remaining > 0 && g4 > remaining),
+            tip: g4 > 0 && remaining > 0 ? `תקציב שוטף ₪${Math.round(g4).toLocaleString()} > יתרה ₪${Math.round(remaining).toLocaleString()}` : '',
+            dismissable: false, dismissed: false,
+            instructions: null
+        });
+        checks.push({
+            id: 'no_fixed', group: 'budget',
+            label: 'לא הוגדרו הוצאות קבועות', labelOk: 'הוגדרו הוצאות קבועות',
+            severity: 'warning',
+            passed: b.fixed.length > 0,
+            tip: 'שכ"ד, ביטוחים, מנויים — הוסף הוצאות קבועות',
+            dismissable: false, dismissed: false,
+            instructions: null
+        });
+        checks.push({
+            id: 'no_annual', group: 'budget',
+            label: 'לא הוגדרו הוצאות מתוכננות', labelOk: 'הוגדרו הוצאות מתוכננות',
+            severity: 'warning',
+            passed: b.annual.length > 0,
+            tip: 'חופשות, רכב, ציוד — הוסף הוצאות מתוכננות',
+            dismissable: false, dismissed: false,
+            instructions: null
+        });
+        checks.push({
+            id: 'no_savings', group: 'budget',
+            label: 'לא הוגדרו חסכונות', labelOk: 'הוגדרו חסכונות',
+            severity: 'warning',
+            passed: (b.savings || []).length > 0,
+            tip: 'הגדר חסכון חודשי — ילדים, החלפת רכב',
+            dismissable: true, dismissed: dismissed.includes('no_savings'),
+            dismissLabel: 'אין לי חסכונות',
+            instructions: null
+        });
+        checks.push({
+            id: 'no_loans', group: 'budget',
+            label: 'לא הוגדרו הלוואות', labelOk: 'הוגדרו הלוואות',
+            severity: 'info',
+            passed: (b.loans || []).length > 0,
+            tip: 'הוסף הלוואות קיימות',
+            dismissable: true, dismissed: dismissed.includes('no_loans'),
+            dismissLabel: 'אין לי הלוואות',
+            instructions: null
+        });
+        checks.push({
+            id: 'negative_remaining', group: 'budget',
+            label: 'ההוצאות הקבועות חורגות מההכנסות', labelOk: 'ההכנסות מכסות את כל ההוצאות',
+            severity: 'critical',
+            passed: remaining >= 0,
+            tip: `יתרה לאחר ניכויים: ₪${Math.round(remaining).toLocaleString()}`,
+            dismissable: false, dismissed: false,
+            instructions: null
+        });
+
+        // — Current group —
+        const balance = state.balance || 0;
+        const balanceThreshold = g4 * 0.3;
+
+        if (balanceThreshold > 0) {
+            if (balance < -balanceThreshold) {
+                checks.push({
+                    id: 'balance_negative', group: 'current',
+                    label: `מאזן שלילי גבוה (₪${Math.round(Math.abs(balance)).toLocaleString()})`,
+                    labelOk: 'המאזן מאוזן',
+                    severity: 'critical',
+                    passed: false,
+                    tip: 'כדאי לצמצם הוצאות שוטפות, להוריד הוצאות קבועות או מתוכננות',
+                    dismissable: false, dismissed: false,
+                    instructions: null
+                });
+            } else if (balance > balanceThreshold) {
+                checks.push({
+                    id: 'balance_positive', group: 'current',
+                    label: `יתרה חיובית גבוהה (₪${Math.round(balance).toLocaleString()})`,
+                    labelOk: 'המאזן מאוזן',
+                    severity: 'info',
+                    passed: false,
+                    tip: 'יש עודף — שקול להגדיל הפקדה לחסכון',
+                    dismissable: false, dismissed: false,
+                    instructions: null
+                });
+            } else {
+                checks.push({
+                    id: 'balance_ok', group: 'current',
+                    label: 'המאזן מאוזן', labelOk: 'המאזן מאוזן',
+                    severity: 'ok',
+                    passed: true,
+                    tip: '',
+                    dismissable: false, dismissed: false,
+                    instructions: null
+                });
+            }
+        }
+
+        const regularTxs = state.transactions.filter(t =>
+            t.name !== 'תקציב יומי' && t.amount > 0 && !t.isAdjustment
+        );
+
+        // Convert dd/mm/yyyy → yyyy-mm-dd ISO string once per tx (string comparison is faster than Date)
+        const toISO = dateStr => {
+            const p = dateStr.split('/');
+            return p.length === 3 ? `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}` : '';
+        };
+
+        if (regularTxs.length === 0) {
+            checks.push({
+                id: 'no_transactions', group: 'current',
+                label: 'לא הוזנו הוצאות עדיין',
+                severity: 'warning',
+                passed: false,
+                tip: 'התחל לתעד הוצאות יומיות',
+                dismissable: false, dismissed: false,
+                instructions: null
+            });
+        } else {
+            // Find latest tx using ISO string comparison — no Date objects in loop
+            let latestISO = '';
+            for (const t of regularTxs) {
+                const iso = toISO(t.date);
+                if (iso > latestISO) latestISO = iso;
+            }
+            if (latestISO) {
+                const lastDate = new Date(latestISO);
+                const daysSince = Math.floor((new Date() - lastDate) / 86400000);
+                if (daysSince > 7) {
+                    checks.push({
+                        id: 'no_recent_expenses', group: 'current',
+                        label: `לא תועדו הוצאות ב-${daysSince} ימים`,
+                        severity: 'warning',
+                        passed: false,
+                        tip: 'חוסר בתיעוד — ייתכן שהוצאות לא נרשמו',
+                        dismissable: false, dismissed: false,
+                        instructions: null
+                    });
+                } else {
+                    checks.push({
+                        id: 'tracking_ok', group: 'current',
+                        label: 'מעקב הוצאות תקין',
+                        severity: 'ok',
+                        passed: true,
+                        tip: '',
+                        dismissable: false, dismissed: false,
+                        instructions: null
+                    });
+                }
+            }
+
+            if (g4 > 0) {
+                const now = new Date();
+                const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 30);
+                const cutoffISO = cutoff.toISOString().slice(0, 10);
+                const recentSum = regularTxs.reduce((s, t) => toISO(t.date) >= cutoffISO ? s + t.amount : s, 0);
+                const dailyAvg = recentSum / 30;
+                const dailyBudget = g4 / 30;
+                if (dailyAvg > dailyBudget * 1.2) {
+                    const overPct = Math.round((dailyAvg / dailyBudget - 1) * 100);
+                    checks.push({
+                        id: 'daily_avg_high', group: 'current',
+                        label: `ממוצע יומי חורג ב-${overPct}% מהתקציב`,
+                        severity: 'warning',
+                        passed: false,
+                        tip: `ממוצע: ₪${Math.round(dailyAvg).toLocaleString()} ליום | תקציב: ₪${Math.round(dailyBudget).toLocaleString()}`,
+                        dismissable: false, dismissed: false,
+                        instructions: null
+                    });
+                }
+            }
+        }
+
+        return checks;
+    };
+
+    window.renderHealthCard = function() {
+        const card = document.getElementById('healthCard');
+        if (!card) return;
+
+        const checks = window.computeHealthChecks();
+        const activeIssues = checks.filter(c => !c.passed && !c.dismissed);
+
+        const bannerText = activeIssues.length === 0 ? null
+            : activeIssues.length === 1 ? 'יש עניין אחד הדורש תשומת לב'
+            : `יש ${activeIssues.length} עניינים הדורשים תשומת לב`;
+
+        // Main-view banner only
+        const mainBanner = document.getElementById('mainHealthAlertBanner');
+        const mainTxt    = document.getElementById('mainHealthAlertText');
+        if (mainBanner) mainBanner.classList.toggle('hidden', !bannerText);
+        if (mainTxt && bannerText) mainTxt.textContent = bannerText;
+
+        // Score label — show issue count + icon (or green check when all clear)
+        const scoreEl = document.getElementById('healthScoreLabel');
+        if (scoreEl) {
+            if (activeIssues.length === 0) {
+                scoreEl.className = 'flex items-center gap-1 text-xs font-bold text-green-600';
+                scoreEl.innerHTML = '<i class="fa-solid fa-circle-check text-[11px]"></i>';
+            } else {
+                const hasCritical = activeIssues.some(c => c.severity === 'critical');
+                const color = hasCritical ? 'text-red-500' : 'text-amber-500';
+                const icon  = hasCritical ? 'fa-circle-xmark' : 'fa-triangle-exclamation';
+                scoreEl.className = `flex items-center gap-1 text-xs font-bold ${color}`;
+                scoreEl.innerHTML = `<i class="fa-solid ${icon} text-[11px]"></i><span>${activeIssues.length}</span>`;
+            }
+        }
+
+        card.classList.remove('hidden');
+
+        const sevCfg = {
+            critical: { bg: 'bg-red-50',   border: 'border-red-200',    icon: 'fa-circle-xmark',         ic: 'text-red-500',   tx: 'text-red-800' },
+            warning:  { bg: 'bg-amber-50', border: 'border-amber-200',  icon: 'fa-triangle-exclamation',  ic: 'text-amber-500', tx: 'text-amber-800' },
+            info:     { bg: 'bg-blue-50',  border: 'border-blue-200',   icon: 'fa-circle-info',           ic: 'text-blue-500',  tx: 'text-blue-800' },
+            ok:       { bg: 'bg-green-50', border: 'border-green-200',  icon: 'fa-circle-check',          ic: 'text-green-500', tx: 'text-green-800' },
+        };
+
+        const renderGroup = (containerId, group) => {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            const grouped = checks.filter(c => c.group === group);
+
+            // Budget group all-clear
+            if (group === 'budget' && grouped.every(c => c.passed || c.dismissed)) {
+                el.innerHTML = `<div class="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+                    <i class="fa-solid fa-circle-check text-green-500 text-xs flex-shrink-0"></i>
+                    <p class="text-xs font-bold text-green-800">התקציב מוגדר היטב</p>
+                </div>`;
+                return;
+            }
+
+            el.innerHTML = grouped.map(c => {
+                if (c.dismissed) return '';
+                const cfg = sevCfg[c.passed ? 'ok' : c.severity] || sevCfg.info;
+                // Passed checks: use positive label, no tip
+                const displayLabel = c.passed ? (c.labelOk || c.label) : c.label;
+                const tipHtml = (!c.passed && c.tip)
+                    ? `<p class="text-[9px] text-slate-500 mt-0.5 leading-tight">${c.tip}</p>`
+                    : '';
+                const dismissBtn = (c.dismissable && !c.passed)
+                    ? `<button type="button" onclick="window.dismissHealthCheck('${c.id}')" class="text-[9px] font-bold text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-full transition-colors flex-shrink-0">${c.dismissLabel || 'סגור'}</button>`
+                    : '';
+                const howToBtn = c.instructions
+                    ? `<span class="health-how-to hidden"><button type="button" onclick="window.showHealthInstructions('${c.id}')" class="text-[9px] font-bold text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-full transition-colors flex-shrink-0">כיצד לטפל?</button></span>`
+                    : '';
+                return `<div class="flex items-start gap-2 ${cfg.bg} border ${cfg.border} rounded-xl px-3 py-2">
+                    <i class="fa-solid ${cfg.icon} ${cfg.ic} text-xs mt-0.5 flex-shrink-0"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-bold ${cfg.tx} leading-tight">${displayLabel}</p>
+                        ${tipHtml}
+                    </div>
+                    ${howToBtn}${dismissBtn}
+                </div>`;
+            }).join('');
+        };
+
+        renderGroup('healthBudgetChecks', 'budget');
+        renderGroup('healthCurrentChecks', 'current');
+    };
+
+    window.openHealthCard = function() {
+        const go = () => {
+            const card    = document.getElementById('healthCard');
+            const body    = document.getElementById('healthCardBody');
+            const chevron = document.getElementById('healthCardChevron');
+            if (card)    card.classList.remove('hidden');
+            if (body)    body.classList.remove('hidden');
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+            if (card)    setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+        };
+        if (state.currentView !== 'budget') {
+            window.setNav('budget');
+            setTimeout(go, 350);
+        } else {
+            go();
+        }
+    };
+
+    window.toggleHealthCard = function() {
+        const body    = document.getElementById('healthCardBody');
+        const chevron = document.getElementById('healthCardChevron');
+        if (!body) return;
+        const opening = body.classList.contains('hidden');
+        body.classList.toggle('hidden');
+        if (chevron) chevron.style.transform = opening ? 'rotate(180deg)' : '';
+    };
+
+    window.dismissHealthCheck = function(id) {
+        const dismissed = JSON.parse(localStorage.getItem('health_dismissed') || '[]');
+        if (!dismissed.includes(id)) { dismissed.push(id); localStorage.setItem('health_dismissed', JSON.stringify(dismissed)); }
+        window.renderHealthCard();
+    };
+
+    window.showHealthInstructions = function(id) {
+        const check = (window.computeHealthChecks() || []).find(c => c.id === id);
+        if (check && check.instructions) window.showToast(check.instructions, 'info');
+    };
 
     // =====================================================
     // RECOMMENDATION
@@ -12311,16 +12653,13 @@
         if (dateInp) {
             const now = new Date();
             const todayStr = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
-            // Always set the text value first (works without flatpickr)
-            dateInp.value = todayStr;
-            // Then try to attach/update flatpickr for a proper date picker UI
+            // Destroy any stale flatpickr instance (form.reset() leaves it empty) and recreate
             try {
-                if (dateInp._flatpickr) {
-                    dateInp._flatpickr.setDate(now, false);
-                } else {
-                    flatpickr(dateInp, { dateFormat: 'd/m/Y', maxDate: 'today', defaultDate: now });
-                }
-            } catch(e2) { /* flatpickr unavailable, plain text input is fine */ }
+                if (dateInp._flatpickr) dateInp._flatpickr.destroy();
+                flatpickr(dateInp, { dateFormat: 'd/m/Y', maxDate: 'today', defaultDate: now });
+            } catch(e2) { /* flatpickr unavailable */ }
+            // Always set text value as fallback (also fixes flatpickr clearing on init)
+            dateInp.value = todayStr;
         }
         const o = document.getElementById('addExpenseOverlay');
         if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
@@ -12401,6 +12740,8 @@
         // Resolve token: URL param → localStorage → show login
         const urlParams = new URLSearchParams(window.location.search);
         const urlToken = (urlParams.get('token') || '').toUpperCase().trim();
+        // Hide onboarding button when accessed with a token (e.g. from admin iframe)
+        if (urlToken) document.body.classList.add('has-url-token');
         const storedToken = localStorage.getItem('user_token') || '';
 
         // ── Quick-add via URL: ?token=XXXX&add=50&name=קפה ──────────────────
