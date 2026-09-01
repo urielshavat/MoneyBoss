@@ -42,6 +42,12 @@
         #transactionList { transition: opacity 0.2s; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .sticky-header { position: sticky; top: 0; z-index: 10; background-color: rgba(243, 244, 246, 0.95); backdrop-filter: blur(4px); }
+        #bootSplash { position: fixed; inset: 0; z-index: 190; display: flex; align-items: center; justify-content: center; background: #f3f4f6; }
+        body.app-ready #bootSplash { display: none !important; }
+        #appRoot { visibility: hidden; }
+        body.app-ready #appRoot { visibility: visible; }
+        @keyframes boot-spin { to { transform: rotate(360deg); } }
+        .boot-spinner { width: 28px; height: 28px; border: 3px solid #dbeafe; border-top-color: #2563eb; border-radius: 50%; animation: boot-spin 0.7s linear infinite; }
         .budget-input { background: transparent; border: none; text-align: left; width: 65px; padding: 1px 4px; outline: none; }
         .name-input { background: transparent; border: none; width: 100%; font-weight: 600; color: #334155; padding: 1px 0; }
         .btn-sync { background: #eff6ff; color: #2563eb; font-size: 0.7rem; font-weight: 700; padding: 0.4rem 0.8rem; border-radius: 9999px; display: flex; align-items: center; gap: 0.4rem; transition: all 0.2s; }
@@ -134,6 +140,7 @@
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center p-4 large-text">
+    <div id="bootSplash" aria-hidden="true"><div class="boot-spinner"></div></div>
 
     <!-- ===================== LOGIN SCREEN ===================== -->
     <div id="loginScreen" class="hidden">
@@ -185,22 +192,16 @@
                     <i class="fa-solid fa-bars text-lg"></i>
                 </button>
                 <h1 id="pageTitle" class="text-xl font-bold text-slate-800 tracking-tight">הוצאות</h1>
-                <button id="budgetAiBtn" onclick="window.showBudgetRecommendation()" class="hidden w-6 h-6 rounded-full bg-amber-100 text-amber-600 text-xs font-bold flex items-center justify-center hover:bg-amber-200 transition-colors ai-pulse" title="המלצה">
-                    <i class="fa-solid fa-lightbulb text-[10px]"></i>
-                </button>
-                <button id="healthCardBtn" onclick="window.openHealthCard()" class="hidden w-6 h-6 rounded-full bg-rose-100 text-rose-500 text-xs font-bold flex items-center justify-center hover:bg-rose-200 transition-colors" title="בריאות פיננסית">
-                    <i class="fa-solid fa-heart-pulse text-[10px]"></i>
-                </button>
                 <button id="budgetHelpBtn" onclick="window.openBudgetHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="איך למלא את התקציב">?</button>
-                <button id="mainHelpBtn" onclick="window.openMainHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="הסבר על הוצאות">?</button>
+                <button id="mainHelpBtn" onclick="window.openMainHelp()" class="w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="הסבר על הוצאות">?</button>
                 <button id="annualHelpBtn" onclick="window.openAnnualHelp()" class="hidden w-6 h-6 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors" title="הסבר על הוצאות מתוכננות">?</button>
                 <button id="onboardingBtn" onclick="window.openOnboarding()" class="hidden bg-blue-50 border border-blue-200 text-blue-600 text-[10px] font-bold px-2.5 py-1 rounded-full hover:bg-blue-100 transition-colors whitespace-nowrap" title="איך מתחילים?">איך מתחילים?</button>
             </div>
             <div class="flex items-center gap-2">
-                <button id="mainSearchBtn" onclick="window.toggleSearch()" class="hidden items-center justify-center w-8 h-8 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-500 rounded-full transition-colors">
+                <button id="mainSearchBtn" onclick="window.toggleSearch()" class="flex items-center justify-center w-8 h-8 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-500 rounded-full transition-colors">
                     <i id="mainSearchIcon" class="fa-solid fa-magnifying-glass text-[11px]"></i>
                 </button>
-                <button id="mainDateFilterBtn" onclick="window.openDateFilter()" class="hidden flex items-center gap-1 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-[10px] px-2.5 py-1.5 rounded-full transition-colors">
+                <button id="mainDateFilterBtn" onclick="window.openDateFilter()" class="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-[10px] px-2.5 py-1.5 rounded-full transition-colors">
                     <i class="fa-solid fa-calendar-days text-[9px] text-slate-400"></i>
                     <span id="mainDateFilterLabel">30 תנועות</span>
                     <i class="fa-solid fa-chevron-down text-[8px] text-slate-400"></i>
@@ -388,7 +389,7 @@
             <div id="annualReserveSection" class="reserve-banner animate-fade-in hidden">
                 <div class="flex justify-between items-center mb-1">
                     <div class="flex items-center gap-1.5">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">שריון בצד (יתרה מצטברת)</span>
+                        <span id="annualReserveLabel" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">שריון בצד (יתרה מצטברת)</span>
                         <button onclick="window.showReserveExplain()" class="reserve-info-btn"><i class="fa-solid fa-question"></i></button>
                     </div>
                 </div>
@@ -533,7 +534,7 @@
                                     <input type="date" id="futureStartDateInput" onchange="window.saveFutureStartDate()" class="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none">
                                 </div>
                             </div>
-                            <p class="text-[9px] text-slate-400 font-semibold text-right leading-normal">הגדר מתי תקציב זה יכנס לתוקף. המעבר והחלפת התקציבים יתרחשו אוטומטית בתאריך זה, והמאזן ההיסטורי יישמר בצורה מדויקת.</p>
+                            <p class="text-[9px] text-slate-400 font-semibold text-right leading-normal">אפשר להחליף תקציב לפני סוף השנה. אם לא יוגדר תקציב עתידי, יועתק התקציב הנוכחי אוטומטית אחרי שנה.</p>
                             
                             <div id="futureBudgetActions" class="hidden border-t border-slate-100 pt-2.5 mt-1 flex flex-col gap-2">
                                 <button id="wipeFutureBudgetBtn" onclick="window.showWipeFutureBudgetConfirm()" class="w-full text-right text-red-500 hover:text-red-600 font-bold text-[10px] flex items-center justify-end gap-1.5 transition-colors">
@@ -698,10 +699,14 @@
                 <span>החשבון שלי</span>
             </button>
             <div class="border-t border-slate-100 mx-3"></div>
-            <button id="futureBudgetMenuBtn" onclick="window.toggleBudgetModeFromMenu()" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
-                <i id="futureBudgetMenuIcon" class="fa-solid fa-calendar-days text-purple-500 w-4 text-center flex-shrink-0"></i>
-                <span id="futureBudgetMenuLabel">תקציב עתידי</span>
-            </button>
+            <div id="budgetMenuWrapper">
+                <button onclick="window.toggleBudgetSubmenu()" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                    <i class="fa-solid fa-wallet text-blue-500 w-4 text-center flex-shrink-0"></i>
+                    <span class="flex-1 text-right">תקופת תקציב</span>
+                    <i id="budgetMenuChevron" class="fa-solid fa-chevron-left text-[10px] text-slate-300 flex-shrink-0 transition-transform duration-200"></i>
+                </button>
+                <div id="budgetSubmenu" class="hidden bg-blue-50 border-t border-b border-blue-100"></div>
+            </div>
             <div class="border-t border-slate-100 mx-3"></div>
             <!-- התקנה with submenu -->
             <div id="installMenuWrapper">
@@ -1127,6 +1132,10 @@
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סוג הוצאה</label>
+                    <div id="editExpenseBudgetPickerWrap" class="hidden mb-3">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תקופת תקציב</label>
+                        <select id="editExpenseBudgetSelect" onchange="window.onEditExpenseBudgetChange()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 text-right outline-none"></select>
+                    </div>
                     <div class="flex bg-slate-100 p-1 rounded-xl mb-3">
                         <button type="button" id="editCatTypeCurrentBtn" onclick="window.setEditCategoryType('current')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
                         <button type="button" id="editCatTypeFixedBtn" onclick="window.setEditCategoryType('fixed')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
@@ -2160,6 +2169,15 @@
     // =====================================================
     // HELPERS
     // =====================================================
+    function safeJsonParse(raw, fallback) {
+        try {
+            if (raw == null || raw === '' || raw === 'undefined') return fallback;
+            const v = JSON.parse(raw);
+            return v == null ? fallback : v;
+        } catch (e) {
+            return fallback;
+        }
+    }
     function safeParseFloat(val) {
         if (!val) return 0;
         let s = val.toString().trim();
@@ -2172,27 +2190,443 @@
         const c = s.replace(/[^\d.-]/g, '');
         return parseFloat(c) || 0;
     }
-    function parseLocalDate(s) { if (!s) return new Date(); const p = s.split('/'); return new Date(p[2], p[1]-1, p[0]); }
-    function getBudgetStartDate() {
-        let displayStartDate = state.budget.startDate || '';
-        if (state.transactions.length > 0) {
-            const sorted = [...state.transactions].sort((a, b) => {
-                const da = parseLocalDate(a.date);
-                const db = parseLocalDate(b.date);
-                return da - db;
-            });
-            displayStartDate = sorted[0].date;
+    function parseLocalDate(s) {
+        if (!s) return new Date();
+        const str = String(s).trim();
+        if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+            const p = str.slice(0, 10).split('-');
+            return new Date(+p[0], +p[1] - 1, +p[2]);
         }
-        return parseLocalDate(displayStartDate);
+        const p = str.split('/');
+        if (p.length === 3) return new Date(p[2], p[1] - 1, p[0]);
+        return new Date(str);
+    }
+    function localDateToISO(d = new Date()) {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function parseStartDateToISO(s) {
+        if (!s) return '';
+        const str = String(s).trim();
+        if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+        const p = str.split('/');
+        if (p.length === 3 && p[0] && p[1] && p[2]) {
+            return `${String(p[2]).padStart(4, '0')}-${String(p[1]).padStart(2, '0')}-${String(p[0]).padStart(2, '0')}`;
+        }
+        return '';
+    }
+    function isoToDDMMYYYY(iso) {
+        if (!iso) return '';
+        const p = String(iso).slice(0, 10).split('-');
+        if (p.length === 3) return `${p[2]}/${p[1]}/${p[0]}`;
+        return String(iso);
+    }
+    function addOneYearISO(iso) {
+        const p = parseStartDateToISO(iso).split('-').map(Number);
+        if (p.length !== 3 || !p[0]) return '';
+        return localDateToISO(new Date(p[0] + 1, p[1] - 1, p[2]));
+    }
+    function getFutureBudgetStartISO() {
+        const stored = parseStartDateToISO(state.futureBudget && state.futureBudget.startDate);
+        if (stored) return stored;
+        const active = getActiveEpochStartISO();
+        return active ? addOneYearISO(active) : '';
+    }
+    function emptyEpoch(partial) {
+        return Object.assign({
+            startDate: '',
+            kind: 'active',
+            g4: 0,
+            incomes: [],
+            fixed: [],
+            annual: [],
+            savings: [],
+            loans: [],
+            synthetic: false
+        }, partial || {});
+    }
+    function getTrackingStartISO() {
+        if (state.trackingStartDate) {
+            const iso = parseStartDateToISO(state.trackingStartDate);
+            if (iso) return iso;
+        }
+        if (state.transactions && state.transactions.length > 0) {
+            const sorted = [...state.transactions].filter(t => t && t.date && !t.isVirtual).sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
+            if (sorted.length) return parseStartDateToISO(sorted[0].date);
+        }
+        // Do not fall back to dailyBudgetHistory / epoch startDate — those can be g4 rate changes.
+        return '';
+    }
+    function getActiveEpochStartISO() {
+        let iso = state.budget && state.budget.epochStart ? parseStartDateToISO(state.budget.epochStart) : '';
+        const startFromDate = state.budget && state.budget.startDate ? parseStartDateToISO(state.budget.startDate) : '';
+        const histIsos = (state.budgetEpochs || [])
+            .filter(e => e && e.kind === 'hist')
+            .map(e => parseStartDateToISO(e.startDate))
+            .filter(Boolean)
+            .sort();
+        if (histIsos.length) {
+            const latestHist = histIsos[histIsos.length - 1];
+            if (!iso || iso <= latestHist) {
+                const later = [startFromDate, iso].find(v => v && v > latestHist);
+                if (later) iso = later;
+            }
+        }
+        if (!iso) iso = getTrackingStartISO();
+        return iso || '';
+    }
+    function cloneEpochCats(src) {
+        const s = src || {};
+        const copyList = arr => (arr || []).map(i => ({ ...i }));
+        return {
+            incomes: copyList(s.incomes),
+            fixed: copyList(s.fixed),
+            annual: copyList(s.annual),
+            savings: copyList(s.savings),
+            loans: copyList(s.loans)
+        };
+    }
+    let _epochIndex = null;
+    function invalidateEpochIndex() {
+        _epochIndex = null;
+        (state.transactions || []).forEach(tx => { if (tx) delete tx._epochStart; });
+    }
+    function getEpochIndex() {
+        if (_epochIndex) return _epochIndex;
+        const starts = [];
+        const byStart = Object.create(null);
+        (state.budgetEpochs || []).forEach(e => {
+            const s = parseStartDateToISO(e.startDate);
+            if (!s) return;
+            if (!byStart[s]) {
+                byStart[s] = e;
+                starts.push(s);
+            }
+        });
+        starts.sort();
+        _epochIndex = { starts, byStart };
+        return _epochIndex;
+    }
+    function isPlausibleEpochISO(iso) {
+        const s = parseStartDateToISO(iso);
+        if (!s || s <= '1970-01-01') return false;
+        const y = parseInt(s.slice(0, 4), 10);
+        const ty = new Date().getFullYear();
+        return y >= ty - 15 && y <= ty + 5;
+    }
+    function listBudgetEpochs() {
+        const list = (state.budgetEpochs || []).slice();
+        const hasFuture = list.some(e => e.kind === 'future');
+        if (!hasFuture) {
+            list.push(emptyEpoch({
+                startDate: getFutureBudgetStartISO(),
+                kind: 'future',
+                g4: (state.futureBudget && state.futureBudget.g4) || 0,
+                ...cloneEpochCats(state.futureBudget || {})
+            }));
+        }
+        return list.sort((a, b) => {
+            if (a.kind === 'future' && b.kind !== 'future') return 1;
+            if (b.kind === 'future' && a.kind !== 'future') return -1;
+            return String(a.startDate || '').localeCompare(String(b.startDate || ''));
+        });
+    }
+    function getEpochByStart(iso) {
+        const key = parseStartDateToISO(iso);
+        if (!key) return null;
+        return getEpochIndex().byStart[key] || null;
+    }
+    function getEditingKind() {
+        if (state.budgetMode === 'future') return 'future';
+        if (state.budgetMode === 'hist') return 'hist';
+        return 'active';
+    }
+    function getEditingBudget() {
+        const kind = getEditingKind();
+        if (kind === 'future') {
+            if (!state.futureBudget) state.futureBudget = emptyEpoch({ kind: 'future' });
+            return state.futureBudget;
+        }
+        if (kind === 'hist') {
+            const ep = getEpochByStart(state.editingBudgetStart);
+            return ep || state.budget;
+        }
+        return state.budget;
+    }
+    function dbCatNameForEdit(plainName) {
+        const kind = getEditingKind();
+        if (kind === 'future') return '__future__:' + plainName;
+        if (kind === 'hist') return `__hist__:${parseStartDateToISO(state.editingBudgetStart)}:${plainName}`;
+        return plainName;
+    }
+    function dbTypeForEdit(baseType) {
+        const kind = getEditingKind();
+        const base = String(baseType || '').replace(/^(future_|hist_)/, '');
+        if (kind === 'future') return 'future_' + base;
+        if (kind === 'hist') return 'hist_' + base;
+        return base;
+    }
+    function inferBudgetStartFromDate(dateISO) {
+        const iso = parseStartDateToISO(dateISO) || localDateToISO();
+        const starts = getEpochIndex().starts;
+        if (!starts.length) return getActiveEpochStartISO();
+        let match = starts[0];
+        for (let i = 0; i < starts.length; i++) {
+            if (starts[i] <= iso) match = starts[i];
+            else break;
+        }
+        return match;
+    }
+    function getTxBudgetStart(tx) {
+        if (!tx) return getActiveEpochStartISO();
+        if (tx._epochStart) return tx._epochStart;
+        const id = String(tx.id || tx.row || '');
+        let start;
+        if (tx.budgetStart) start = parseStartDateToISO(tx.budgetStart);
+        else if (id && state.txBudgetOverrides && state.txBudgetOverrides[id]) {
+            start = parseStartDateToISO(state.txBudgetOverrides[id]);
+        } else {
+            start = inferBudgetStartFromDate(tx.date);
+        }
+        tx._epochStart = start;
+        return start;
+    }
+    function getBudgetForTx(tx) {
+        const start = getTxBudgetStart(tx);
+        return getEpochByStart(start) || state.budget;
+    }
+    function getViewBudget() {
+        const sel = state.selectedBudgetStart;
+        if (!sel || sel === 'active') return state.budget;
+        if (sel === 'all') return state.budget;
+        if (sel === 'future') {
+            if (!state.futureBudget) state.futureBudget = emptyEpoch({ kind: 'future' });
+            return {
+                ...state.futureBudget,
+                kind: 'future',
+                startDate: getFutureBudgetStartISO(),
+                annual: state.futureBudget.annual || [],
+                fixed: state.futureBudget.fixed || [],
+                savings: state.futureBudget.savings || [],
+                incomes: state.futureBudget.incomes || [],
+                loans: state.futureBudget.loans || []
+            };
+        }
+        return getEpochByStart(sel) || state.budget;
+    }
+    function getSelectedEpochStartISO() {
+        const sel = state.selectedBudgetStart;
+        if (!sel || sel === 'active') return getActiveEpochStartISO();
+        if (sel === 'all') return '';
+        if (sel === 'future') return getFutureBudgetStartISO();
+        return parseStartDateToISO(sel);
+    }
+    function txBelongsToSelectedBudget(tx) {
+        const sel = state.selectedBudgetStart;
+        if (!sel || sel === 'all') return true;
+        if (sel === 'future') {
+            const futureISO = getFutureBudgetStartISO();
+            if (!futureISO) return false;
+            return getTxBudgetStart(tx) === futureISO;
+        }
+        const want = getSelectedEpochStartISO();
+        return getTxBudgetStart(tx) === want;
+    }
+    function getBudgetStartDate() {
+        const selISO = getSelectedEpochStartISO() || getActiveEpochStartISO();
+        if (selISO) return parseLocalDate(selISO);
+        return parseLocalDate(state.budget.startDate || localDateToISO());
+    }
+    function txHasExplicitBudgetOverride(tx) {
+        if (!tx) return false;
+        const id = String(tx.id || tx.row || '');
+        if (tx.budgetStart) return !!parseStartDateToISO(tx.budgetStart);
+        return !!(id && state.txBudgetOverrides && parseStartDateToISO(state.txBudgetOverrides[id]));
+    }
+    /** Planned/fixed spend for an epoch: include pre-epoch txs only when explicitly assigned to that budget. */
+    function txInPlannedEpochWindow(tx, epochStartISO) {
+        const epochISO = parseStartDateToISO(epochStartISO);
+        if (!epochISO || !tx) return true;
+        if (parseLocalDate(tx.date) >= parseLocalDate(epochISO)) return true;
+        return txHasExplicitBudgetOverride(tx) && getTxBudgetStart(tx) === epochISO;
+    }
+    function getPlannedEpochStartISO() {
+        return getSelectedEpochStartISO() || getActiveEpochStartISO();
+    }
+    function getEpochEndISO(startISO) {
+        const s = parseStartDateToISO(startISO);
+        if (!s) return '';
+        const starts = getEpochIndex().starts;
+        for (let i = 0; i < starts.length; i++) {
+            if (starts[i] === s && i < starts.length - 1) return starts[i + 1];
+        }
+        return '';
+    }
+    function isViewingHistPlannedBudget() {
+        const sel = state.selectedBudgetStart || 'active';
+        if (sel === 'active' || sel === 'all' || sel === 'future') return false;
+        const startISO = getPlannedEpochStartISO();
+        if (!startISO) return false;
+        const ep = getEpochByStart(startISO);
+        if (ep && ep.kind === 'hist') return true;
+        return parseStartDateToISO(startISO) !== getActiveEpochStartISO();
+    }
+    function countReserveMonths(startISO) {
+        const s = parseStartDateToISO(startISO);
+        if (!s) return 1;
+        const startMonth = new Date(parseLocalDate(s).getFullYear(), parseLocalDate(s).getMonth(), 1);
+        const now = new Date();
+        let endRef = now;
+        const activeISO = getActiveEpochStartISO();
+        const viewingCurrent = ((state.selectedBudgetStart || 'active') === 'active') && s === activeISO;
+
+        if (!viewingCurrent) {
+            const endExclusiveISO = getEpochEndISO(s);
+            if (endExclusiveISO) {
+                const nextEp = getEpochByStart(endExclusiveISO);
+                // Future epoch is not the end of the current period — only real transitions (hist → active)
+                if (!nextEp || nextEp.kind !== 'future') {
+                    const nextStart = parseLocalDate(endExclusiveISO);
+                    endRef = new Date(nextStart.getFullYear(), nextStart.getMonth(), nextStart.getDate() - 1);
+                }
+            }
+            if (endRef > now) endRef = now;
+        }
+
+        const endMonth = new Date(endRef.getFullYear(), endRef.getMonth(), 1);
+        const months = Math.max(1,
+            (endMonth.getFullYear() - startMonth.getFullYear()) * 12 +
+            (endMonth.getMonth() - startMonth.getMonth()) + 1
+        );
+        return Math.min(12, months);
+    }
+    function formatAnnualPageTitle() {
+        const startISO = getPlannedEpochStartISO();
+        const sel = state.selectedBudgetStart || 'active';
+        if (sel === 'future') {
+            const iso = getFutureBudgetStartISO();
+            return `הוצאות מתוכננות <span style="color:#dc2626">עתידי</span>${iso ? ' · ' + isoToDDMMYYYY(iso) : ''}`;
+        }
+        if (isViewingHistPlannedBudget() && startISO) {
+            return `הוצאות מתוכננות <span style="color:#6366f1">קודם</span> · ${isoToDDMMYYYY(startISO)}`;
+        }
+        return 'הוצאות מתוכננות';
+    }
+    function txIsPlanned(tx) {
+        if (!tx || !tx.tag) return false;
+        const b = getBudgetForTx(tx);
+        return (b.annual || []).some(a => tagMatchesCat(tx.tag, a));
+    }
+    function txHitsCurrentBalance(tx) {
+        if (!tx) return false;
+        if (tx.isAdjustment || tx.category === 'איזון עדכון תקציב') return false;
+        if (tx.name === 'תקציב יומי' || (tx.name && tx.name.startsWith('שינוי תקציב יומי'))) return false;
+        if (txIsPlanned(tx) || txIsFixedLike(tx)) return false;
+        if (tx.tag) return false;
+        return true;
+    }
+    function epochKindLabel(kind) {
+        if (kind === 'future') return 'עתידי';
+        if (kind === 'hist') return 'קודם';
+        return 'נוכחי';
+    }
+    function formatEpochMenuLabel(ep) {
+        const startISO = ep.kind === 'future' ? getFutureBudgetStartISO() : parseStartDateToISO(ep.startDate);
+        const datePart = startISO ? isoToDDMMYYYY(startISO) : 'טרם הוגדר';
+        return `תקופה מ-${datePart} (${epochKindLabel(ep.kind)})`;
+    }
+    function formatSelectedPeriodTitleSuffix() {
+        const sel = state.selectedBudgetStart || 'active';
+        if (sel === 'active' || sel === 'all') return '';
+        if (sel === 'future') {
+            const iso = getFutureBudgetStartISO();
+            return ` <span style="color:#dc2626">עתידי</span>${iso ? ' · ' + isoToDDMMYYYY(iso) : ''}`;
+        }
+        if (isViewingHistPlannedBudget()) {
+            return ` <span style="color:#6366f1">קודם</span> · ${isoToDDMMYYYY(sel)}`;
+        }
+        return '';
+    }
+    function formatBudgetPageTitle() {
+        const sel = state.selectedBudgetStart || 'active';
+        if (sel === 'future') {
+            const iso = getFutureBudgetStartISO();
+            return `ניהול תקציב <span style="color:#dc2626">עתידי</span>${iso ? ' · ' + isoToDDMMYYYY(iso) : ''}`;
+        }
+        if (sel !== 'active' && sel !== 'all' && isViewingHistPlannedBudget()) {
+            return `ניהול תקציב <span style="color:#6366f1">קודם</span> · ${isoToDDMMYYYY(sel)}`;
+        }
+        return 'ניהול תקציב';
+    }
+    function getStatsPeriodBounds() {
+        const sel = state.selectedBudgetStart || 'active';
+        const now = new Date();
+        now.setHours(23, 59, 59, 999);
+        if (sel === 'all') {
+            const startISO = getTrackingStartISO();
+            return { start: startISO ? parseLocalDate(startISO) : null, end: now };
+        }
+        const startISO = getSelectedEpochStartISO();
+        if (!startISO) return { start: null, end: now };
+        let end = new Date(now);
+        if (sel === 'future') {
+            const yearEnd = addOneYearISO(startISO);
+            if (yearEnd) {
+                end = parseLocalDate(yearEnd);
+                end.setDate(end.getDate() - 1);
+                end.setHours(23, 59, 59, 999);
+            }
+        } else if (sel !== 'active') {
+            const endExclusive = getEpochEndISO(startISO);
+            if (endExclusive) {
+                const nextEp = getEpochByStart(endExclusive);
+                if (!nextEp || nextEp.kind !== 'future') {
+                    end = parseLocalDate(endExclusive);
+                    end.setDate(end.getDate() - 1);
+                    end.setHours(23, 59, 59, 999);
+                }
+            }
+        }
+        return { start: parseLocalDate(startISO), end };
+    }
+    function populateStatsMonthSelect() {
+        const select = document.getElementById('specificMonthSelect');
+        if (!select) return '';
+        const bounds = getStatsPeriodBounds();
+        const months = [];
+        if (bounds.start && bounds.end && bounds.start <= bounds.end) {
+            let cur = new Date(bounds.start.getFullYear(), bounds.start.getMonth(), 1);
+            const endMonth = new Date(bounds.end.getFullYear(), bounds.end.getMonth(), 1);
+            while (cur <= endMonth) {
+                const y = cur.getFullYear();
+                const m = cur.getMonth() + 1;
+                const val = `${y}-${String(m).padStart(2, '0')}`;
+                months.push({
+                    val,
+                    label: new Date(y, m - 1, 1).toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })
+                });
+                cur.setMonth(cur.getMonth() + 1);
+            }
+            months.reverse();
+        }
+        if (!months.length) {
+            select.innerHTML = '<option value="">—</option>';
+            state.stats.specificMonth = '';
+            return '';
+        }
+        let selected = state.stats.specificMonth || '';
+        if (!months.some(mo => mo.val === selected)) selected = months[0].val;
+        state.stats.specificMonth = selected;
+        select.innerHTML = months.map(mo =>
+            `<option value="${mo.val}"${mo.val === selected ? ' selected' : ''}>${mo.label}</option>`
+        ).join('');
+        return selected;
     }
     function getSafeId(name) { return 'cat_' + name.replace(/[^a-z0-9א-ת]/gi, '_'); }
 
     function formatDateForSupabase(dateStr) {
-        // dateStr is DD/MM/YYYY, convert to ISO
-        if (!dateStr) return new Date().toISOString().split('T')[0];
-        const parts = dateStr.split('/');
-        if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-        return dateStr;
+        const iso = parseStartDateToISO(dateStr);
+        if (iso) return iso;
+        return localDateToISO();
     }
 
     function formatDateFromSupabase(isoDate) {
@@ -2210,8 +2644,15 @@
     // =====================================================
     let state = {
         balance: safeParseFloat(localStorage.getItem('cached_balance')),
-        transactions: JSON.parse(localStorage.getItem('expense_history') || '[]'),
-        budgetMode: 'active', // 'active' or 'future'
+        transactions: (v => Array.isArray(v) ? v : [])(safeJsonParse(localStorage.getItem('expense_history'), [])),
+        budgetMode: 'active', // 'active', 'future', or 'hist'
+        editingBudgetStart: null,
+        selectedBudgetStart: localStorage.getItem('selected_budget_period') || 'active',
+        trackingStartDate: '',
+        budgetEpochs: [],
+        txBudgetOverrides: {},
+        editExpenseBudgetStart: '',
+        _suppressPaint: false,
         budget: {
             incomes: [],
             fixed: [],
@@ -2222,6 +2663,7 @@
             loanMeta: {},
             g4: safeParseFloat(localStorage.getItem('cached_g4')),
             startDate: localStorage.getItem('cached_start_date') || '',
+            epochStart: '',
             cycleStartDay: 1,
             dailyBudgetHistory: []
         },
@@ -2256,7 +2698,7 @@
         balanceShowDays: false,
         searchText: '',
         searchOpen: false,
-        collapsedGroups: JSON.parse(localStorage.getItem('collapsedGroups') || '{}'),
+        collapsedGroups: (v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {})(safeJsonParse(localStorage.getItem('collapsedGroups'), {})),
         editingParentType: null,
         editingParentName: null,
         pendingG4: null,
@@ -2264,7 +2706,7 @@
             startDay: 1,
             specificMonth: ''
         },
-        expenseCategories: JSON.parse(localStorage.getItem('expense_categories') || '[]'),
+        expenseCategories: (v => Array.isArray(v) ? v : [])(safeJsonParse(localStorage.getItem('expense_categories'), [])),
         activeCategoryFilter: null,  // null = show all
         selectedTxIds: new Set(),     // for bulk categorization
         categoriesCollapsed: localStorage.getItem('categoriesCollapsed') === 'true'
@@ -2346,38 +2788,18 @@
             localStorage.setItem('expense_history', JSON.stringify(state.transactions));
             localStorage.setItem('cached_balance', state.balance.toString());
 
-            // סנכרן start_date לפי ההוצאה הראשונה — גובר על כל מקור אחר (ייבוא GAS, הגדרות ידניות וכו')
+            // Tracking start = first real expense. Align the first budget period to that date.
             if (state.transactions.length > 0) {
-                const sorted = [...state.transactions].sort((a, b) =>
-                    new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
+                const sorted = [...state.transactions].filter(t => t && t.date && !t.isVirtual).sort((a, b) =>
+                    parseLocalDate(a.date) - parseLocalDate(b.date)
                 );
-                const firstTxDate = sorted[0].date; // dd/mm/yyyy
-                const fp = firstTxDate.split('/');
-                if (fp.length === 3) {
-                    const startDateISO = `${fp[2]}-${fp[1].padStart(2,'0')}-${fp[0].padStart(2,'0')}`;
-                    // Compare using zero-padded ISO to avoid mismatches from unpadded stored values
-                    let currentStartISO = null;
-                    if (state.budget.startDate) {
-                        const csp = state.budget.startDate.split('/');
-                        if (csp.length === 3) currentStartISO = `${csp[2]}-${csp[1].padStart(2,'0')}-${csp[0].padStart(2,'0')}`;
-                    }
-                    if (startDateISO !== currentStartISO) {
-                        // Update in-memory startDate so calculateAccumulatedBudget clips from the right date
-                        state.budget.startDate = firstTxDate;
-                        localStorage.setItem('cached_start_date', firstTxDate);
-                        // Persist to budget_settings.__start_date__ so next load is already correct
-                        sbClient.from('budget_settings')
-                            .delete()
-                            .eq('user_token', USER_TOKEN)
-                            .eq('category_name', '__start_date__')
-                            .then(() => sbClient.from('budget_settings').insert({
-                                category_name: '__start_date__',
-                                budget_amount: 0,
-                                type: 'system',
-                                parent_group: firstTxDate,
-                                user_token: USER_TOKEN
-                            }));
-                        // Also sync user_tokens.start_date
+                const firstTxDate = sorted[0] && sorted[0].date;
+                const startDateISO = parseStartDateToISO(firstTxDate);
+                if (startDateISO) {
+                    state.trackingStartDate = startDateISO;
+                    const currentTrack = parseStartDateToISO(state.budget.startDate);
+                    // Keep user_tokens.start_date at tracking start so accumulated מאזן is continuous
+                    if (startDateISO !== currentTrack) {
                         sbClient.rpc('update_daily_budget', {
                             p_user_token:   USER_TOKEN,
                             p_daily_budget: state.budget.g4 / 30,
@@ -2390,22 +2812,23 @@
                                     if (acc > 0) state.balance = window.calculateClientSideBalance();
                                 }
                                 localStorage.setItem('cached_balance', state.balance.toString());
-                                render();
+                                if (!state._suppressPaint) render();
                             }
                         });
                     }
+                    invalidateEpochIndex();
                 }
             }
 
             // Allow cleanup to re-run if user manually refreshed
             if (isManual) window._budgetHistoryCleanedUp = false;
-            render();
+            if (!state._suppressPaint) render();
             if (isManual) window.showToast('עודכן בהצלחה', 'check');
         } catch (e) {
             console.error(e);
             window.showToast('שגיאה בטעינת נתונים', 'circle-xmark');
         } finally {
-            setLoading(false);
+            if (!state._suppressPaint) setLoading(false);
         }
     };
 
@@ -2427,42 +2850,39 @@
             tag,
             isAdjustment,
             external_id: t.external_id || null,
-            expense_category_id: t.expense_category_id || null
+            expense_category_id: t.expense_category_id || null,
+            budgetStart: (state.txBudgetOverrides && (state.txBudgetOverrides[t.id] || state.txBudgetOverrides[String(t.id)])) || null
         };
     }
 
 
-    // מוצא קטגוריה לפי tag — תומך בשם מלא "parent > child" וגם בשם קצר "child"
-    function findCatByTag(tag) {
+    function catsInBudget(budget) {
+        const b = budget || state.budget || {};
+        return [...(b.annual || []), ...(b.fixed || []), ...(b.savings || [])];
+    }
+
+    // מוצא קטגוריה לפי tag בתקציב של התקופה — לא תמיד בתקציב הנוכחי
+    function findCatByTag(tag, budget) {
         if (!tag) return null;
         const t = tag.trim();
-        // חיפוש לפי שם מלא "parent > child"
+        const cats = catsInBudget(budget);
         const bySep = t.indexOf(' > ');
         if (bySep !== -1) {
             const parent = t.slice(0, bySep).trim();
             const child  = t.slice(bySep + 3).trim();
-            const foundAnnual = state.budget.annual.find(a =>
-                (a.category_name||'').trim() === child &&
-                (a.parent_group||'').trim() === parent
+            const foundFull = cats.find(c =>
+                (c.category_name||'').trim() === child &&
+                (c.parent_group||'').trim() === parent
             );
-            if (foundAnnual) return foundAnnual;
-            
-            const foundFixed = state.budget.fixed.find(f =>
-                (f.category_name||'').trim() === child &&
-                (f.parent_group||'').trim() === parent
-            );
-            if (foundFixed) return foundFixed;
+            if (foundFull) return foundFull;
         }
-        // חיפוש לפי שם קצר בלבד
-        return state.budget.annual.find(a => (a.category_name||'').trim() === t) || 
-               state.budget.fixed.find(f => (f.category_name||'').trim() === t) || null;
+        return cats.find(c => (c.category_name||'').trim() === t) || null;
     }
 
     // מחזיר את ה-category_name המפורסר (השם הקצר) שמשמש להשוואה
-    function tagToShortName(tag) {
-        const cat = findCatByTag(tag);
+    function tagToShortName(tag, budget) {
+        const cat = findCatByTag(tag, budget);
         if (cat) return (cat.category_name||'').trim();
-        // אם לא נמצא — אם יש > קח את החלק השני
         const sep = (tag||'').indexOf(' > ');
         return sep !== -1 ? tag.slice(sep + 3).trim() : (tag||'').trim();
     }
@@ -2505,16 +2925,14 @@
         // Priority: startDate (explicitly declared tracking start) → "תקציב יומי" marker date.
         // startDate is more reliable because the marker is created when the user first opens
         // the app, which may be later than when they actually started tracking expenses.
-        let clipISO = null;
-        if (state.budget.startDate) {
-            const sp = state.budget.startDate.split('/');
-            if (sp.length === 3) clipISO = `${sp[2]}-${sp[1].padStart(2,'0')}-${sp[0].padStart(2,'0')}`;
+        let clipISO = getTrackingStartISO();
+        if (!clipISO && state.budget.startDate) {
+            clipISO = parseStartDateToISO(state.budget.startDate);
         }
         if (!clipISO) {
             const initialMarkerTx = (state.transactions || []).find(tx => tx.name === 'תקציב יומי' && !tx.isVirtual);
             if (initialMarkerTx && initialMarkerTx.date) {
-                const p = initialMarkerTx.date.split('/');
-                if (p.length === 3) clipISO = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+                clipISO = parseStartDateToISO(initialMarkerTx.date);
             }
         }
         if (clipISO) {
@@ -2580,14 +2998,7 @@
     window.calculateClientSideBalance = function() {
         const accumulated = window.calculateAccumulatedBudget(new Date());
         
-        const currentTxs = state.transactions.filter(tx => {
-            const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-            const isFixed   = txIsFixedLike(tx);
-            const isLegacyAdjustment = tx.isAdjustment || tx.category === 'איזון עדכון תקציב';
-            // Phase 2: exclude budget markers — their contribution is already in calculateAccumulatedBudget
-            const isBudgetMarker = tx.name === 'תקציב יומי' || (tx.name && tx.name.startsWith('שינוי תקציב יומי'));
-            return !isPlanned && !isFixed && !isLegacyAdjustment && !isBudgetMarker;
-        });
+        const currentTxs = state.transactions.filter(tx => txHitsCurrentBalance(tx));
         
         const sumTxs = currentTxs.reduce((sum, tx) => sum + safeParseFloat(tx.amount), 0);
         return accumulated - sumTxs;
@@ -2621,10 +3032,9 @@
             return window.calculateAccumulatedBudget(end) - window.calculateAccumulatedBudget(dayBeforeStart);
         }
 
-        // Helper: convert dd/mm/yyyy → yyyy-mm-dd ISO string
+        // Helper: convert dd/mm/yyyy or ISO → yyyy-mm-dd
         function toISO(ddmmyyyy) {
-            const p = ddmmyyyy.split('/');
-            return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+            return parseStartDateToISO(ddmmyyyy);
         }
 
         // Helper: convert Date → dd/mm/yyyy
@@ -2644,7 +3054,9 @@
         // Collect unique expense dates from relevant (שוטף) transactions, sorted ascending
         const expenseDateSet = new Set();
         relevantTxs.forEach(tx => {
-            if (!tx.isVirtual) expenseDateSet.add(toISO(tx.date));
+            if (tx.isVirtual) return;
+            const iso = toISO(tx.date);
+            if (iso) expenseDateSet.add(iso);
         });
         const expenseDatesISO = [...expenseDateSet].sort(); // ascending
 
@@ -2682,13 +3094,9 @@
         // the first transaction across ALL types (stored in state.budget.startDate as DD/MM/YYYY).
         // This guards against stale DB records that have an incorrect (too-early) start date.
         let actualBudgetStart = budgetStartISO;
-        if (state.budget.startDate) {
-            const sp = state.budget.startDate.split('/');
-            if (sp.length === 3) {
-                const stateStartISO = `${sp[2]}-${sp[1].padStart(2,'0')}-${sp[0].padStart(2,'0')}`;
-                // Use the later of the two: budget history entry vs actual first transaction
-                if (stateStartISO > actualBudgetStart) actualBudgetStart = stateStartISO;
-            }
+            if (state.budget.startDate) {
+            const stateStartISO = parseStartDateToISO(state.budget.startDate);
+            if (stateStartISO && stateStartISO > actualBudgetStart) actualBudgetStart = stateStartISO;
         }
 
         // Helper: find the start date of the budget segment active on a given ISO date
@@ -2801,6 +3209,293 @@
         return markers;
     };
 
+    let _budgetBoundaryTimer = null;
+    let _budgetTransitionLock = false;
+    let _budgetRolloverAttempted = false;
+
+    function histTypeToListKey(type) {
+        const base = String(type || '').replace(/^(future_|hist_)/, '');
+        if (base === 'income') return 'incomes';
+        if (base === 'loan') return 'loans';
+        return base;
+    }
+
+    async function persistSystemRow(categoryName, parentGroup, amount) {
+        if (!sbClient || !USER_TOKEN) return;
+        await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', categoryName);
+        await sbClient.from('budget_settings').insert({
+            category_name: categoryName,
+            budget_amount: amount || 0,
+            parent_group: parentGroup || null,
+            type: 'system',
+            user_token: USER_TOKEN
+        });
+    }
+
+    async function persistEpochStart(iso) {
+        const startISO = parseStartDateToISO(iso);
+        if (!startISO) return;
+        state.budget.epochStart = startISO;
+        state.budget.startDate = isoToDDMMYYYY(startISO);
+        localStorage.setItem('cached_start_date', state.budget.startDate);
+        await persistSystemRow('__epoch_start__', startISO, 0);
+        await persistSystemRow('__start_date__', isoToDDMMYYYY(startISO), 0);
+    }
+
+    async function persistTxBudgetOverride(txId, startISO) {
+        if (!sbClient || !USER_TOKEN || !txId) return;
+        const key = '__tx_budget__:' + txId;
+        const iso = parseStartDateToISO(startISO);
+        if (!iso) {
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', key);
+            delete state.txBudgetOverrides[String(txId)];
+            const tx = (state.transactions || []).find(t => String(t.id || t.row) === String(txId));
+            if (tx) delete tx._epochStart;
+            return;
+        }
+        state.txBudgetOverrides[String(txId)] = iso;
+        const tx = (state.transactions || []).find(t => String(t.id || t.row) === String(txId));
+        if (tx) { tx.budgetStart = iso; delete tx._epochStart; }
+        await persistSystemRow(key, iso, 0);
+    }
+
+    function scheduleBudgetBoundaryTimer() {
+        if (_budgetBoundaryTimer) {
+            clearTimeout(_budgetBoundaryTimer);
+            _budgetBoundaryTimer = null;
+        }
+        const now = new Date();
+        const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 2);
+        _budgetBoundaryTimer = setTimeout(() => {
+            window.fetchBudgetData();
+            scheduleBudgetBoundaryTimer();
+        }, Math.max(1000, next.getTime() - now.getTime()));
+    }
+
+    function buildSyntheticHistEpoch(activeStartISO) {
+        const trackingISO = getTrackingStartISO();
+        const prevStart = trackingISO && trackingISO < activeStartISO ? trackingISO : '';
+        if (!prevStart || prevStart === activeStartISO) return null;
+        const cats = { incomes: [], fixed: [], annual: [], savings: [], loans: [] };
+        const seen = new Set();
+        (state.transactions || []).forEach(tx => {
+            if (!tx || !tx.tag || tx.isVirtual) return;
+            const txISO = parseStartDateToISO(tx.date);
+            if (!txISO || txISO >= activeStartISO) return;
+            const key = tx.tag.trim();
+            if (seen.has(key)) return;
+            seen.add(key);
+            const sep = key.indexOf(' > ');
+            const item = {
+                category_name: sep === -1 ? key : key.slice(sep + 3).trim(),
+                parent_group: sep === -1 ? null : key.slice(0, sep).trim(),
+                budget_amount: 0,
+                type: 'hist_annual'
+            };
+            const inFixed = (state.budget.fixed || []).some(f => tagMatchesCat(key, f)) ||
+                (state.budget.savings || []).some(s => tagMatchesCat(key, s));
+            if (inFixed) {
+                if ((state.budget.savings || []).some(s => tagMatchesCat(key, s))) {
+                    item.type = 'hist_savings';
+                    cats.savings.push(item);
+                } else {
+                    item.type = 'hist_fixed';
+                    cats.fixed.push(item);
+                }
+            } else {
+                cats.annual.push(item);
+            }
+        });
+        return emptyEpoch({
+            startDate: prevStart,
+            kind: 'hist',
+            g4: 0,
+            synthetic: true,
+            ...cats
+        });
+    }
+
+    function rebuildBudgetEpochs(histMap) {
+        const activeISO = getActiveEpochStartISO();
+        const epochs = [];
+        Object.keys(histMap || {}).sort().forEach(iso => {
+            if (iso && iso !== activeISO) epochs.push(histMap[iso]);
+        });
+        if (!epochs.length && activeISO) {
+            const synthetic = buildSyntheticHistEpoch(activeISO);
+            if (synthetic) epochs.push(synthetic);
+        }
+        epochs.push(emptyEpoch({
+            startDate: activeISO,
+            kind: 'active',
+            g4: state.budget.g4,
+            ...cloneEpochCats(state.budget)
+        }));
+        const futureISO = getFutureBudgetStartISO();
+        epochs.push(emptyEpoch({
+            startDate: futureISO,
+            kind: 'future',
+            g4: (state.futureBudget && state.futureBudget.g4) || 0,
+            ...cloneEpochCats(state.futureBudget || {})
+        }));
+        state.budgetEpochs = epochs;
+        invalidateEpochIndex();
+    }
+
+    async function archiveActiveBudgetToHist(startISO) {
+        if (!sbClient || !USER_TOKEN) return;
+        const iso = parseStartDateToISO(startISO);
+        if (!iso) return;
+        const { data: existing } = await sbClient
+            .from('budget_settings')
+            .select('id')
+            .eq('user_token', USER_TOKEN)
+            .eq('type', 'hist_annual')
+            .like('category_name', `__hist__:${iso}:%`)
+            .limit(1);
+        const { data: rows } = await sbClient
+            .from('budget_settings')
+            .select('*')
+            .eq('user_token', USER_TOKEN)
+            .in('type', ['income', 'fixed', 'annual', 'savings', 'loan']);
+        if (!(existing && existing.length) && rows && rows.length) {
+            const histRows = rows.map(r => ({
+                category_name: `__hist__:${iso}:${r.category_name}`,
+                parent_group: r.parent_group || null,
+                budget_amount: safeParseFloat(r.budget_amount) || 0,
+                type: 'hist_' + r.type,
+                user_token: USER_TOKEN
+            }));
+            const { error } = await sbClient.from('budget_settings').insert(histRows);
+            if (error) throw error;
+        }
+        await persistSystemRow('__hist_g4__:' + iso, iso, safeParseFloat(state.budget.g4) || 0);
+    }
+
+    function retargetHistMap(histMap, fromISO, toISO) {
+        if (!histMap || !fromISO || !toISO || fromISO === toISO || !histMap[fromISO]) return;
+        const ep = histMap[fromISO];
+        ep.startDate = toISO;
+        if (!histMap[toISO]) {
+            histMap[toISO] = ep;
+        } else {
+            ['incomes', 'fixed', 'annual', 'savings', 'loans'].forEach(k => {
+                histMap[toISO][k] = [...(histMap[toISO][k] || []), ...(ep[k] || [])];
+            });
+            if (!histMap[toISO].g4 && ep.g4) histMap[toISO].g4 = ep.g4;
+        }
+        delete histMap[fromISO];
+    }
+
+    async function retargetHistEpochInDb(fromISO, toISO) {
+        if (!sbClient || !USER_TOKEN || !fromISO || !toISO || fromISO === toISO) return;
+        const prefix = `__hist__:${fromISO}:`;
+        const { data: rows } = await sbClient
+            .from('budget_settings')
+            .select('id, category_name')
+            .eq('user_token', USER_TOKEN)
+            .like('category_name', prefix + '%');
+        for (const r of (rows || [])) {
+            const rest = (r.category_name || '').slice(prefix.length);
+            await sbClient.from('budget_settings').update({
+                category_name: `__hist__:${toISO}:${rest}`
+            }).eq('id', r.id).eq('user_token', USER_TOKEN);
+        }
+        const oldG4 = '__hist_g4__:' + fromISO;
+        const { data: g4s } = await sbClient
+            .from('budget_settings')
+            .select('id, budget_amount')
+            .eq('user_token', USER_TOKEN)
+            .eq('category_name', oldG4);
+        if (g4s && g4s.length) {
+            await persistSystemRow('__hist_g4__:' + toISO, toISO, safeParseFloat(g4s[0].budget_amount) || 0);
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', oldG4);
+        }
+        const { data: overrides } = await sbClient
+            .from('budget_settings')
+            .select('id')
+            .eq('user_token', USER_TOKEN)
+            .eq('type', 'system')
+            .eq('parent_group', fromISO)
+            .like('category_name', '__tx_budget__:%');
+        for (const r of (overrides || [])) {
+            await sbClient.from('budget_settings').update({ parent_group: toISO })
+                .eq('id', r.id).eq('user_token', USER_TOKEN);
+        }
+        Object.keys(state.txBudgetOverrides || {}).forEach(id => {
+            if (state.txBudgetOverrides[id] === fromISO) state.txBudgetOverrides[id] = toISO;
+        });
+    }
+
+    function collectHistMapFromEpochs() {
+        const histMap = {};
+        (state.budgetEpochs || []).forEach(e => {
+            if (!e || e.kind !== 'hist' || e.synthetic) return;
+            const iso = parseStartDateToISO(e.startDate);
+            if (iso) histMap[iso] = e;
+        });
+        return histMap;
+    }
+
+    async function retargetEarliestHistToTracking(histMap) {
+        const trackingISO = getTrackingStartISO();
+        if (!histMap || !trackingISO || !isPlausibleEpochISO(trackingISO)) return;
+        const histIsos = Object.keys(histMap).filter(iso => isPlausibleEpochISO(iso)).sort();
+        if (!histIsos.length || histIsos[0] <= trackingISO) return;
+        const fromISO = histIsos[0];
+        retargetHistMap(histMap, fromISO, trackingISO);
+        await retargetHistEpochInDb(fromISO, trackingISO);
+    }
+
+    function resolveActiveEpochStartISO(histMap, epochRowISO, startDateISO) {
+        const trackingISO = getTrackingStartISO();
+        const histIsos = Object.keys(histMap || {}).filter(iso => isPlausibleEpochISO(iso)).sort();
+        const stored = parseStartDateToISO(epochRowISO);
+        const startParsed = parseStartDateToISO(startDateISO);
+
+        if (!histIsos.length) {
+            return trackingISO || stored || startParsed || '';
+        }
+
+        const latestHist = histIsos[histIsos.length - 1];
+        const candidates = [stored, startParsed].filter(iso => iso && iso > latestHist);
+        if (candidates.length) return candidates.sort().pop();
+        if (startParsed && startParsed > latestHist) return startParsed;
+        if (stored && stored > latestHist) return stored;
+        return stored || startParsed || addOneYearISO(latestHist) || latestHist;
+    }
+
+    function archiveStartForCurrentPeriod() {
+        const trackingISO = getTrackingStartISO();
+        const activeISO = getActiveEpochStartISO();
+        const hasHist = Object.keys(collectHistMapFromEpochs()).length > 0;
+        if (!hasHist && trackingISO && isPlausibleEpochISO(trackingISO)) return trackingISO;
+        return activeISO || trackingISO;
+    }
+
+    async function insertDailyHistoryAt(startISO, dailyBudget) {
+        const iso = parseStartDateToISO(startISO);
+        if (!iso) return;
+        await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__daily_budget_history__:' + iso);
+        await sbClient.from('budget_settings').insert({
+            category_name: '__daily_budget_history__:' + iso,
+            budget_amount: dailyBudget,
+            parent_group: iso,
+            type: 'system',
+            user_token: USER_TOKEN
+        });
+    }
+
+    window.rolloverBudgetYear = async function(oldStartISO, newStartISO) {
+        await archiveActiveBudgetToHist(oldStartISO);
+        await persistEpochStart(newStartISO);
+        const dailyBudget = (safeParseFloat(state.budget.g4) || 0) / 30;
+        await insertDailyHistoryAt(newStartISO, dailyBudget);
+        state.budget.epochStart = parseStartDateToISO(newStartISO);
+        state.budget.startDate = isoToDDMMYYYY(newStartISO);
+        window.showToast('התחיל תקציב חדש (העתק מהתקציב הקודם)', 'check');
+    };
+
     window.fetchBudgetData = async function(isManual = false) {
         if (!sbClient || !USER_TOKEN) return;
         const icon = document.getElementById('budgetRefreshIcon');
@@ -2869,6 +3564,53 @@
             state.budget.savings = parsedRows.filter(r => r.type === 'savings');
             state.budget.loans   = parsedRows.filter(r => r.type === 'loan');
 
+            // Load hist_* epochs and per-transaction budget overrides
+            const histMap = {};
+            state.txBudgetOverrides = {};
+            rawRows.forEach(r => {
+                if (!r) return;
+                const cname = r.category_name || '';
+                if (cname.startsWith('__tx_budget__:')) {
+                    state.txBudgetOverrides[cname.slice('__tx_budget__:'.length)] = r.parent_group || '';
+                    return;
+                }
+                if (cname.startsWith('__hist_g4__:')) {
+                    const iso = r.parent_group || cname.slice('__hist_g4__:'.length);
+                    if (!histMap[iso]) histMap[iso] = emptyEpoch({ startDate: iso, kind: 'hist' });
+                    histMap[iso].g4 = safeParseFloat(r.budget_amount);
+                    return;
+                }
+                if (r.type && String(r.type).startsWith('hist_')) {
+                    let name = cname;
+                    let iso = '';
+                    if (name.startsWith('__hist__:')) {
+                        const rest = name.slice('__hist__:'.length);
+                        const idx = rest.indexOf(':');
+                        if (idx !== -1) {
+                            iso = rest.slice(0, idx);
+                            name = rest.slice(idx + 1);
+                        }
+                    }
+                    if (!iso) return;
+                    const sep = name.indexOf(' > ');
+                    let parent = r.parent_group || null;
+                    if (sep !== -1) {
+                        parent = name.slice(0, sep).trim();
+                        name = name.slice(sep + 3).trim();
+                    }
+                    if (!histMap[iso]) histMap[iso] = emptyEpoch({ startDate: iso, kind: 'hist' });
+                    const listKey = histTypeToListKey(r.type);
+                    if (histMap[iso][listKey]) {
+                        histMap[iso][listKey].push({
+                            ...r,
+                            category_name: name,
+                            parent_group: parent,
+                            type: r.type
+                        });
+                    }
+                }
+            });
+
             // Load savings metadata: __savings_meta__:{id}:{field}
             state.budget.savingsMeta = {};
             rows.filter(r => r.category_name && r.category_name.startsWith('__savings_meta__:')).forEach(r => {
@@ -2896,19 +3638,35 @@
             });
 
             // g4 stored as a special budget_setting row
-            const g4Row = rows.find(r => r.category_name === '__g4__' || r.category_name.endsWith('__g4__'));
+            const g4Row = rows.find(r => r.category_name === '__g4__' || (r.category_name && r.category_name.endsWith('__g4__')));
             state.budget.g4 = g4Row ? safeParseFloat(g4Row.budget_amount) : state.budget.g4;
 
-            const startRow = rows.find(r => r.category_name === '__start_date__' || r.category_name.endsWith('__start_date__'));
+            const startRow = rows.find(r => r.category_name === '__start_date__' || (r.category_name && r.category_name.endsWith('__start_date__')));
             state.budget.startDate = startRow ? (startRow.parent_group || '') : state.budget.startDate;
+
+            const epochRow = rawRows.find(r => r.category_name === '__epoch_start__');
+            let epochISO = epochRow ? parseStartDateToISO(epochRow.parent_group) : '';
+            const trackingISO = getTrackingStartISO();
+
+            await retargetEarliestHistToTracking(histMap);
+            const startDateForEpoch = startRow ? (startRow.parent_group || '') : state.budget.startDate;
+            let activeEpochISO = resolveActiveEpochStartISO(
+                histMap,
+                epochRow ? epochRow.parent_group : '',
+                startDateForEpoch
+            );
+            if (!activeEpochISO) activeEpochISO = trackingISO;
+            const prevStored = epochRow ? parseStartDateToISO(epochRow.parent_group) : '';
+            const histIsosAfter = Object.keys(histMap).filter(iso => isPlausibleEpochISO(iso)).sort();
+            const shouldPersist = activeEpochISO && activeEpochISO !== prevStored &&
+                (!histIsosAfter.length || activeEpochISO > histIsosAfter[histIsosAfter.length - 1]);
+            if (shouldPersist) persistEpochStart(activeEpochISO);
+            state.budget.epochStart = activeEpochISO;
+            if (activeEpochISO) state.budget.startDate = isoToDDMMYYYY(activeEpochISO);
 
             // If there's no history but there is a current g4, initialize daily budget history
             if (state.budget.dailyBudgetHistory.length === 0 && state.budget.g4 > 0) {
-                let sDate = '1970-01-01';
-                if (state.budget.startDate) {
-                    const sp = state.budget.startDate.split('/');
-                    if (sp.length === 3) sDate = `${sp[2]}-${sp[1].padStart(2,'0')}-${sp[0].padStart(2,'0')}`;
-                }
+                let sDate = parseStartDateToISO(state.budget.startDate) || getTrackingStartISO() || '1970-01-01';
                 state.budget.dailyBudgetHistory = [{
                     startDate: sDate,
                     dailyBudget: state.budget.g4 / 30
@@ -2939,20 +3697,12 @@
             const futureStartRow = rows.find(r => r.category_name === '__future_start_date__');
             state.futureBudget.startDate = futureStartRow ? (futureStartRow.parent_group || '') : '';
 
-            // Check automatic activation of prepared future budget
-            if (state.futureBudget.startDate) {
-                const todayStr = new Date().toISOString().split('T')[0];
-                if (todayStr >= state.futureBudget.startDate) {
-                    setTimeout(() => {
-                        window.activateFutureBudget();
-                    }, 500);
-                    return;
-                }
-            }
+            rebuildBudgetEpochs(histMap);
 
             // __month_start_day__ stored as a special budget_setting row
-            const cycleStartRow = rows.find(r => r.category_name === '__month_start_day__' || r.category_name.endsWith('__month_start_day__'));
+            const cycleStartRow = rows.find(r => r.category_name === '__month_start_day__' || (r.category_name && r.category_name.endsWith('__month_start_day__')));
             state.budget.cycleStartDay = cycleStartRow ? parseInt(cycleStartRow.budget_amount) : 1;
+            if (!state.budget.cycleStartDay || isNaN(state.budget.cycleStartDay)) state.budget.cycleStartDay = 1;
             state.stats.startDay = state.budget.cycleStartDay;
 
             localStorage.setItem('cached_g4', state.budget.g4.toString());
@@ -2960,30 +3710,57 @@
 
             // Keep user_tokens.daily_budget in sync so get_balance is accurate
             if (state.budget.g4 > 0) {
-                // תאריך התחלה = תאריך התנועה הראשונה, או startDate אם אין תנועות
-                let startDateISO = null;
-                if (state.transactions.length > 0) {
-                    const sorted = [...state.transactions].sort((a, b) =>
-                        new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
-                    );
-                    const fp = sorted[0].date.split('/');
-                    if (fp.length === 3) startDateISO = `${fp[2]}-${fp[1].padStart(2,'0')}-${fp[0].padStart(2,'0')}`;
+                const startDateISO = getTrackingStartISO() || parseStartDateToISO(state.budget.startDate);
+                if (startDateISO) {
+                    sbClient.rpc('update_daily_budget', {
+                        p_user_token:   USER_TOKEN,
+                        p_daily_budget: state.budget.g4 / 30,
+                        p_start_date:   startDateISO
+                    }).then(({ error }) => { if (error) console.warn('update_daily_budget sync:', error); });
                 }
-                if (!startDateISO && state.budget.startDate) {
-                    const startParts = state.budget.startDate.split('/');
-                    if (startParts.length === 3)
-                        startDateISO = `${startParts[2]}-${startParts[1].padStart(2,'0')}-${startParts[0].padStart(2,'0')}`;
-                }
-                sbClient.rpc('update_daily_budget', {
-                    p_user_token:   USER_TOKEN,
-                    p_daily_budget: state.budget.g4 / 30,
-                    p_start_date:   startDateISO
-                }).then(({ error }) => { if (error) console.warn('update_daily_budget sync:', error); });
             }
 
             state.isDirty = false;
-            renderBudget();
+            scheduleBudgetBoundaryTimer();
+            if (typeof window.renderBudgetSubmenu === 'function') window.renderBudgetSubmenu();
+            if (!state._suppressPaint) {
+                try { renderBudget(); } catch (e) { console.error('renderBudget error:', e); }
+                if (state.currentView === 'budget') updateNavigationUI();
+                if (state.currentView === 'main' || state.currentView === 'annual') {
+                    try { render(); } catch (e) { console.error('render error:', e); }
+                }
+            }
             if (isManual) window.showToast('תקציב סונכרן', 'check');
+
+            // Transitions after first paint so a rollover/activation never blanks the page
+            const todayStr = localDateToISO();
+            const futureStartISO = getFutureBudgetStartISO();
+            const activeStart = getActiveEpochStartISO();
+            const anniversary = activeStart ? addOneYearISO(activeStart) : '';
+            if (!_budgetTransitionLock && futureStartISO && todayStr >= futureStartISO) {
+                setTimeout(() => { window.activateFutureBudget(); }, 500);
+            } else if (!_budgetRolloverAttempted && !_budgetTransitionLock && anniversary && todayStr >= anniversary && isPlausibleEpochISO(activeStart)) {
+                _budgetRolloverAttempted = true;
+                _budgetTransitionLock = true;
+                setTimeout(async () => {
+                    try {
+                        let start = archiveStartForCurrentPeriod() || activeStart;
+                        let guard = 0;
+                        while (start && localDateToISO() >= addOneYearISO(start) && guard < 15) {
+                            const next = addOneYearISO(start);
+                            if (!next || next === start) break;
+                            await window.rolloverBudgetYear(start, next);
+                            start = next;
+                            guard++;
+                        }
+                    } catch (e) {
+                        console.error('budget rollover error:', e);
+                    } finally {
+                        _budgetTransitionLock = false;
+                        try { await window.fetchBudgetData(); } catch (e2) { console.error(e2); }
+                    }
+                }, 500);
+            }
         } catch (e) {
             console.error(e);
         } finally {
@@ -3007,16 +3784,14 @@
         // Tracking start: startDate first (most reliable), fall back to marker date.
         // startDate is more reliable because the budget marker is created when the user
         // first opens the app, which may be later than when they started tracking.
-        let clipISO = null;
-        if (state.budget.startDate) {
-            const sp = state.budget.startDate.split('/');
-            if (sp.length === 3) clipISO = `${sp[2]}-${sp[1].padStart(2,'0')}-${sp[0].padStart(2,'0')}`;
+        let clipISO = getTrackingStartISO();
+        if (!clipISO && state.budget.startDate) {
+            clipISO = parseStartDateToISO(state.budget.startDate);
         }
         if (!clipISO) {
             const markerTx = (state.transactions || []).find(tx => tx.name === 'תקציב יומי' && !tx.isVirtual);
             if (markerTx && markerTx.date) {
-                const p = markerTx.date.split('/');
-                if (p.length === 3) clipISO = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+                clipISO = parseStartDateToISO(markerTx.date);
             }
         }
         if (!clipISO) return;
@@ -3099,6 +3874,7 @@
         if (!sbClient || !USER_TOKEN) return;
         setLoading(true);
         state.displayedTransactionsCount = 30;
+        state._suppressPaint = true;
         try {
             // fetchBudgetData must complete first so dailyBudgetHistory is available
             // before fetchTransactionsOnly calls calculateClientSideBalance
@@ -3107,11 +3883,13 @@
             // Clean up stale budget history entries only if server/client balance mismatch detected
             await cleanupDailyBudgetHistory(window._lastServerBalance ?? state.balance);
             state.isDirty = false;
-            render();
         } catch (e) {
             console.error(e);
         } finally {
+            state._suppressPaint = false;
             setLoading(false);
+            try { render(); } catch (e) { console.error(e); }
+            revealApp();
         }
     };
 
@@ -3434,7 +4212,7 @@
                     created_at = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00${tzStr}`;
                 }
             }
-            const { error: insertErr } = await sbClient
+            const { data: insertedTx, error: insertErr } = await sbClient
                 .from('transactions')
                 .insert({ 
                     amount, 
@@ -3443,8 +4221,15 @@
                     expense_category_id: expInp?.value || null,
                     user_token: USER_TOKEN, 
                     created_at
-                });
+                })
+                .select('id')
+                .single();
             if (insertErr) throw insertErr;
+            const resolvedISO = parseStartDateToISO(getActiveEpochStartISO());
+            const inferred = inferBudgetStartFromDate(dateInp && dateInp.value);
+            if (insertedTx && insertedTx.id && resolvedISO && resolvedISO !== inferred) {
+                await persistTxBudgetOverride(insertedTx.id, resolvedISO);
+            }
 
             // עדכן state מיד (optimistic) — fetchTransactionsOnly יסנכרן מהשרת בעוד 800ms
             let txDate;
@@ -3454,13 +4239,14 @@
                 txDate = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
             }
             const newTx = {
-                id: `temp_${Date.now()}`,
-                row: `temp_${Date.now()}`,
+                id: (insertedTx && insertedTx.id) || `temp_${Date.now()}`,
+                row: (insertedTx && insertedTx.id) || `temp_${Date.now()}`,
                 name, amount,
                 date: txDate,
                 time: now.toLocaleTimeString('he-IL'),
                 tag: category !== 'שוטף' ? category : null,
-                expense_category_id: expInp?.value || null
+                expense_category_id: expInp?.value || null,
+                budgetStart: resolvedISO || null
             };
             state.transactions = [newTx, ...state.transactions];
             if (window.calculateClientSideBalance && window.calculateAccumulatedBudget) {
@@ -3550,6 +4336,18 @@
                 .eq('id', state.pendingActionRow.row)
                 .eq('user_token', USER_TOKEN);
             if (error) throw error;
+            const pickedBudget = (document.getElementById('editExpenseBudgetSelect') || {}).value;
+            const inferred = inferBudgetStartFromDate(dateVal);
+            let resolvedISO = pickedBudget;
+            if (pickedBudget === 'future') resolvedISO = parseStartDateToISO(state.futureBudget && state.futureBudget.startDate);
+            if (pickedBudget === 'active' || !pickedBudget) resolvedISO = getActiveEpochStartISO();
+            resolvedISO = parseStartDateToISO(resolvedISO);
+            const txId = state.pendingActionRow.row;
+            if (resolvedISO && resolvedISO !== inferred) {
+                await persistTxBudgetOverride(txId, resolvedISO);
+            } else if (txId) {
+                await persistTxBudgetOverride(txId, '');
+            }
             await window.fetchTransactionsOnly();
             const savingsItem = findSavingsByTag(category);
             if (savingsItem) {
@@ -3787,13 +4585,8 @@
         try {
             const amount = safeParseFloat((amtInp?.value || '').replace(/,/g, ''));
             
-            // Map type to future if in future budget mode
-            let insertType = state.pendingAddType;
-            let dbCatName = newName;
-            if (state.budgetMode === 'future') {
-                insertType = 'future_' + insertType;
-                dbCatName = '__future__:' + newName;
-            }
+            let insertType = dbTypeForEdit(state.pendingAddType);
+            let dbCatName = dbCatNameForEdit(newName);
 
             const { data, error } = await sbClient
                 .from('budget_settings')
@@ -3846,7 +4639,7 @@
 
     // ── Budget item edit via ellipsis ─────────────────────────────────────
     window.initBudgetItemEdit = function(dbName) {
-        const b = state.budgetMode === 'future' ? state.futureBudget : state.budget;
+        const b = getEditingBudget();
         const allItems = [...b.incomes, ...b.fixed, ...b.annual, ...(b.savings || []), ...(b.loans || [])];
         const sep = dbName.indexOf(' > ');
         const searchName = sep !== -1 ? dbName.slice(sep + 3).trim() : dbName.trim();
@@ -4013,6 +4806,26 @@
         });
     }
 
+    async function renameCategoryInEpoch(oldName, newName, parentGroup, epochISO) {
+        if (!sbClient || !USER_TOKEN || !oldName || !newName || oldName === newName) return;
+        const oldShort = oldName.trim();
+        const newShort = newName.trim();
+        const want = parseStartDateToISO(epochISO);
+        const ids = (state.transactions || []).filter(tx => {
+            if (!tx.tag || !tx.id) return false;
+            if (getTxBudgetStart(tx) !== want) return false;
+            const t = tx.tag.trim();
+            return t === oldShort || (parentGroup && t === `${parentGroup.trim()} > ${oldShort}`);
+        }).map(tx => tx.id);
+        for (const id of ids) {
+            await sbClient.from('transactions').update({ category: newShort }).eq('id', id).eq('user_token', USER_TOKEN);
+        }
+        state.transactions.forEach(tx => {
+            if (!ids.includes(tx.id) && !ids.includes(tx.row)) return;
+            tx.tag = newShort;
+        });
+    }
+
     /** After rename / edit: recompute deposit-based balance using current tags, then drop internal flags. */
     function finalizeSavingsMetaForSave(item, meta, categoryName) {
         if (!meta) return meta;
@@ -4092,7 +4905,23 @@
             const oldName = item.category_name.trim();
             const renamed = newName !== oldName;
             if (renamed) {
-                updates.category_name = (item.type && item.type.startsWith('future_')) ? '__future__:' + newName : newName;
+                updates.category_name = dbCatNameForEdit(newName);
+            }
+
+            if (getEditingKind() === 'hist' && !itemId) {
+                const { error: insErr } = await sbClient.from('budget_settings').insert({
+                    category_name: dbCatNameForEdit(newName),
+                    parent_group: item.parent_group || null,
+                    budget_amount: updates.budget_amount,
+                    type: dbTypeForEdit(item.type || 'annual'),
+                    user_token: USER_TOKEN
+                });
+                if (insErr) throw insErr;
+                if (renamed) await renameCategoryInEpoch(oldName, newName, item.parent_group, state.editingBudgetStart);
+                await window.fetchBudgetData();
+                if (renamed) await window.fetchTransactionsOnly();
+                window.showToast('עודכן', 'check');
+                return;
             }
 
             // Use id if available, otherwise fall back to matching by category_name + parent_group
@@ -4101,7 +4930,7 @@
                 query = query.eq('id', itemId);
             } else {
                 // Try child name + parent_group first
-                let qOldName = (item.type && item.type.startsWith('future_')) ? '__future__:' + oldName : oldName;
+                let qOldName = dbCatNameForEdit(oldName);
                 let q = sbClient.from('budget_settings').update(updates).eq('user_token', USER_TOKEN).eq('category_name', qOldName);
                 if (item.parent_group) q = q.eq('parent_group', item.parent_group);
                 const { error: e1 } = await q.select('id');
@@ -4109,12 +4938,15 @@
                     // also try full "parent > child" legacy format
                     if (item.parent_group) {
                         let qLegacy = `${item.parent_group} > ${oldName}`;
-                        if (item.type && item.type.startsWith('future_')) qLegacy = '__future__:' + qLegacy;
+                        if (getEditingKind() === 'future') qLegacy = '__future__:' + qLegacy;
+                        else if (getEditingKind() === 'hist') qLegacy = dbCatNameForEdit(`${item.parent_group} > ${oldName}`);
                         await sbClient.from('budget_settings').update(updates).eq('user_token', USER_TOKEN).eq('category_name', qLegacy);
                     }
-                    if (renamed && state.budgetMode !== 'future') {
+                    if (renamed && getEditingKind() === 'active') {
                         const parentFromDbName = dbName.includes(' > ') ? dbName.split(' > ')[0].trim() : null;
                         await renameCategoryInTransactions(oldName, newName, item.parent_group || parentFromDbName);
+                    } else if (renamed && getEditingKind() === 'hist') {
+                        await renameCategoryInEpoch(oldName, newName, item.parent_group, state.editingBudgetStart);
                     }
                     if (pendingSavingsMeta && itemKey) {
                         finalizeSavingsMetaForSave(item, pendingSavingsMeta, newName);
@@ -4128,7 +4960,7 @@
                         state.budget.loanMeta[itemKey] = pendingLoanMeta;
                     }
                     await window.fetchBudgetData();
-                    if (renamed && state.budgetMode !== 'future') await window.fetchTransactionsOnly();
+                    if (renamed && getEditingKind() !== 'future') await window.fetchTransactionsOnly();
                     window.showToast('עודכן', 'check');
                     return;
                 }
@@ -4137,10 +4969,11 @@
             const { error } = await query;
             if (error) throw error;
 
-            // If renamed in current budget, update related transactions — never for future budget
-            if (renamed && state.budgetMode !== 'future') {
+            if (renamed && getEditingKind() === 'active') {
                 const parentFromDbName = dbName.includes(' > ') ? dbName.split(' > ')[0].trim() : null;
                 await renameCategoryInTransactions(oldName, newName, item.parent_group || parentFromDbName);
+            } else if (renamed && getEditingKind() === 'hist') {
+                await renameCategoryInEpoch(oldName, newName, item.parent_group, state.editingBudgetStart);
             }
             // Save savings/loan meta to DB
             if (pendingSavingsMeta && itemKey) {
@@ -4156,7 +4989,7 @@
             }
 
             await window.fetchBudgetData();
-            if (renamed && state.budgetMode !== 'future') await window.fetchTransactionsOnly();
+            if (renamed && getEditingKind() !== 'future') await window.fetchTransactionsOnly();
             window.showToast('עודכן', 'check');
         } catch (e) {
             console.error(e);
@@ -4225,7 +5058,8 @@
             if (!deleted) {
                 // Try with child name + parent_group column
                 let qName = item.category_name.trim();
-                if (item.type && item.type.startsWith('future_')) qName = '__future__:' + qName;
+                if (item.type && String(item.type).startsWith('future_')) qName = '__future__:' + qName;
+                else if (getEditingKind() === 'hist') qName = dbCatNameForEdit(item.category_name.trim());
                 let q = sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', qName);
                 if (item.parent_group) q = q.eq('parent_group', item.parent_group.trim());
                 const { error: e1 } = await q;
@@ -4234,7 +5068,8 @@
             if (!deleted) {
                 // Try with full "parent > child" format in category_name (legacy storage)
                 let fullName = item.parent_group ? `${item.parent_group} > ${item.category_name}` : item.category_name;
-                if (item.type && item.type.startsWith('future_')) fullName = '__future__:' + fullName;
+                if (item.type && String(item.type).startsWith('future_')) fullName = '__future__:' + fullName;
+                else if (getEditingKind() === 'hist') fullName = dbCatNameForEdit(fullName);
                 const { error: e2 } = await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', fullName.trim());
                 if (e2) throw e2;
             }
@@ -4324,10 +5159,10 @@
         window.closeParentGroupModal();
         setLoading(true, true);
         try {
-            const b = state.budgetMode === 'future' ? state.futureBudget : state.budget;
+            const b = getEditingBudget();
             for (const chk of checkboxes) {
                 const catName = chk.value;
-                const qCatName = (state.budgetMode === 'future') ? '__future__:' + catName : catName;
+                const qCatName = dbCatNameForEdit(catName);
                 if (chk.checked) {
                     await sbClient.from('budget_settings').update({ parent_group: parentName }).eq('category_name', qCatName).eq('user_token', USER_TOKEN);
                 } else {
@@ -4354,17 +5189,29 @@
         
         if (state.budgetMode === 'future') {
             setLoading(true, true);
-            sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__future_g4__')
-            .then(() => {
-                sbClient.from('budget_settings').insert({ category_name: '__future_g4__', budget_amount: actualRequested, type: 'system', user_token: USER_TOKEN })
-                .then(() => {
-                    window.fetchBudgetData().then(() => {
-                        const g4Btn = document.getElementById('g4UpdateBtn');
-                        if (g4Btn) g4Btn.disabled = true;
-                        window.showToast('עדכון תקציב עתידי נשמר', 'check');
-                        setLoading(false, true);
-                    });
+            persistSystemRow('__future_g4__', null, actualRequested).then(() => {
+                window.fetchBudgetData().then(() => {
+                    const g4Btn = document.getElementById('g4UpdateBtn');
+                    if (g4Btn) g4Btn.disabled = true;
+                    window.showToast('עדכון תקציב עתידי נשמר', 'check');
+                    setLoading(false, true);
                 });
+            });
+            return;
+        }
+        if (state.budgetMode === 'hist') {
+            const iso = parseStartDateToISO(state.editingBudgetStart);
+            setLoading(true, true);
+            persistSystemRow('__hist_g4__:' + iso, iso, actualRequested).then(async () => {
+                const daily = actualRequested / 30;
+                await insertDailyHistoryAt(iso, daily);
+                const ep = getEpochByStart(iso);
+                if (ep) ep.g4 = actualRequested;
+                await window.fetchBudgetData();
+                const g4Btn = document.getElementById('g4UpdateBtn');
+                if (g4Btn) g4Btn.disabled = true;
+                window.showToast('תקציב קודם עודכן', 'check');
+                setLoading(false, true);
             });
             return;
         }
@@ -4803,9 +5650,13 @@
 
     window.activateFutureBudget = async function() {
         if (!sbClient) return;
+        if (_budgetTransitionLock) return;
+        _budgetTransitionLock = true;
         setLoading(true, true);
         try {
             console.log('🚀 Promoting future budget to active!');
+            const oldStartISO = archiveStartForCurrentPeriod();
+            await archiveActiveBudgetToHist(oldStartISO);
             
             // 1. Fetch future category rows
             const { data: futRows } = await sbClient
@@ -4829,13 +5680,13 @@
                 };
             });
 
-            // 2. Delete all current active and future budget rows
+            // 2. Delete current active and future rows — keep hist_* archives
             await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('type', [
                 'income', 'fixed', 'annual', 'savings', 'loan',
                 'future_income', 'future_fixed', 'future_annual', 'future_savings', 'future_loan'
             ]);
             await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('category_name', [
-                '__g4__', '__start_date__', '__future_g4__', '__future_start_date__'
+                '__g4__', '__start_date__', '__future_g4__', '__future_start_date__', '__epoch_start__'
             ]);
 
             // 3. Insert promoted rows
@@ -4843,50 +5694,40 @@
                 const { error: insErr } = await sbClient.from('budget_settings').insert(promotedCategories);
                 if (insErr) throw insErr;
             }
+            const futureG4 = safeParseFloat(state.futureBudget && state.futureBudget.g4) || 0;
+            const startDateISO = getFutureBudgetStartISO() || localDateToISO();
             await sbClient.from('budget_settings').insert([
-                { category_name: '__g4__', budget_amount: safeParseFloat(state.futureBudget.g4) || 0, type: 'system', user_token: USER_TOKEN },
-                { category_name: '__start_date__', budget_amount: 0, type: 'system', parent_group: state.futureBudget.startDate || '', user_token: USER_TOKEN }
+                { category_name: '__g4__', budget_amount: futureG4, type: 'system', user_token: USER_TOKEN },
+                { category_name: '__start_date__', budget_amount: 0, type: 'system', parent_group: isoToDDMMYYYY(startDateISO), user_token: USER_TOKEN },
+                { category_name: '__epoch_start__', budget_amount: 0, type: 'system', parent_group: startDateISO, user_token: USER_TOKEN }
             ]);
 
-            // 4. Record new rate in history to maintain flawless balance calculations
-            const futureG4 = state.futureBudget.g4;
             const dailyBudget = futureG4 / 30;
-            const startDateISO = state.futureBudget.startDate;
+            await insertDailyHistoryAt(startDateISO, dailyBudget);
 
-            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__daily_budget_history__:' + startDateISO);
-            await sbClient.from('budget_settings').insert({
-                category_name: '__daily_budget_history__:' + startDateISO,
-                budget_amount: dailyBudget,
-                parent_group: startDateISO,
-                type: 'system',
-                user_token: USER_TOKEN
-            });
-
-            // 5. Update user_tokens start_date & daily_budget
+            // Keep server tracking start at first transaction so מאזן stays continuous
+            const trackingISO = getTrackingStartISO() || startDateISO;
             await sbClient.rpc('update_daily_budget', {
                 p_user_token: USER_TOKEN,
                 p_daily_budget: dailyBudget,
-                p_start_date: startDateISO
+                p_start_date: trackingISO
             });
 
             state.budgetMode = 'active';
-            state.futureBudget = null;
+            state.editingBudgetStart = null;
+            state.selectedBudgetStart = 'active';
+            state.futureBudget = emptyEpoch({ kind: 'future' });
+            state.budget.epochStart = startDateISO;
+            state.budget.startDate = isoToDDMMYYYY(startDateISO);
 
             window.showToast('התקציב העתידי הופעל בהצלחה!', 'check');
             await window.fetchBudgetData();
             await window.fetchTransactionsOnly(false);
-            
-            // Switch tabs back to active
-            const activeTab = document.getElementById('viewActiveBudgetTab');
-            const futureTab = document.getElementById('viewFutureBudgetTab');
-            if (activeTab && futureTab) {
-                activeTab.className = "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all bg-white text-slate-800 shadow-sm";
-                futureTab.className = "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-500";
-            }
         } catch (e) {
             console.error(e);
             window.showToast('שגיאה בהפעלת התקציב', 'circle-xmark');
         } finally {
+            _budgetTransitionLock = false;
             setLoading(false, true);
         }
     };
@@ -4915,14 +5756,15 @@
     // בדיקת חריגה בקטגוריה מתוכננת לאחר הוספת הוצאה
     window.checkAnnualOverspend = function(categoryName) {
         // מצא את הקטגוריה
-        const cat = state.budget.annual.find(a => (a.category_name||'').trim() === categoryName.trim());
+        const cat = (getBudgetForTx({ tag: categoryName, date: localDateToISO() }).annual || []).find(a => (a.category_name||'').trim() === categoryName.trim())
+            || (getViewBudget().annual || []).find(a => (a.category_name||'').trim() === categoryName.trim());
         if (!cat) return;
         const budget = safeParseFloat(cat.budget_amount);
         if (budget <= 0) return;
 
         // חשב כמה הוצא עד עכשיו
         const spent = state.transactions
-            .filter(t => tagMatchesCat(t.tag, cat))
+            .filter(t => txBelongsToSelectedBudget(t) && tagMatchesCat(t.tag, cat) && txInPlannedEpochWindow(t, getPlannedEpochStartISO()))
             .reduce((s, t) => s + safeParseFloat(t.amount), 0);
 
         if (spent <= budget) return; // אין חריגה
@@ -5140,15 +5982,16 @@
         const monthStart = currentMonthStart();
         const monthEnd = currentMonthEnd();
         const yearStart = currentYearStart();
+        const viewBudget = getViewBudget();
 
         // 1. Collect and filter categories based on state.mainViewFilter
         if (filter === 'current') {
             catsShown.push(...state.expenseCategories.map(c => ({ ...c, $type: 'current' })));
         } else if (filter === 'fixed') {
-            catsShown.push(...state.budget.fixed.map(c => ({ ...c, $type: 'fixed' })));
-            catsShown.push(...(state.budget.savings || []).map(c => ({ ...c, $type: 'fixed', $isSavings: true })));
+            catsShown.push(...(viewBudget.fixed || []).map(c => ({ ...c, $type: 'fixed' })));
+            catsShown.push(...(viewBudget.savings || []).map(c => ({ ...c, $type: 'fixed', $isSavings: true })));
         } else if (filter === 'planned') {
-            catsShown.push(...state.budget.annual.filter(c => safeParseFloat(c.budget_amount || 0) > 0).map(c => ({ ...c, $type: 'planned' })));
+            catsShown.push(...(viewBudget.annual || []).filter(c => safeParseFloat(c.budget_amount || 0) > 0 || viewBudget.synthetic).map(c => ({ ...c, $type: 'planned' })));
         }
 
         if (catsShown.length === 0) {
@@ -5181,10 +6024,13 @@
 
         // 3. Prepare totals for categorization
         const totals = {};
+        const plannedEpochISO = getPlannedEpochStartISO();
         state.transactions.forEach(tx => {
             if (tx.isAdjustment) return;
+            if (!txBelongsToSelectedBudget(tx)) return;
             const d = parseLocalDate(tx.date);
             const amt = safeParseFloat(tx.amount);
+            const vb = viewBudget;
             
             if (!tx.tag) {
                 if (d >= monthStart && d <= monthEnd) {
@@ -5192,9 +6038,8 @@
                     totals['current:' + cid] = (totals['current:' + cid] || 0) + amt;
                 }
             } else {
-                // Check if it's fixed or savings deposit
-                const fixed = state.budget.fixed.find(f => tagMatchesCat(tx.tag, f));
-                const savings = !fixed ? (state.budget.savings || []).find(s => tagMatchesCat(tx.tag, s)) : null;
+                const fixed = (vb.fixed || []).find(f => tagMatchesCat(tx.tag, f));
+                const savings = !fixed ? (vb.savings || []).find(s => tagMatchesCat(tx.tag, s)) : null;
                 if (fixed && d >= monthStart && d <= monthEnd) {
                     const key = 'fixed:' + (fixed.id || fixed.category_name);
                     totals[key] = (totals[key] || 0) + amt;
@@ -5202,9 +6047,8 @@
                     const key = 'fixed:' + (savings.id || savings.category_name);
                     totals[key] = (totals[key] || 0) + amt;
                 } else {
-                    // Check if it's planned
-                    const planned = state.budget.annual.find(a => tagMatchesCat(tx.tag, a));
-                    if (planned && d >= getBudgetStartDate()) {
+                    const planned = (vb.annual || []).find(a => tagMatchesCat(tx.tag, a));
+                    if (planned && txInPlannedEpochWindow(tx, plannedEpochISO)) {
                         const key = 'planned:' + (planned.id || planned.category_name);
                         totals[key] = (totals[key] || 0) + amt;
                     }
@@ -5228,7 +6072,10 @@
         let labelsWidth = 120;
         if (filter === 'planned') {
             // Find all active planned categories (budgeted > 0)
-            const annualCats = state.budget.annual.filter(c => safeParseFloat(c.budget_amount || 0) > 0);
+            const annualCats = (viewBudget.annual || []).filter(c => {
+                const spent = Math.round(totals['planned:' + (c.id || c.category_name)] || 0);
+                return safeParseFloat(c.budget_amount || 0) > 0 || spent > 0;
+            });
             
             // Collect groups and group budgets
             const groupBudgets = {};
@@ -5299,14 +6146,14 @@
             const groups = {};
             const ungrouped = [];
             
-            state.budget.annual.forEach(cat => {
+            (viewBudget.annual || []).forEach(cat => {
                 const budget = safeParseFloat(cat.budget_amount || 0);
-                if (budget <= 0) return; // Hide categories budgeted 0
+                const catId = cat.id || cat.category_name;
+                const spent = Math.round(totals['planned:' + catId] || 0);
+                if (budget <= 0 && spent <= 0) return;
                 if (cat.parent_group) {
                     const pid = cat.parent_group;
                     if (!groups[pid]) groups[pid] = { name: pid, children: [], spent: 0, budget: 0 };
-                    const catId = cat.id || cat.category_name;
-                    const spent = Math.round(totals['planned:' + catId] || 0);
                     groups[pid].children.push({ ...cat, spent, budget });
                     groups[pid].spent += spent;
                     groups[pid].budget += budget;
@@ -6472,7 +7319,7 @@
         menu.classList.toggle('hidden', !isHidden);
         backdrop.classList.toggle('hidden', !isHidden);
         // Reset submenu when closing
-        if (!isHidden) window.closeInstallSubmenu();
+        if (!isHidden) { window.closeInstallSubmenu(); window.closeBudgetSubmenu(); }
     };
 
     window.closeHamburgerMenu = function() {
@@ -6481,21 +7328,106 @@
         if (menu) menu.classList.add('hidden');
         if (backdrop) backdrop.classList.add('hidden');
         window.closeInstallSubmenu();
+        window.closeBudgetSubmenu();
+    };
+
+    window.renderBudgetSubmenu = function() {
+        const sub = document.getElementById('budgetSubmenu');
+        if (!sub) return;
+        sub.innerHTML = '';
+        const opts = [
+            { key: 'active', label: 'תקציב נוכחי' },
+            { key: 'all', label: 'כל התקופות' }
+        ];
+        listBudgetEpochs().forEach(ep => {
+            if (ep.kind === 'active') return;
+            if (ep.kind === 'future') {
+                opts.push({ key: 'future', label: formatEpochMenuLabel({ ...ep, startDate: getFutureBudgetStartISO() }) });
+            } else if (ep.startDate) {
+                opts.push({ key: ep.startDate, label: formatEpochMenuLabel(ep) });
+            }
+        });
+        const selected = state.selectedBudgetStart || 'active';
+        opts.forEach(o => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            const isSel = selected === o.key;
+            btn.className = 'w-full flex items-center gap-3 px-6 py-3 text-sm font-bold text-slate-700 hover:bg-blue-100 active:bg-blue-200 transition-colors text-right ' + (isSel ? 'bg-blue-100 text-indigo-700' : '');
+            btn.innerHTML = `<span class="flex-1">${o.label}</span>${isSel ? '<i class="fa-solid fa-check text-indigo-500 text-xs"></i>' : ''}`;
+            btn.onclick = () => window.setBudgetPeriod(o.key);
+            sub.appendChild(btn);
+        });
+    };
+
+    window.toggleBudgetSubmenu = function() {
+        const sub = document.getElementById('budgetSubmenu');
+        const chevron = document.getElementById('budgetMenuChevron');
+        if (!sub) return;
+        window.renderBudgetSubmenu();
+        const isHidden = sub.classList.contains('hidden');
+        sub.classList.toggle('hidden', !isHidden);
+        if (chevron) chevron.style.transform = isHidden ? 'rotate(-90deg)' : '';
+    };
+
+    window.closeBudgetSubmenu = function() {
+        const sub = document.getElementById('budgetSubmenu');
+        const chevron = document.getElementById('budgetMenuChevron');
+        if (sub) sub.classList.add('hidden');
+        if (chevron) chevron.style.transform = '';
+    };
+
+    function syncBudgetModeFromSelectedPeriod() {
+        const sel = state.selectedBudgetStart || 'active';
+        if (sel === 'future') {
+            state.budgetMode = 'future';
+            state.editingBudgetStart = null;
+        } else if (sel === 'active' || sel === 'all') {
+            state.budgetMode = 'active';
+            state.editingBudgetStart = null;
+        } else {
+            const ep = getEpochByStart(sel);
+            if (ep && ep.kind === 'hist') {
+                state.budgetMode = 'hist';
+                state.editingBudgetStart = parseStartDateToISO(sel);
+            } else {
+                state.budgetMode = 'active';
+                state.editingBudgetStart = null;
+            }
+        }
+    }
+
+    window.setBudgetPeriod = function(key) {
+        state.selectedBudgetStart = key || 'active';
+        localStorage.setItem('selected_budget_period', state.selectedBudgetStart);
+        state.stats.specificMonth = '';
+        window.closeHamburgerMenu();
+        window.refreshAllViews();
+    };
+
+    window.refreshAllViews = function() {
+        window.updateNavigationUI();
+        if (state.currentView === 'annual') renderAnnualView();
+        else if (state.currentView === 'budget') {
+            syncBudgetModeFromSelectedPeriod();
+            renderBudget();
+        } else if (state.currentView === 'stats') window.updateStats(true);
+        else render();
+    };
+
+    window.selectBudgetForEdit = function(kind, startISO) {
+        if (kind === 'future') window.setBudgetPeriod('future');
+        else if (kind === 'hist') window.setBudgetPeriod(parseStartDateToISO(startISO));
+        else window.setBudgetPeriod('active');
+        if (state.currentView !== 'budget') window.setNav('budget');
+        else {
+            syncBudgetModeFromSelectedPeriod();
+            window.updateNavigationUI();
+            renderBudget();
+        }
     };
 
     window.toggleBudgetModeFromMenu = function() {
-        window.closeHamburgerMenu();
-        const inFutureBudget = state.currentView === 'budget' && state.budgetMode === 'future';
-        if (inFutureBudget) {
-            // Return to active budget
-            state.budgetMode = 'active';
-            if (state.currentView !== 'budget') window.setNav('budget');
-            else { window.updateNavigationUI(); renderBudget(); }
-        } else {
-            // Go to future budget
-            if (state.currentView !== 'budget') window.setNav('budget');
-            window.switchBudgetTab('future');
-        }
+        window.toggleBudgetSubmenu();
     };
 
     window.toggleInstallSubmenu = function() {
@@ -6626,6 +7558,7 @@
         document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
         const navMap = { main: 'navHome', budget: 'navBudget', annual: 'navAnnual', stats: 'navStats' };
         if (navMap[view]) document.getElementById(navMap[view]).classList.add('active');
+        if (view === 'budget') syncBudgetModeFromSelectedPeriod();
         updateNavigationUI();
         if (view === 'annual') {
             // Only fetch if data is missing or dirty; otherwise just re-render with existing data
@@ -6637,7 +7570,7 @@
                 renderAnnualView();
             }
         }
-        else if (view === 'budget') { state.budgetMode = 'active'; if (state.isDirty || state.budget.incomes.length === 0) window.fetchBudgetData(); else renderBudget(); }
+        else if (view === 'budget') { if (state.isDirty || state.budget.incomes.length === 0) window.fetchBudgetData(); else renderBudget(); }
         else if (view === 'stats') window.updateStats(true);
         else render();
     };
@@ -6653,26 +7586,21 @@
         });
         const pt = document.getElementById('pageTitle');
         if (pt) {
-            if (state.currentView === 'budget' && state.budgetMode === 'future') {
-                pt.innerHTML = 'ניהול תקציב <span style="color:#dc2626">עתידי</span>';
+            if (state.currentView === 'budget') {
+                pt.innerHTML = formatBudgetPageTitle();
+            } else if (state.currentView === 'annual') {
+                pt.innerHTML = formatAnnualPageTitle();
             } else {
-                const titles = { main: 'הוצאות', budget: 'ניהול תקציב', annual: 'הוצאות מתוכננות', stats: 'נתונים וסטטיסטיקה' };
-                pt.innerText = titles[state.currentView] || '';
+                const titles = { main: 'הוצאות', stats: 'נתונים וסטטיסטיקה' };
+                const base = titles[state.currentView] || '';
+                const suffix = formatSelectedPeriodTitleSuffix();
+                if (base && suffix) pt.innerHTML = base + suffix;
+                else if (base) pt.innerText = base;
+                else pt.innerText = '';
             }
         }
-
-        // Update future/current budget menu button
-        const inFutureBudget = state.currentView === 'budget' && state.budgetMode === 'future';
-        const menuLabel = document.getElementById('futureBudgetMenuLabel');
-        const menuIcon  = document.getElementById('futureBudgetMenuIcon');
-        if (menuLabel) menuLabel.textContent = inFutureBudget ? 'תקציב נוכחי' : 'תקציב עתידי';
-        if (menuIcon)  menuIcon.className = inFutureBudget
-            ? 'fa-solid fa-wallet text-blue-500 w-4 text-center flex-shrink-0'
-            : 'fa-solid fa-calendar-days text-purple-500 w-4 text-center flex-shrink-0';
         const helpBtn = document.getElementById('budgetHelpBtn');
         if (helpBtn) helpBtn.classList.toggle('hidden', state.currentView !== 'budget');
-        const healthCardBtn = document.getElementById('healthCardBtn');
-        if (healthCardBtn) healthCardBtn.classList.toggle('hidden', state.currentView !== 'budget');
         const mainHelpBtn = document.getElementById('mainHelpBtn');
         if (mainHelpBtn) mainHelpBtn.classList.toggle('hidden', state.currentView !== 'main');
         const annualHelpBtn = document.getElementById('annualHelpBtn');
@@ -6719,7 +7647,12 @@
     // =====================================================
     // RENDER MAIN
     // =====================================================
+    function revealApp() {
+        document.body.classList.add('app-ready');
+    }
+
     function render() {
+        try {
         updateNavigationUI();
         if (state.currentView === 'annual') return renderAnnualView();
         if (state.currentView === 'budget') return;
@@ -6742,10 +7675,8 @@
             if (tx.isAdjustment) return acc;
             const d = parseLocalDate(tx.date);
             if (d < cycleStart || d > cycleEnd) return acc;
-            const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-            const isFixed   = txIsFixedLike(tx);
-            if (!isPlanned && !isFixed) return acc + safeParseFloat(tx.amount);
-            return acc;
+            if (!txHitsCurrentBalance(tx)) return acc;
+            return acc + safeParseFloat(tx.amount);
         }, 0);
         
         const monthlyBudget = dailyVal * cycleTotalDays;
@@ -6904,31 +7835,6 @@
             }
         }
 
-        const aiBtn = document.getElementById('budgetAiBtn');
-        if (aiBtn) {
-            // Use first transaction date (same as showBudgetRecommendation) for daysPassed calculation
-            let aiBtnStartDate = null;
-            const nonAdjTxs = state.transactions.filter(t => !t.isAdjustment);
-            if (nonAdjTxs.length > 0) {
-                const sorted = [...nonAdjTxs].sort((a, b) =>
-                    new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
-                );
-                const fp = sorted[0].date.split('/');
-                if (fp.length === 3) aiBtnStartDate = new Date(parseInt(fp[2]), parseInt(fp[1]) - 1, parseInt(fp[0]));
-            }
-            if (!aiBtnStartDate && state.budget.startDate) {
-                const parts = state.budget.startDate.split('/');
-                if (parts.length === 3) aiBtnStartDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-            }
-            if (aiBtnStartDate && state.balance !== 0) {
-                const today = new Date(); today.setHours(0,0,0,0);
-                const daysPassed = Math.floor((today - aiBtnStartDate) / (1000*3600*24));
-                const threshold = dailyVal * 7;
-                aiBtn.classList.toggle('hidden', !(daysPassed >= 30 && Math.abs(state.balance) > threshold));
-            } else {
-                aiBtn.classList.add('hidden');
-            }
-        }
 
         renderCategorySummary();
         updateBulkBar();
@@ -6943,15 +7849,16 @@
             : txsAfterDate;
 
         const filteredTxs = txsForFilter.filter(tx => {
+            if (!txBelongsToSelectedBudget(tx)) return false;
             // Adjustment txs only in "שוטף" or "הכל"
             if (tx.isAdjustment) {
                 return state.mainViewFilter === 'all' || state.mainViewFilter === 'current';
             }
             
             // Filter by type
-            const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+            const isPlanned = txIsPlanned(tx);
             const isFixed   = txIsFixedLike(tx);
-            const isCurrent = !isPlanned && !isFixed;
+            const isCurrent = txHitsCurrentBalance(tx);
 
             if (state.mainViewFilter === 'current' && !isCurrent) return false;
             if (state.mainViewFilter === 'planned' && !isPlanned) return false;
@@ -6963,14 +7870,16 @@
                 
                 if (state.activeCategoryFilter.startsWith('group:')) {
                     const groupName = state.activeCategoryFilter.slice(6);
-                    const allBudget = [...state.budget.fixed, ...state.budget.annual, ...(state.budget.savings || [])];
+                    const vb = getViewBudget();
+                    const allBudget = [...(vb.fixed || []), ...(vb.annual || []), ...(vb.savings || [])];
                     const catsInGroup = allBudget.filter(b => b.parent_group === groupName);
                     return catsInGroup.some(cat => tagMatchesCat(tx.tag, cat));
                 }
 
                 if (state.activeCategoryFilter.startsWith('budget:')) {
                     const catId = state.activeCategoryFilter.slice(7);
-                    const allBudget = [...state.budget.fixed, ...state.budget.annual, ...(state.budget.savings || [])];
+                    const vb = getViewBudget();
+                    const allBudget = [...(vb.fixed || []), ...(vb.annual || []), ...(vb.savings || [])];
                     const cat = allBudget.find(b => String(b.id || b.category_name) === catId);
                     return cat ? tagMatchesCat(tx.tag, cat) : false;
                 }
@@ -6998,9 +7907,7 @@
             // Use all שוטף (current) transactions for accumulation calculation — not just the paginated view
             const allCurrentTxs = state.transactions.filter(tx => {
                 if (tx.isVirtual) return false;
-                const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-                const isFixed   = txIsFixedLike(tx);
-                return !isPlanned && !isFixed;
+                return txHitsCurrentBalance(tx);
             });
             const virtualEntries = window.computeVirtualBudgetEntries(allCurrentTxs);
 
@@ -7057,13 +7964,7 @@
         const dailyBalanceMap = {};
         if (state.mainViewFilter === 'current') {
             const allTxsSorted = [...state.transactions]
-                .filter(tx => {
-                    const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-                    const isFixed   = txIsFixedLike(tx);
-                    // Exclude legacy adjustments — same set excluded by calculateClientSideBalance
-                    const isLegacyAdj = tx.isAdjustment || tx.category === 'איזון עדכון תקציב';
-                    return !isPlanned && !isFixed && !isLegacyAdj;
-                })
+                .filter(tx => txHitsCurrentBalance(tx))
                 .sort((a, b) => {
                     const da = parseLocalDate(a.date);
                     const db = parseLocalDate(b.date);
@@ -7147,13 +8048,7 @@
 
             // Build per-day expenses — same filter as the backward walk
             const allForDebug = [...state.transactions]
-                .filter(tx => {
-                    if (tx.isVirtual) return false;
-                    const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-                    const isFixed   = txIsFixedLike(tx);
-                    const isLegacyAdj = tx.isAdjustment || tx.category === 'איזון עדכון תקציב';
-                    return !isPlanned && !isFixed && !isLegacyAdj;
-                })
+                .filter(tx => !tx.isVirtual && txHitsCurrentBalance(tx))
                 .sort((a, b) => parseLocalDate(b.date) - parseLocalDate(a.date));
 
             const expByDay = {};
@@ -7300,6 +8195,9 @@
         if (!document.getElementById('balanceChartCard')?.classList.contains('hidden')) {
             renderMainBalanceChart();
         }
+        } catch (e) {
+            console.error('render error:', e);
+        }
     }
 
     function createTransactionEl(tx, hideDate = true, hideTag = false) {
@@ -7365,13 +8263,24 @@
 
         let tagHtml = '';
         if (tx.tag && !hideTag) {
-            const cat = findCatByTag(tx.tag);
+            const tagBudget = getBudgetForTx(tx) || getViewBudget() || state.budget;
+            const viewBudget = getViewBudget() || state.budget;
+            let budgetForTag = tagBudget;
+            let cat = findCatByTag(tx.tag, tagBudget);
+            if (!cat && viewBudget !== tagBudget) {
+                cat = findCatByTag(tx.tag, viewBudget);
+                if (cat) budgetForTag = viewBudget;
+            }
             const filter = state.mainViewFilter;
             
             let displayName = tx.tag;
             if (cat) {
-                const isFixed = state.budget.fixed.some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name);
-                displayName = (isFixed) ? cat.category_name : (cat.parent_group ? cat.parent_group + ' : ' + cat.category_name : cat.category_name);
+                const isFixed = (budgetForTag.fixed || []).some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name)
+                    || (budgetForTag.savings || []).some(s => (s.id && s.id === cat.id) || s.category_name === cat.category_name);
+                displayName = isFixed ? cat.category_name : (cat.parent_group ? cat.parent_group + ' : ' + cat.category_name : cat.category_name);
+            } else {
+                const sep = String(tx.tag).indexOf(' > ');
+                if (sep !== -1) displayName = tx.tag.slice(0, sep).trim() + ' : ' + tx.tag.slice(sep + 3).trim();
             }
 
             let style = '';
@@ -7379,8 +8288,9 @@
                 // All view: dark gray tags
                 style = `style="background:#f1f5f9; color:#475569; border: 1px solid #e2e8f0"`;
             } else if (cat) {
-                 // Use mapping from summary rendering for consistent coloring based on visible order
-                 const categoryType = state.budget.fixed.some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name) ? 'fixed' : 'planned';
+                 const isFixedCat = (budgetForTag.fixed || []).some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name)
+                    || (budgetForTag.savings || []).some(s => (s.id && s.id === cat.id) || s.category_name === cat.category_name);
+                 const categoryType = isFixedCat ? 'fixed' : 'planned';
                  const key = categoryType + ':' + (cat.id || cat.category_name);
                  const idx = state.viewCategoryColors ? state.viewCategoryColors[key] : undefined;
                  
@@ -7388,8 +8298,9 @@
                      const c = BUDGET_COLORS[idx % BUDGET_COLORS.length];
                      style = `style="background:${c.bg}; color:${c.hex}; border: 1px solid ${c.hex}20"`;
                  } else {
-                     // Fallback to static index if not found in current visible summary
-                     let listToSearch = (categoryType === 'fixed') ? state.budget.fixed : state.budget.annual;
+                     let listToSearch = (categoryType === 'fixed')
+                        ? [...(budgetForTag.fixed || []), ...(budgetForTag.savings || [])]
+                        : (budgetForTag.annual || []);
                      let fallbackIdx = listToSearch.findIndex(item => (item.id && item.id === cat.id) || item.category_name === cat.category_name);
                      if (fallbackIdx !== -1) {
                          const c = BUDGET_COLORS[fallbackIdx % BUDGET_COLORS.length];
@@ -7456,7 +8367,10 @@
     function renderBudget() {
         if (state.currentView !== 'budget') return;
         const isFuture = state.budgetMode === 'future';
-        const b = isFuture ? state.futureBudget : state.budget;
+        const isHist = state.budgetMode === 'hist';
+        const b = getEditingBudget() || state.budget;
+        if (!b) return;
+        ['incomes', 'fixed', 'annual', 'savings', 'loans'].forEach(k => { if (!Array.isArray(b[k])) b[k] = []; });
 
         // Show/hide Copy Current Budget banners & Future date input
         const copyBanner = document.getElementById('copyCurrentBudgetContainer');
@@ -7471,24 +8385,7 @@
                 if (b.startDate) {
                     futureDateInp.value = b.startDate;
                 } else {
-                    // Default: 1 year from the active budget start (first transaction date)
-                    let defaultDate = '';
-                    const toISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                    if (state.transactions.length > 0) {
-                        const sorted = [...state.transactions].sort((a, bx) =>
-                            new Date(a.date.split('/').reverse().join('-')) - new Date(bx.date.split('/').reverse().join('-'))
-                        );
-                        const fp = sorted[0].date.split('/');
-                        if (fp.length === 3) {
-                            defaultDate = toISO(new Date(parseInt(fp[2]) + 1, parseInt(fp[1]) - 1, parseInt(fp[0])));
-                        }
-                    } else if (state.budget.startDate) {
-                        const sp = state.budget.startDate.split('/');
-                        if (sp.length === 3) {
-                            defaultDate = toISO(new Date(parseInt(sp[2]) + 1, parseInt(sp[1]) - 1, parseInt(sp[0])));
-                        }
-                    }
-                    futureDateInp.value = defaultDate;
+                    futureDateInp.value = getFutureBudgetStartISO() || addOneYearISO(localDateToISO());
                 }
             }
             
@@ -7513,10 +8410,10 @@
         // Show wizard CTA only when budget is completely empty & not in future mode
         const isEmpty = b.incomes.length === 0 && b.fixed.length === 0 && b.annual.length === 0;
         const ctaEl = document.getElementById('budgetWizardCta');
-        if (ctaEl) ctaEl.classList.toggle('hidden', isEmpty ? isFuture : true);
+        if (ctaEl) ctaEl.classList.toggle('hidden', isEmpty ? (isFuture || isHist) : true);
 
         // Health card — only for active budget
-        if (!isFuture && window.renderHealthCard) window.renderHealthCard();
+        if (!isFuture && !isHist && window.renderHealthCard) window.renderHealthCard();
 
         const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
         setEl('summaryTotalIncome', state.isPrivacyMode ? '20,000' : Math.round(incTotal).toLocaleString());
@@ -7566,16 +8463,15 @@
         if (cycleStartEl) {
             cycleStartEl.value = (b.cycleStartDay || 1).toString();
         }
-        // תאריך התחלה = תאריך התנועה הראשונה
+        // תאריך התחלה of the epoch being edited
         let displayStartDate = b.startDate || '';
-        if (!isFuture && state.transactions.length > 0) {
-            const sorted = [...state.transactions].sort((a, b) =>
-                new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
-            );
-            displayStartDate = sorted[0].date;
+        if (displayStartDate && parseStartDateToISO(displayStartDate)) {
+            displayStartDate = isoToDDMMYYYY(parseStartDateToISO(displayStartDate));
         }
         if (isFuture) {
-            setEl('startDateDisplay', b.startDate ? 'הפעלה עתידית: ' + b.startDate : 'טרם הוגדר תאריך הפעלה');
+            setEl('startDateDisplay', b.startDate ? 'הפעלה עתידית: ' + (parseStartDateToISO(b.startDate) ? isoToDDMMYYYY(parseStartDateToISO(b.startDate)) : b.startDate) : 'טרם הוגדר תאריך הפעלה');
+        } else if (isHist) {
+            setEl('startDateDisplay', 'תאריך התחלה (קודם): ' + (displayStartDate || '--'));
         } else {
             setEl('startDateDisplay', 'תאריך התחלה: ' + (displayStartDate || '--'));
         }
@@ -7800,8 +8696,9 @@
 
     function txIsFixedLike(tx) {
         if (!tx || !tx.tag) return false;
-        return (state.budget.fixed || []).some(f => tagMatchesCat(tx.tag, f)) ||
-            (state.budget.savings || []).some(s => tagMatchesCat(tx.tag, s));
+        const b = getBudgetForTx(tx);
+        return (b.fixed || []).some(f => tagMatchesCat(tx.tag, f)) ||
+            (b.savings || []).some(s => tagMatchesCat(tx.tag, s));
     }
 
     function findSavingsByTag(tag) {
@@ -8416,7 +9313,11 @@
         const now = new Date();
         const months = [];
         let cur = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
-        while (cur <= now) {
+        if (isNaN(cur.getTime()) || cur > now) cur = new Date(now.getFullYear(), now.getMonth(), 1);
+        const minCur = new Date(now.getFullYear() - 15, 0, 1);
+        if (cur < minCur) cur = minCur;
+        let guard = 0;
+        while (cur <= now && guard++ < 240) {
             const y = cur.getFullYear(), m = cur.getMonth() + 1;
             const val = `${y}-${String(m).padStart(2,'0')}`;
             const label = new Date(y, m-1, 1).toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
@@ -8427,6 +9328,8 @@
         select.innerHTML = months.map(mo => `<option value="${mo.val}"${state.dateFilterMonth === mo.val ? ' selected' : ''}>${mo.label}</option>`).join('');
         if (!state.dateFilterMonth && months.length) state.dateFilterMonth = months[0].val;
     }
+
+    window.setBudgetFilter = window.setBudgetPeriod;
 
     window.openDateFilter = function() {
         populateDfMonthDropdown();
@@ -8552,6 +9455,33 @@
         render();
     };
 
+    function fillExpenseBudgetSelect(selectId, wrapId, currentKey, dateStr) {
+        const sel = document.getElementById(selectId);
+        const wrap = document.getElementById(wrapId);
+        if (!sel) return '';
+        const epochs = listBudgetEpochs();
+        const inferred = inferBudgetStartFromDate(dateStr || localDateToISO());
+        const options = epochs.filter(e => e.startDate || e.kind === 'future');
+        if (options.length <= 1) {
+            if (wrap) wrap.classList.add('hidden');
+            return inferred || getActiveEpochStartISO();
+        }
+        if (wrap) wrap.classList.remove('hidden');
+        const chosen = currentKey || inferred || getActiveEpochStartISO();
+        sel.innerHTML = options.map(e => {
+            const key = e.startDate || (e.kind === 'future' ? 'future' : '');
+            const selected = key === chosen ? ' selected' : '';
+            return `<option value="${key}"${selected}>${formatEpochMenuLabel(e)}</option>`;
+        }).join('');
+        return chosen;
+    }
+
+    window.onEditExpenseBudgetChange = function() {
+        const sel = document.getElementById('editExpenseBudgetSelect');
+        state.editExpenseBudgetStart = sel ? sel.value : '';
+        window.populateEditRowCategoryPicker(null, null, true);
+    };
+
     window.setCategoryType = function(type) {
         const input = document.getElementById('categoryTypeInput');
         if (input) input.value = type;
@@ -8621,7 +9551,8 @@
             currentTag,
             currentCatId,
             forceOpen,
-            onPopulate: (t, c, f) => window.populateAddExpenseCategoryPicker(t, c, f)
+            onPopulate: (t, c, f) => window.populateAddExpenseCategoryPicker(t, c, f),
+            budgetStart: getActiveEpochStartISO()
         });
     };
 
@@ -8634,7 +9565,8 @@
             currentTag,
             currentCatId,
             forceOpen,
-            onPopulate: (t, c, f) => window.populateEditRowCategoryPicker(t, c, f)
+            onPopulate: (t, c, f) => window.populateEditRowCategoryPicker(t, c, f),
+            budgetStart: state.editExpenseBudgetStart || undefined
         });
     };
 
@@ -8644,6 +9576,7 @@
         const expInp = document.getElementById(config.expCatInputId);
         const typeInp = document.getElementById(config.typeInputId);
         const type = typeInp ? typeInp.value : 'current';
+        const pickerBudget = (config.budgetStart && (config.budgetStart === 'future' ? (state.futureBudget || emptyEpoch({ kind: 'future' })) : getEpochByStart(config.budgetStart))) || getViewBudget();
         
         if (config.currentTag) {
             if (eCat) eCat.value = config.currentTag;
@@ -8663,14 +9596,15 @@
         
         if (!picker) return;
 
-        const activeAnnuals = state.budget.annual.filter(a => safeParseFloat(a.budget_amount) > 0);
-        const activeFixed   = (state.budget.fixed || []).filter(f => safeParseFloat(f.budget_amount) > 0);
-        const activeSavings = (state.budget.savings || []);
+        const activeAnnuals = (pickerBudget.annual || []).filter(a => safeParseFloat(a.budget_amount) > 0 || pickerBudget.synthetic);
+        const activeFixed   = (pickerBudget.fixed || []).filter(f => safeParseFloat(f.budget_amount) > 0 || pickerBudget.synthetic);
+        const activeSavings = (pickerBudget.savings || []);
         const ongoingCats   = state.expenseCategories || [];
 
         function getSpent(cat) {
+            const startISO = parseStartDateToISO(config.budgetStart) || getActiveEpochStartISO();
             return state.transactions
-                .filter(t => tagMatchesCat(t.tag, cat))
+                .filter(t => (!startISO || getTxBudgetStart(t) === startISO) && tagMatchesCat(t.tag, cat) && txInPlannedEpochWindow(t, startISO))
                 .reduce((s, t) => s + safeParseFloat(t.amount), 0);
         }
 
@@ -8852,50 +9786,34 @@
     // RENDER ANNUAL VIEW
     // =====================================================
     function calculateAnnualReserveDetails() {
-        const annualTotal = state.budget.annual.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
-        if (annualTotal === 0) return null;
+        const viewBudget = getViewBudget();
+        const annualTotal = (viewBudget.annual || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        if (annualTotal === 0 && !(viewBudget.annual || []).length) return null;
 
-        const now = new Date();
-        let startDate;
-
-        // תאריך התחלה = תאריך התנועה הראשונה שנרשמה
-        if (state.transactions.length > 0) {
-            const sorted = [...state.transactions].sort((a, b) =>
-                new Date(a.date.split('/').reverse().join('-')) - new Date(b.date.split('/').reverse().join('-'))
-            );
-            const firstParts = sorted[0].date.split('/');
-            startDate = new Date(parseInt(firstParts[2]), parseInt(firstParts[1]) - 1, 1);
-        } else if (state.budget.startDate && state.budget.startDate.includes('/')) {
-            const parts = state.budget.startDate.split('/');
-            startDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, 1);
-        } else {
-            startDate = new Date(now.getFullYear(), 0, 1);
-        }
-
-        const monthsPassed = Math.max(1,
-            (now.getFullYear() - startDate.getFullYear()) * 12 +
-            (now.getMonth() - startDate.getMonth()) + 1
-        );
+        const startISO = getPlannedEpochStartISO();
+        const isHist = isViewingHistPlannedBudget();
+        const epochEndISO = getEpochEndISO(startISO);
+        const monthsPassed = countReserveMonths(startISO);
 
         const monthlySetAside = annualTotal / 12;
         const totalAccruedBudget = monthlySetAside * monthsPassed;
         const annualCatNames = new Set();
-        state.budget.annual.forEach(a => {
+        (viewBudget.annual || []).forEach(a => {
             const short = (a.category_name||'').trim();
             annualCatNames.add(short);
             if (a.parent_group) annualCatNames.add((a.parent_group + ' > ' + short).trim());
         });
-        const budgetStartDate = getBudgetStartDate();
+        const plannedEpochISO = startISO;
         const actualSpent = state.transactions.reduce((s, tx) => {
-            if (tx.tag && annualCatNames.has(tagToShortName(tx.tag))) {
-                const d = parseLocalDate(tx.date);
-                if (d >= budgetStartDate) {
+            if (!txBelongsToSelectedBudget(tx)) return s;
+            if (tx.tag && annualCatNames.has(tagToShortName(tx.tag, viewBudget))) {
+                if (txInPlannedEpochWindow(tx, plannedEpochISO)) {
                     return s + safeParseFloat(tx.amount);
                 }
             }
             return s;
         }, 0);
-        return { monthsPassed, annualTotal, monthlySetAside, totalAccruedBudget, actualSpent, reserve: totalAccruedBudget - actualSpent };
+        return { monthsPassed, annualTotal, monthlySetAside, totalAccruedBudget, actualSpent, reserve: totalAccruedBudget - actualSpent, isHist, epochEndISO, startISO };
     }
 
     // פונקציית עזר: האם תנועה שייכת לקטגוריה מתוכננת?
@@ -8918,7 +9836,18 @@
             reserveSection.classList.remove('hidden');
             const valEl = document.getElementById('annualReserveValue');
             const badgeEl = document.getElementById('reserveStatusBadge');
-            const { reserve } = reserveDetails;
+            const reserveLabel = document.getElementById('annualReserveLabel');
+            const { reserve, isHist, epochEndISO, startISO } = reserveDetails;
+            if (reserveLabel) {
+                let label = 'שריון בצד (יתרה מצטברת)';
+                if (isHist && startISO) {
+                    const endPart = epochEndISO
+                        ? isoToDDMMYYYY(epochEndISO)
+                        : (addOneYearISO(startISO) ? isoToDDMMYYYY(addOneYearISO(startISO)) : '');
+                    label += endPart ? ` · תקופה עד ${endPart}` : ' · תקציב קודם';
+                }
+                reserveLabel.textContent = label;
+            }
             valEl.innerText = `₪ ${Math.round(formatDisplayAmount(reserve)).toLocaleString()}`;
             if (reserve < 0) {
                 badgeEl.innerText = 'חריגה'; badgeEl.className = 'text-[8px] font-bold px-1.5 py-0.5 rounded uppercase bg-red-100 text-red-600';
@@ -8929,7 +9858,8 @@
             }
         } else if (reserveSection) reserveSection.classList.add('hidden');
 
-        const activeCats = state.budget.annual.filter(c => safeParseFloat(c.budget_amount) > 0);
+        const viewBudget = getViewBudget();
+        const activeCats = (viewBudget.annual || []).filter(c => safeParseFloat(c.budget_amount) > 0 || (viewBudget.synthetic && (c.category_name)));
         if (activeCats.length === 0) {
             container.innerHTML = '<div class="text-center py-10 text-slate-300 font-bold text-xs">לא הוגדרו קטגוריות מתוכננות</div>';
             return;
@@ -8996,32 +9926,35 @@
             return { card, details: cardDetails };
         };
 
-        const budgetStartDate = getBudgetStartDate();
+        const plannedEpochISO = getPlannedEpochStartISO();
+        const txsForAnnualItem = (item) => state.transactions.filter(t =>
+            txBelongsToSelectedBudget(t) && tagMatchesCat(t.tag, item) && txInPlannedEpochWindow(t, plannedEpochISO)
+        );
         Object.values(groups).forEach(group => {
             let groupSpent = 0;
             group.items.forEach(item => {
-                groupSpent += state.transactions.filter(t => tagMatchesCat(t.tag, item) && parseLocalDate(t.date) >= budgetStartDate).reduce((s, t) => s + safeParseFloat(t.amount), 0);
+                groupSpent += txsForAnnualItem(item).reduce((s, t) => s + safeParseFloat(t.amount), 0);
             });
             const groupObj = createCard(group.name, group.totalValue, groupSpent, true);
             container.appendChild(groupObj.card);
             if (state.expandedAnnualCategories.has(group.name)) {
                 group.items.forEach(item => {
-                    const itemSpent = state.transactions.filter(t => tagMatchesCat(t.tag, item) && parseLocalDate(t.date) >= budgetStartDate).reduce((s, t) => s + safeParseFloat(t.amount), 0);
+                    const itemSpent = txsForAnnualItem(item).reduce((s, t) => s + safeParseFloat(t.amount), 0);
                     const childObj = createCard(item.category_name, safeParseFloat(item.budget_amount), itemSpent, false, item.category_name);
                     groupObj.details.appendChild(childObj.card);
                     if (state.expandedAnnualCategories.has(item.category_name)) {
-                        state.transactions.filter(t => tagMatchesCat(t.tag, item) && parseLocalDate(t.date) >= budgetStartDate).forEach(tx => childObj.details.appendChild(createTransactionEl(tx, false, true)));
+                        txsForAnnualItem(item).forEach(tx => childObj.details.appendChild(createTransactionEl(tx, false, true)));
                     }
                 });
             }
         });
 
         standalone.forEach(item => {
-            const spent = state.transactions.filter(t => tagMatchesCat(t.tag, item) && parseLocalDate(t.date) >= budgetStartDate).reduce((s, t) => s + safeParseFloat(t.amount), 0);
+            const spent = txsForAnnualItem(item).reduce((s, t) => s + safeParseFloat(t.amount), 0);
             const standObj = createCard(item.category_name, safeParseFloat(item.budget_amount), spent, false);
             container.appendChild(standObj.card);
             if (state.expandedAnnualCategories.has(item.category_name)) {
-                state.transactions.filter(t => tagMatchesCat(t.tag, item) && parseLocalDate(t.date) >= budgetStartDate).forEach(tx => standObj.details.appendChild(createTransactionEl(tx, false, true)));
+                txsForAnnualItem(item).forEach(tx => standObj.details.appendChild(createTransactionEl(tx, false, true)));
             }
         });
     }
@@ -9061,13 +9994,15 @@
         if (expInpEdit) expInpEdit.value = tx.expense_category_id || '';
 
         // Determine initial type for picker
-        const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+                const isPlanned = txIsPlanned(tx);
         const isFixed   = txIsFixedLike(tx);
         
         let initialType = 'current';
         if (isPlanned) initialType = 'planned';
         else if (isFixed) initialType = 'fixed';
         
+        state.editExpenseBudgetStart = fillExpenseBudgetSelect('editExpenseBudgetSelect', 'editExpenseBudgetPickerWrap', getTxBudgetStart(tx), tx.date);
+
         window.setEditCategoryType(initialType);
 
         // Populate custom visual picker - force open as requested
@@ -9279,7 +10214,7 @@
     window.initParentGroupModal = (type, existingParent = null) => {
         state.editingParentType = type;
         state.editingParentName = existingParent;
-        const b = state.budgetMode === 'future' ? state.futureBudget : state.budget;
+        const b = getEditingBudget();
         const list = type === 'income' ? b.incomes : (type === 'fixed' ? b.fixed : (type === 'annual' ? b.annual : (type === 'savings' ? (b.savings || []) : (b.loans || []))));
         const container = document.getElementById('parentGroupList');
         const nameInput = document.getElementById('parentGroupName');
@@ -9361,7 +10296,7 @@
         const btn = document.getElementById('g4UpdateBtn'), inp = document.getElementById('g4Input');
         if (!btn || !inp) return;
         const numericInp = safeParseFloat(inp.value.replace(/,/g, ''));
-        const b = state.budgetMode === 'future' ? state.futureBudget : state.budget;
+        const b = getEditingBudget();
         const numericG4 = Math.round(formatDisplayAmount(safeParseFloat(b.g4)));
         btn.disabled = numericInp === numericG4;
     };
@@ -9506,13 +10441,22 @@
 
         if (balanceThreshold > 0) {
             if (balance < -balanceThreshold) {
+                // Calculate monthly overspend (same logic as showBudgetRecommendation)
+                let daysPassed = 30;
+                const nonAdjTxs = state.transactions.filter(t => !t.isAdjustment);
+                if (nonAdjTxs.length > 0) {
+                    let minISO = '';
+                    for (const t of nonAdjTxs) { const p = t.date.split('/'); if (p.length===3) { const iso=`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`; if (!minISO||iso<minISO) minISO=iso; } }
+                    if (minISO) { const today=new Date(); today.setHours(0,0,0,0); daysPassed=Math.max(1,Math.floor((today-new Date(minISO))/86400000)); }
+                }
+                const monthlyOverspend = Math.round(formatDisplayAmount(Math.abs(balance / (daysPassed / 30))));
                 checks.push({
                     id: 'balance_negative', group: 'current',
                     label: `מאזן שלילי גבוה (₪${Math.round(Math.abs(balance)).toLocaleString()})`,
                     labelOk: 'המאזן מאוזן',
                     severity: 'critical',
                     passed: false,
-                    tip: 'כדאי לצמצם הוצאות שוטפות, להוריד הוצאות קבועות או מתוכננות',
+                    tip: `חריגה חודשית ממוצעת: ₪${monthlyOverspend.toLocaleString()} — כדאי לצמצם סכום זה מהקבועות או מהמתוכננות`,
                     dismissable: false, dismissed: false,
                     instructions: null
                 });
@@ -9594,11 +10538,33 @@
             }
 
             if (g4 > 0) {
+                const activeISO = getActiveEpochStartISO();
                 const now = new Date();
-                const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 30);
-                const cutoffISO = cutoff.toISOString().slice(0, 10);
-                const recentSum = regularTxs.reduce((s, t) => toISO(t.date) >= cutoffISO ? s + t.amount : s, 0);
-                const dailyAvg = recentSum / 30;
+                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const lookbackStart = new Date(todayStart);
+                lookbackStart.setDate(lookbackStart.getDate() - 29);
+                let windowStart = new Date(lookbackStart);
+                let daysNote = '30 הימים האחרונים בתקופה הנוכחית';
+                if (activeISO) {
+                    const epochStart = parseLocalDate(activeISO);
+                    epochStart.setHours(0, 0, 0, 0);
+                    if (epochStart > windowStart) {
+                        windowStart = epochStart;
+                        const dayCount = Math.max(1, Math.floor((todayStart - windowStart) / 86400000) + 1);
+                        daysNote = dayCount === 1 ? 'יום אחד מתחילת התקציב הנוכחי' : `${dayCount} ימים מתחילת התקציב הנוכחי`;
+                    }
+                }
+                const windowStartISO = `${windowStart.getFullYear()}-${String(windowStart.getMonth() + 1).padStart(2, '0')}-${String(windowStart.getDate()).padStart(2, '0')}`;
+                const todayISO = `${todayStart.getFullYear()}-${String(todayStart.getMonth() + 1).padStart(2, '0')}-${String(todayStart.getDate()).padStart(2, '0')}`;
+                const dayCount = Math.max(1, Math.floor((todayStart - windowStart) / 86400000) + 1);
+                const currentBudgetTxs = regularTxs.filter(t => {
+                    if (!activeISO || getTxBudgetStart(t) !== activeISO) return false;
+                    if (t.tag) return false;
+                    const iso = toISO(t.date);
+                    return iso && iso >= windowStartISO && iso <= todayISO;
+                });
+                const recentSum = currentBudgetTxs.reduce((s, t) => s + t.amount, 0);
+                const dailyAvg = recentSum / dayCount;
                 const dailyBudget = g4 / 30;
                 if (dailyAvg > dailyBudget * 1.2) {
                     const overPct = Math.round((dailyAvg / dailyBudget - 1) * 100);
@@ -9607,7 +10573,7 @@
                         label: `ממוצע יומי חורג ב-${overPct}% מהתקציב`,
                         severity: 'warning',
                         passed: false,
-                        tip: `ממוצע: ₪${Math.round(dailyAvg).toLocaleString()} ליום | תקציב: ₪${Math.round(dailyBudget).toLocaleString()}`,
+                        tip: `ממוצע: ₪${Math.round(dailyAvg).toLocaleString()} ליום | תקציב: ₪${Math.round(dailyBudget).toLocaleString()} | מחושב על ${daysNote}`,
                         dismissable: false, dismissed: false,
                         instructions: null
                     });
@@ -9779,10 +10745,14 @@
         const details = calculateAnnualReserveDetails();
         const content = document.getElementById('explainContent'), overlay = document.getElementById('explainOverlay');
         if (!details || !content || !overlay) return;
-        const { monthsPassed, monthlySetAside, totalAccruedBudget, actualSpent, reserve } = details;
+        const { monthsPassed, monthlySetAside, totalAccruedBudget, actualSpent, reserve, isHist, epochEndISO, startISO } = details;
+        const periodNote = isHist && startISO
+            ? `<p class="text-[10px] text-indigo-600 font-bold">תקציב קודם${epochEndISO ? ` · חישוב עד ${isoToDDMMYYYY(epochEndISO)}` : ''} (עד ${monthsPassed} חודשים)</p>`
+            : `<p class="text-[10px] text-slate-400">חישוב לפי ${monthsPassed} חודשים מתחילת התקופה (מקסימום 12)</p>`;
         content.innerHTML = `
             <div class="space-y-4">
-                <p>השריון מייצג את החלק היחסי מהתקציב של ההוצאות המתוכננות שהיה אמור להיחסך עד היום.</p>
+                <p>השריון מייצג את החלק היחסי מהתקציב של ההוצאות המתוכננות שהיה אמור להיחסך עד ${isHist ? 'סוף התקופה' : 'היום'}.</p>
+                ${periodNote}
                 <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2 text-xs">
                     <div class="flex justify-between"><span>חודשים שחלפו:</span><span class="font-bold">${monthsPassed}</span></div>
                     <div class="flex justify-between"><span>הפרשה חודשית:</span><span class="font-bold">₪${Math.round(formatDisplayAmount(monthlySetAside)).toLocaleString()}</span></div>
@@ -9801,50 +10771,44 @@
     // =====================================================
     let statsChartInstance = null;
 
-    window.updateStats = function(forceSyncWithStateByOpening = false) {
+    window.updateStats = function(forceRepopulateMonths = false) {
         if (state.currentView !== 'stats') return;
         const startDay = state.budget.cycleStartDay || 1;
         state.stats.startDay = startDay;
-        let startDate, endDate;
-        const monthVal = document.getElementById('specificMonthSelect').value;
-        if (!monthVal) {
-            const months = new Set();
-            const now = new Date();
-            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-            months.add(currentMonthStr);
-            state.transactions.forEach(tx => {
-                const d = parseLocalDate(tx.date);
-                months.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
-            });
-            const sorted = Array.from(months).sort().reverse();
-            const select = document.getElementById('specificMonthSelect');
-            select.innerHTML = sorted.map(m => `<option value="${m}" ${m === currentMonthStr ? 'selected' : ''}>${m}</option>`).join('');
-            const m = currentMonthStr.split('-');
-            startDate = new Date(parseInt(m[0]), parseInt(m[1])-1, startDay);
-        } else {
-            const m = monthVal.split('-');
-            startDate = new Date(parseInt(m[0]), parseInt(m[1])-1, startDay);
+        if (forceRepopulateMonths) state.stats.specificMonth = '';
+        const monthVal = populateStatsMonthSelect();
+        if (!monthVal) return;
+        const m = monthVal.split('-');
+        let startDate = new Date(parseInt(m[0], 10), parseInt(m[1], 10) - 1, startDay);
+        let endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + 1);
+        endDate.setDate(endDate.getDate() - 1);
+        endDate.setHours(23, 59, 59, 999);
+        const periodBounds = getStatsPeriodBounds();
+        if (periodBounds.start && startDate < periodBounds.start) {
+            startDate = new Date(periodBounds.start);
         }
-        endDate = new Date(startDate);
-        endDate.setMonth(endDate.getMonth()+1);
-        endDate.setDate(endDate.getDate()-1);
-        endDate.setHours(23,59,59,999);
+        if (periodBounds.end && endDate > periodBounds.end) {
+            endDate = new Date(periodBounds.end);
+        }
         if (!startDate || isNaN(startDate.getTime())) return;
+        const viewBudget = getViewBudget();
         const filteredTxs = state.transactions.filter(tx => {
+            if (!txBelongsToSelectedBudget(tx)) return false;
             const d = parseLocalDate(tx.date);
             return d >= startDate && d <= endDate;
         });
-        const income = state.budget.incomes.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
-        const fixed = state.budget.fixed.reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
-        const savings = (state.budget.savings || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
-        const loans = (state.budget.loans || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        const income = (viewBudget.incomes || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        const fixed = (viewBudget.fixed || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        const savings = (viewBudget.savings || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
+        const loans = (viewBudget.loans || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0);
         const annualCatNames = new Set();
-        state.budget.annual.forEach(a => {
+        (viewBudget.annual || []).forEach(a => {
             const short = (a.category_name||'').trim();
             annualCatNames.add(short);
             if (a.parent_group) annualCatNames.add((a.parent_group + ' > ' + short).trim());
         });
-        const planned = filteredTxs.reduce((s, tx) => tx.tag && annualCatNames.has(tagToShortName(tx.tag)) ? s + safeParseFloat(tx.amount) : s, 0);
+        const planned = filteredTxs.reduce((s, tx) => tx.tag && annualCatNames.has(tagToShortName(tx.tag, viewBudget)) ? s + safeParseFloat(tx.amount) : s, 0);
         const current = filteredTxs.reduce((s, tx) => !tx.tag ? s + safeParseFloat(tx.amount) : s, 0);
         renderStatsChart(
             formatDisplayAmount(income),
@@ -9869,7 +10833,7 @@
             const currentTxs = filteredTxs.filter(tx => !tx.tag && !tx.isAdjustment);
             renderCategoryStatsChart(currentTxs);
         } else if (state.statsFilter === 'planned') {
-            const plannedTxs = filteredTxs.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.annual.some(a => a.category_name === tx.tag));
+            const plannedTxs = filteredTxs.filter(tx => !!tx.tag && !tx.isAdjustment && txIsPlanned(tx));
             renderPlannedCategoryStatsChart(plannedTxs);
         } else if (state.statsFilter === 'fixed') {
             const fixedTxs = filteredTxs.filter(tx => !!tx.tag && !tx.isAdjustment && txIsFixedLike(tx));
@@ -9890,12 +10854,7 @@
         // Mirror the exact logic from the expenses page dailyBalanceMap:
         // use only current (non-planned, non-fixed) transactions, work backwards from state.balance
         const allCurrentTxsSorted = [...state.transactions]
-            .filter(tx => {
-                const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-                const isFixed   = txIsFixedLike(tx);
-                const isLegacyAdj = tx.isAdjustment || tx.category === 'איזון עדכון תקציב';
-                return !isPlanned && !isFixed && !isLegacyAdj;
-            })
+            .filter(tx => txHitsCurrentBalance(tx))
             .sort((a, b) => {
                 const da = parseLocalDate(a.date), db = parseLocalDate(b.date);
                 if (da.getTime() !== db.getTime()) return db - da; // newest first
@@ -10039,9 +10998,7 @@
         const allCurrentTxsSorted = [...state.transactions]
             .filter(tx => {
                 if (tx.isAdjustment) return false;
-                const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
-                const isFixed = txIsFixedLike(tx);
-                return !isPlanned && !isFixed;
+                return txHitsCurrentBalance(tx);
             })
             .sort((a, b) => {
                 const da = parseLocalDate(a.date), db = parseLocalDate(b.date);
@@ -10484,9 +11441,10 @@
     let _plannedTrendHidden = new Set();
 
     function renderFixedCategoryStatsChart(txs) {
+        const vb = getViewBudget();
         const fixedItems = [
-            ...((state.budget && state.budget.fixed) ? state.budget.fixed.filter(f => safeParseFloat(f.budget_amount) > 0) : []),
-            ...((state.budget && state.budget.savings) ? state.budget.savings : [])
+            ...((vb && vb.fixed) ? vb.fixed.filter(f => safeParseFloat(f.budget_amount) > 0) : []),
+            ...((vb && vb.savings) ? vb.savings : [])
         ];
         const card = document.getElementById('fixedCatStatsCard');
         if (!card) return;
@@ -10506,8 +11464,8 @@
         const totals = {};
         txs.forEach(tx => {
             if (tx.tag) {
-                const foundFixed = state.budget.fixed.find(f => tagMatchesCat(tx.tag, f))
-                    || (state.budget.savings || []).find(s => tagMatchesCat(tx.tag, s));
+                const foundFixed = (vb.fixed || []).find(f => tagMatchesCat(tx.tag, f))
+                    || (vb.savings || []).find(s => tagMatchesCat(tx.tag, s));
                 if (foundFixed) {
                     const key = foundFixed.parent_group || foundFixed.category_name;
                     totals[key] = (totals[key] || 0) + safeParseFloat(tx.amount);
@@ -10605,7 +11563,7 @@
             if (!trendCtx) return;
             const months = getTrendMonths();
             if (months.length === 0) return;
-            const allTxs = state.transactions.filter(tx => !!tx.tag && !tx.isAdjustment && txIsFixedLike(tx));
+            const allTxs = state.transactions.filter(tx => !!tx.tag && !tx.isAdjustment && txIsFixedLike(tx) && txBelongsToSelectedBudget(tx));
             const datasets = [];
 
             // Group fixed items by parent_group or keep as standalone
@@ -10740,7 +11698,8 @@
     }
 
     function renderPlannedCategoryStatsChart(txs) {
-        const annuals = state.budget.annual.filter(a => safeParseFloat(a.budget_amount) > 0);
+        const vb = getViewBudget();
+        const annuals = (vb.annual || []).filter(a => safeParseFloat(a.budget_amount) > 0);
         const card = document.getElementById('plannedCatStatsCard');
         if (!card) return;
         if (annuals.length === 0) { card.classList.add('hidden'); return; }
@@ -10855,7 +11814,7 @@
             if (!trendCtx) return;
             const months = getTrendMonths();
             if (months.length === 0) return;
-            const allTxs = state.transactions.filter(tx => !!tx.tag && !tx.isAdjustment && state.budget.annual.some(a => tagMatchesCat(tx.tag, a)));
+            const allTxs = state.transactions.filter(tx => !!tx.tag && !tx.isAdjustment && txIsPlanned(tx) && txBelongsToSelectedBudget(tx));
             const datasets = [];
 
             // Group annual items by parent_group or keep as standalone
@@ -10990,28 +11949,21 @@
     }
 
     function getTrendMonths() {
-        let startDate = null;
-        if (state.transactions.length > 0) {
-            const sorted = [...state.transactions].sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
-            startDate = parseLocalDate(sorted[0].date);
-        } else if (state.budget.startDate) {
-            const parts = state.budget.startDate.split('/');
-            if (parts.length === 3) startDate = new Date(parseInt(parts[2]), parseInt(parts[1])-1, 1);
+        const bounds = getStatsPeriodBounds();
+        if (!bounds.start || !bounds.end || bounds.start > bounds.end) {
+            return { sorted: [], labels: [] };
         }
-        if (!startDate) return { sorted: [], labels: [] };
-
-        const now = new Date();
         const sorted = [];
-        const cur = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-        const end = new Date(now.getFullYear(), now.getMonth(), 1);
+        const cur = new Date(bounds.start.getFullYear(), bounds.start.getMonth(), 1);
+        const end = new Date(bounds.end.getFullYear(), bounds.end.getMonth(), 1);
         while (cur <= end) {
-            sorted.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`);
+            sorted.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`);
             cur.setMonth(cur.getMonth() + 1);
         }
         const labels = sorted.map(m => {
             const [y, mo] = m.split('-');
-            const names = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-            return names[parseInt(mo)-1] + ' ' + y.slice(2);
+            const names = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+            return names[parseInt(mo, 10) - 1] + ' ' + y.slice(2);
         });
         return { sorted, labels };
     }
@@ -11034,7 +11986,7 @@
         }
         
         // Build categories to groups map for all time
-        const allTxs = state.transactions.filter(tx => !tx.tag && !tx.isAdjustment);
+        const allTxs = state.transactions.filter(tx => !tx.tag && !tx.isAdjustment && txBelongsToSelectedBudget(tx));
         const groupConfigs = {}; // key -> { label, color, colorHex }
         
         cats.forEach(cat => {
@@ -11187,7 +12139,7 @@
             const currentExpByDate = {};
             state.transactions.forEach(tx => {
                 if (tx.isAdjustment) return;
-                const isPlanned = !!tx.tag && state.budget.annual.some(a => tagMatchesCat(tx.tag, a));
+                const isPlanned = txIsPlanned(tx);
                 const isFixed   = txIsFixedLike(tx);
                 if (isPlanned || isFixed) return;
                 currentExpByDate[tx.date] = (currentExpByDate[tx.date] || 0) + safeParseFloat(tx.amount);
@@ -11256,33 +12208,10 @@
             const trendCtx = document.getElementById('catStackedTrendChart');
             if (!trendCtx) return;
 
-            // Build months from startDate to today
-            let startDate = null;
-            if (state.transactions.length > 0) {
-                const sorted = [...state.transactions].sort((a, b) =>
-                    parseLocalDate(a.date) - parseLocalDate(b.date));
-                startDate = parseLocalDate(sorted[0].date);
-            } else if (state.budget.startDate) {
-                const parts = state.budget.startDate.split('/');
-                if (parts.length === 3) startDate = new Date(parseInt(parts[2]), parseInt(parts[1])-1, 1);
-            }
-            if (!startDate) return;
-
-            const now = new Date();
-            const sortedMonths = [];
-            const cur = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-            const end = new Date(now.getFullYear(), now.getMonth(), 1);
-            while (cur <= end) {
-                sortedMonths.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`);
-                cur.setMonth(cur.getMonth() + 1);
-            }
-            if (sortedMonths.length === 0) return;
-
-            const monthLabels = sortedMonths.map(m => {
-                const [y, mo] = m.split('-');
-                const names = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
-                return names[parseInt(mo)-1] + ' ' + y.slice(2);
-            });
+            const months = getTrendMonths();
+            if (!months.sorted.length) return;
+            const sortedMonths = months.sorted;
+            const monthLabels = months.labels;
 
             const datasets = [];
             
@@ -12634,6 +13563,7 @@
     };
     window.openAddExpenseModal = (prefillType, prefillCatName, prefillCatId, prefillName) => {
         try {
+            const now = new Date();
             window.setTxType('expense');
             window.setCategoryType(prefillType || 'current');
             // After setCategoryType populates the picker with no selection, re-populate with prefill
@@ -12680,11 +13610,12 @@
         if (catFilter && catFilter !== '__none__') {
             if (catFilter.startsWith('budget:')) {
                 // planned/fixed/savings category — set by tag
-                const annualItem = state.budget.annual.find(a => String(a.id) === catFilter.slice(7));
+                const vb = getViewBudget();
+                const annualItem = (vb.annual || []).find(a => String(a.id) === catFilter.slice(7) || a.category_name === catFilter.slice(7));
                 if (annualItem) { prefillType = 'planned'; prefillCatName = annualItem.category_name; }
-                const fixedItem = state.budget.fixed.find(f => String(f.id) === catFilter.slice(7));
+                const fixedItem = (vb.fixed || []).find(f => String(f.id) === catFilter.slice(7) || f.category_name === catFilter.slice(7));
                 if (fixedItem) { prefillType = 'fixed'; prefillCatName = fixedItem.category_name; }
-                const savingsItem = (state.budget.savings || []).find(s => String(s.id) === catFilter.slice(7));
+                const savingsItem = (vb.savings || []).find(s => String(s.id) === catFilter.slice(7) || s.category_name === catFilter.slice(7));
                 if (savingsItem) { prefillType = 'fixed'; prefillCatName = savingsItem.category_name; }
             } else if (catFilter.startsWith('group:')) {
                 // expense category group — no specific sub-category to prefill
@@ -12720,6 +13651,7 @@
     // INIT
     // =====================================================
     document.addEventListener('DOMContentLoaded', () => {
+        try {
         // Prefetch USD/ILS rate early (for USD savings display)
         ensureUsdIlsRate(true).catch(() => {});
 
@@ -12804,15 +13736,25 @@
                             document.getElementById('existingTokenInput').value = urlToken;
                             document.getElementById('loginError').classList.remove('hidden');
                         }
+                    })
+                    .catch(() => {
+                        document.getElementById('loginScreen').classList.remove('hidden');
                     });
+            } else {
+                document.getElementById('loginScreen').classList.remove('hidden');
             }
         } else if (storedToken.length === TOKEN_LEN && sbClient) {
             activateSession(storedToken);
         } else {
             document.getElementById('loginScreen').classList.remove('hidden');
         }
-
-        render();
+        } catch (e) {
+            console.error('init error:', e);
+            try {
+                document.getElementById('loginScreen').classList.remove('hidden');
+                revealApp();
+            } catch (_) {}
+        }
     });
     </script>
 </body>
