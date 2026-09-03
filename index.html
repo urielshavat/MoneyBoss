@@ -449,9 +449,19 @@
             </div>
 
             <div id="budgetSummary" class="card p-4 mb-4 border border-slate-200 bg-white shadow-sm">
-                <div class="flex flex-col mb-4">
-                    <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest">סיכום חודשי</h3>
-                    <p class="text-[9px] text-slate-400 font-semibold" id="startDateDisplay">תאריך התחלה: --</p>
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex flex-col">
+                        <h3 class="text-slate-500 text-[10px] font-bold uppercase tracking-widest">סיכום חודשי</h3>
+                        <p class="text-[9px] text-slate-400 font-semibold" id="startDateDisplay">תאריך התחלה: --</p>
+                    </div>
+                    <div id="budgetEditActions" class="hidden relative">
+                        <button type="button" onclick="window.toggleBudgetEditMenu()" class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors" title="עריכת תקציב" aria-label="עריכת תקציב">
+                            <i class="fa-solid fa-pen text-[10px]"></i>
+                        </button>
+                        <div id="budgetEditMenu" class="hidden absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl z-[90] overflow-hidden p-1.5">
+                            <div id="budgetEditMenuItems"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="flex flex-col gap-3 mb-4">
                     <div class="flex justify-between items-center px-1">
@@ -2334,6 +2344,40 @@
         const key = parseStartDateToISO(iso);
         if (!key) return null;
         return getEpochIndex().byStart[key] || null;
+    }
+    function getPreviousBudgetEpoch() {
+        const activeISO = getActiveEpochStartISO();
+        return (state.budgetEpochs || [])
+            .filter(ep => ep && ep.kind === 'hist' && !ep.synthetic)
+            .filter(ep => {
+                const startISO = parseStartDateToISO(ep.startDate);
+                return startISO && (!activeISO || startISO < activeISO);
+            })
+            .sort((a, b) => parseStartDateToISO(b.startDate).localeCompare(parseStartDateToISO(a.startDate)))[0] || null;
+    }
+    function canReturnToPreviousBudget(ep = getPreviousBudgetEpoch()) {
+        if (!ep) return false;
+        const previousStartISO = parseStartDateToISO(ep.startDate);
+        const previousAnniversary = addOneYearISO(previousStartISO);
+        return !!previousAnniversary && localDateToISO() < previousAnniversary;
+    }
+    function epochToActiveRows(ep) {
+        const rows = [];
+        const addRows = (items, type) => {
+            (items || []).forEach(item => rows.push({
+                category_name: item.category_name,
+                parent_group: item.parent_group || null,
+                budget_amount: safeParseFloat(item.budget_amount) || 0,
+                type,
+                user_token: USER_TOKEN
+            }));
+        };
+        addRows(ep && ep.incomes, 'income');
+        addRows(ep && ep.fixed, 'fixed');
+        addRows(ep && ep.annual, 'annual');
+        addRows(ep && ep.savings, 'savings');
+        addRows(ep && ep.loans, 'loan');
+        return rows;
     }
     function getEditingKind() {
         if (state.budgetMode === 'future') return 'future';
@@ -5574,6 +5618,206 @@
         }
     };
 
+    window.toggleBudgetEditMenu = function(forceOpen) {
+        const menu = document.getElementById('budgetEditMenu');
+        if (!menu) return;
+        window.renderBudgetEditMenu();
+        const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : menu.classList.contains('hidden');
+        menu.classList.toggle('hidden', !shouldOpen);
+    };
+
+    window.closeBudgetEditMenu = function() {
+        const menu = document.getElementById('budgetEditMenu');
+        if (menu) menu.classList.add('hidden');
+    };
+
+    document.addEventListener('click', function(event) {
+        const actions = document.getElementById('budgetEditActions');
+        if (actions && !actions.contains(event.target)) window.closeBudgetEditMenu();
+    });
+
+    window.renderBudgetEditMenu = function() {
+        const container = document.getElementById('budgetEditMenuItems');
+        if (!container) return;
+        container.innerHTML = '';
+
+        const previous = state.budgetMode === 'active' ? getPreviousBudgetEpoch() : null;
+        if (previous) {
+            const previousDate = isoToDDMMYYYY(parseStartDateToISO(previous.startDate));
+            const copyBtn = document.createElement('button');
+            copyBtn.type = 'button';
+            copyBtn.className = 'w-full flex items-center gap-3 px-3 py-3 rounded-xl text-right hover:bg-blue-50 text-slate-700 transition-colors';
+            copyBtn.innerHTML = `<i class="fa-solid fa-clone w-5 text-center text-blue-500"></i><span class="flex-1"><span class="block text-xs font-bold">העתק מתקציב קודם</span><span class="block text-[9px] text-slate-400 mt-0.5">התקציב שהתחיל ב-${previousDate}</span></span>`;
+            copyBtn.onclick = window.copyFromPreviousBudget;
+            container.appendChild(copyBtn);
+
+            if (canReturnToPreviousBudget(previous)) {
+                const returnBtn = document.createElement('button');
+                returnBtn.type = 'button';
+                returnBtn.className = 'w-full flex items-center gap-3 px-3 py-3 rounded-xl text-right hover:bg-amber-50 text-slate-700 transition-colors';
+                returnBtn.innerHTML = `<i class="fa-solid fa-rotate-left w-5 text-center text-amber-500"></i><span class="flex-1"><span class="block text-xs font-bold">חזור לתקציב קודם</span><span class="block text-[9px] text-slate-400 mt-0.5">בטל את התקופה הנוכחית וחזור ל-${previousDate}</span></span>`;
+                returnBtn.onclick = window.returnToPreviousBudget;
+                container.appendChild(returnBtn);
+            }
+        }
+
+        if (!container.children.length) {
+            container.innerHTML = '<p class="px-3 py-3 text-[10px] font-semibold text-slate-400 text-center">אין פעולות עריכה זמינות לתקציב זה</p>';
+        }
+    };
+
+    window.copyFromPreviousBudget = async function() {
+        const previous = getPreviousBudgetEpoch();
+        if (!sbClient || !previous) {
+            window.closeBudgetEditMenu();
+            window.showToast('לא נמצא תקציב קודם', 'circle-xmark');
+            return;
+        }
+        if (!window.confirm('להחליף את סעיפי התקציב הנוכחי והסכומים שלהם בעותק מהתקציב הקודם? תאריך תחילת התקציב הנוכחי לא ישתנה.')) return;
+
+        window.closeBudgetEditMenu();
+        setLoading(true, true);
+        try {
+            const rows = epochToActiveRows(previous);
+            const activeStartISO = getActiveEpochStartISO() || localDateToISO();
+            const previousG4 = safeParseFloat(previous.g4) || 0;
+
+            const { error: deleteError } = await sbClient.from('budget_settings')
+                .delete()
+                .eq('user_token', USER_TOKEN)
+                .in('type', ['income', 'fixed', 'annual', 'savings', 'loan']);
+            if (deleteError) throw deleteError;
+            if (rows.length) {
+                const { error: insertError } = await sbClient.from('budget_settings').insert(rows);
+                if (insertError) throw insertError;
+            }
+            await persistSystemRow('__g4__', null, previousG4);
+            await insertDailyHistoryAt(activeStartISO, previousG4 / 30);
+
+            const trackingISO = getTrackingStartISO() || activeStartISO;
+            const { error: rpcError } = await sbClient.rpc('update_daily_budget', {
+                p_user_token: USER_TOKEN,
+                p_daily_budget: previousG4 / 30,
+                p_start_date: trackingISO
+            });
+            if (rpcError) throw rpcError;
+
+            await window.fetchBudgetData();
+            await window.fetchTransactionsOnly(false);
+            window.showToast('התקציב הקודם הועתק', 'check');
+        } catch (e) {
+            console.error('copyFromPreviousBudget error:', e);
+            window.showToast('שגיאה בהעתקת התקציב הקודם', 'circle-xmark');
+        } finally {
+            setLoading(false, true);
+        }
+    };
+
+    window.returnToPreviousBudget = async function() {
+        const previous = getPreviousBudgetEpoch();
+        if (!sbClient || !previous || !canReturnToPreviousBudget(previous)) {
+            window.closeBudgetEditMenu();
+            window.showToast('לא ניתן לחזור לתקציב הקודם', 'circle-xmark');
+            return;
+        }
+        const previousStartISO = parseStartDateToISO(previous.startDate);
+        const activeStartISO = getActiveEpochStartISO();
+        if (!window.confirm(`לחזור לתקציב שהתחיל ב-${isoToDDMMYYYY(previousStartISO)}? התקציב הנוכחי יבוטל והתקציב הקודם יחזור להיות פעיל.`)) return;
+
+        window.closeBudgetEditMenu();
+        setLoading(true, true);
+        _budgetTransitionLock = true;
+        try {
+            const rows = epochToActiveRows(previous);
+            const previousG4 = safeParseFloat(previous.g4) || 0;
+
+            const { error: deleteActiveError } = await sbClient.from('budget_settings')
+                .delete()
+                .eq('user_token', USER_TOKEN)
+                .in('type', ['income', 'fixed', 'annual', 'savings', 'loan']);
+            if (deleteActiveError) throw deleteActiveError;
+            if (rows.length) {
+                const { error: insertActiveError } = await sbClient.from('budget_settings').insert(rows);
+                if (insertActiveError) throw insertActiveError;
+            }
+
+            const histPrefix = `__hist__:${previousStartISO}:`;
+            const { data: previousHistRows, error: histFetchError } = await sbClient.from('budget_settings')
+                .select('id')
+                .eq('user_token', USER_TOKEN)
+                .like('category_name', histPrefix + '%');
+            if (histFetchError) throw histFetchError;
+            if (previousHistRows && previousHistRows.length) {
+                const { error: deleteHistError } = await sbClient.from('budget_settings')
+                    .delete()
+                    .eq('user_token', USER_TOKEN)
+                    .in('id', previousHistRows.map(row => row.id));
+                if (deleteHistError) throw deleteHistError;
+            }
+            await sbClient.from('budget_settings').delete()
+                .eq('user_token', USER_TOKEN)
+                .eq('category_name', '__hist_g4__:' + previousStartISO);
+
+            if (activeStartISO) {
+                const { data: laterDailyRows, error: dailyFetchError } = await sbClient.from('budget_settings')
+                    .select('id')
+                    .eq('user_token', USER_TOKEN)
+                    .like('category_name', '__daily_budget_history__:%')
+                    .gte('parent_group', activeStartISO);
+                if (dailyFetchError) throw dailyFetchError;
+                if (laterDailyRows && laterDailyRows.length) {
+                    const { error: deleteDailyError } = await sbClient.from('budget_settings')
+                        .delete()
+                        .eq('user_token', USER_TOKEN)
+                        .in('id', laterDailyRows.map(row => row.id));
+                    if (deleteDailyError) throw deleteDailyError;
+                }
+
+                const { data: overrideRows, error: overrideFetchError } = await sbClient.from('budget_settings')
+                    .select('id')
+                    .eq('user_token', USER_TOKEN)
+                    .eq('type', 'system')
+                    .eq('parent_group', activeStartISO)
+                    .like('category_name', '__tx_budget__:%');
+                if (overrideFetchError) throw overrideFetchError;
+                for (const row of (overrideRows || [])) {
+                    const { error: overrideError } = await sbClient.from('budget_settings')
+                        .update({ parent_group: previousStartISO })
+                        .eq('id', row.id)
+                        .eq('user_token', USER_TOKEN);
+                    if (overrideError) throw overrideError;
+                }
+            }
+
+            await persistSystemRow('__g4__', null, previousG4);
+            await persistEpochStart(previousStartISO);
+            await insertDailyHistoryAt(previousStartISO, previousG4 / 30);
+
+            const trackingISO = getTrackingStartISO() || previousStartISO;
+            const { error: rpcError } = await sbClient.rpc('update_daily_budget', {
+                p_user_token: USER_TOKEN,
+                p_daily_budget: previousG4 / 30,
+                p_start_date: trackingISO
+            });
+            if (rpcError) throw rpcError;
+
+            state.budgetMode = 'active';
+            state.editingBudgetStart = null;
+            state.selectedBudgetStart = 'active';
+            localStorage.setItem('selected_budget_period', 'active');
+            _budgetRolloverAttempted = false;
+            await window.fetchBudgetData();
+            await window.fetchTransactionsOnly(false);
+            window.showToast('התקציב הקודם חזר להיות פעיל', 'check');
+        } catch (e) {
+            console.error('returnToPreviousBudget error:', e);
+            window.showToast('שגיאה בחזרה לתקציב הקודם', 'circle-xmark');
+        } finally {
+            _budgetTransitionLock = false;
+            setLoading(false, true);
+        }
+    };
+
     window.saveFutureStartDate = async function() {
         if (!sbClient) return;
         const inp = document.getElementById('futureStartDateInput');
@@ -5659,13 +5903,28 @@
             await archiveActiveBudgetToHist(oldStartISO);
             
             // 1. Fetch future category rows
-            const { data: futRows } = await sbClient
+            const { data: futRows, error: futureRowsError } = await sbClient
                 .from('budget_settings')
                 .select('*')
                 .eq('user_token', USER_TOKEN)
                 .in('type', ['future_income', 'future_fixed', 'future_annual', 'future_savings', 'future_loan']);
+            if (futureRowsError) throw futureRowsError;
 
-            const promotedCategories = (futRows || []).map(r => {
+            // If activation time arrived before a future budget was filled in,
+            // use the outgoing active budget as the future budget before promoting it.
+            const futureWasEmpty = !futRows || futRows.length === 0;
+            let rowsToPromote = futRows || [];
+            if (futureWasEmpty) {
+                const { data: activeRows, error: activeRowsError } = await sbClient
+                    .from('budget_settings')
+                    .select('*')
+                    .eq('user_token', USER_TOKEN)
+                    .in('type', ['income', 'fixed', 'annual', 'savings', 'loan']);
+                if (activeRowsError) throw activeRowsError;
+                rowsToPromote = activeRows || [];
+            }
+
+            const promotedCategories = rowsToPromote.map(r => {
                 let catName = r.category_name || '';
                 if (catName.startsWith('__future__:')) catName = catName.slice(11);
                 // Strip any accidentally embedded "parent > child" format from category name
@@ -5675,7 +5934,7 @@
                     category_name: catName,
                     parent_group: r.parent_group || null,
                     budget_amount: safeParseFloat(r.budget_amount) || 0,
-                    type: (r.type || '').replace('future_', ''),
+                    type: (r.type || '').replace(/^future_/, ''),
                     user_token: USER_TOKEN
                 };
             });
@@ -5694,7 +5953,9 @@
                 const { error: insErr } = await sbClient.from('budget_settings').insert(promotedCategories);
                 if (insErr) throw insErr;
             }
-            const futureG4 = safeParseFloat(state.futureBudget && state.futureBudget.g4) || 0;
+            const futureG4 = futureWasEmpty
+                ? (safeParseFloat(state.budget && state.budget.g4) || 0)
+                : (safeParseFloat(state.futureBudget && state.futureBudget.g4) || 0);
             const startDateISO = getFutureBudgetStartISO() || localDateToISO();
             await sbClient.from('budget_settings').insert([
                 { category_name: '__g4__', budget_amount: futureG4, type: 'system', user_token: USER_TOKEN },
@@ -5720,7 +5981,10 @@
             state.budget.epochStart = startDateISO;
             state.budget.startDate = isoToDDMMYYYY(startDateISO);
 
-            window.showToast('התקציב העתידי הופעל בהצלחה!', 'check');
+            window.showToast(
+                futureWasEmpty ? 'התקציב הקודם הועתק והתקציב החדש הופעל' : 'התקציב העתידי הופעל בהצלחה!',
+                'check'
+            );
             await window.fetchBudgetData();
             await window.fetchTransactionsOnly(false);
         } catch (e) {
@@ -7601,6 +7865,9 @@
         }
         const helpBtn = document.getElementById('budgetHelpBtn');
         if (helpBtn) helpBtn.classList.toggle('hidden', state.currentView !== 'budget');
+        const budgetEditActions = document.getElementById('budgetEditActions');
+        if (budgetEditActions) budgetEditActions.classList.toggle('hidden', state.currentView !== 'budget');
+        if (state.currentView !== 'budget') window.closeBudgetEditMenu();
         const mainHelpBtn = document.getElementById('mainHelpBtn');
         if (mainHelpBtn) mainHelpBtn.classList.toggle('hidden', state.currentView !== 'main');
         const annualHelpBtn = document.getElementById('annualHelpBtn');
@@ -8371,6 +8638,7 @@
         const b = getEditingBudget() || state.budget;
         if (!b) return;
         ['incomes', 'fixed', 'annual', 'savings', 'loans'].forEach(k => { if (!Array.isArray(b[k])) b[k] = []; });
+        window.renderBudgetEditMenu();
 
         // Show/hide Copy Current Budget banners & Future date input
         const copyBanner = document.getElementById('copyCurrentBudgetContainer');
