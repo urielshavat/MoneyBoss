@@ -3528,6 +3528,38 @@
         }
     }
 
+    function histEpochHasArchivedData(ep) {
+        if (!ep) return false;
+        if (safeParseFloat(ep.g4) > 0) return true;
+        return ['incomes', 'fixed', 'annual', 'savings', 'loans'].some(k => {
+            const items = ep[k] || [];
+            return items.length > 0;
+        });
+    }
+
+    function histEpochHasExpensesInPeriod(iso) {
+        const start = parseStartDateToISO(iso);
+        if (!start || !state.transactions || !state.transactions.length) return false;
+        const endExclusive = getEpochEndISO(start) || addOneYearISO(start);
+        return state.transactions.some(tx => {
+            if (!isTrackingExpenseTx(tx)) return false;
+            const txISO = parseStartDateToISO(tx.date);
+            if (!txISO || txISO < start) return false;
+            if (endExclusive && txISO >= endExclusive) return false;
+            return true;
+        });
+    }
+
+    /** Only delete empty/erroneous hist epochs — never real archived budgets. */
+    function isSafeToDeletePhantomHist(histMap, iso, trackingISO) {
+        const ep = histMap[iso];
+        if (!ep) return false;
+        if (histEpochHasArchivedData(ep)) return false;
+        if (histEpochHasExpensesInPeriod(iso)) return false;
+        if (iso === trackingISO) return false;
+        return iso < trackingISO;
+    }
+
     function collectHistMapFromEpochs() {
         const histMap = {};
         (state.budgetEpochs || []).forEach(e => {
@@ -3544,6 +3576,7 @@
         const histIsos = Object.keys(histMap).filter(iso => isPlausibleEpochISO(iso)).sort();
         if (!histIsos.length || histIsos[0] <= trackingISO) return;
         const fromISO = histIsos[0];
+        if (histEpochHasArchivedData(histMap[fromISO])) return;
         retargetHistMap(histMap, fromISO, trackingISO);
         await retargetHistEpochInDb(fromISO, trackingISO);
     }
@@ -3588,23 +3621,15 @@
         let changed = false;
         let histIsos = Object.keys(histMap).filter(iso => isPlausibleEpochISO(iso)).sort();
 
-        // Hist periods that start before the first real expense are phantom (e.g. rollover before tracking began)
-        for (const iso of histIsos.filter(h => h < trackingISO)) {
+        // Remove only empty phantom hist epochs (never real archived budgets)
+        for (const iso of histIsos.filter(h => isSafeToDeletePhantomHist(histMap, h, trackingISO))) {
             await deleteHistEpochFromDb(iso);
             delete histMap[iso];
             changed = true;
         }
         histIsos = Object.keys(histMap).filter(iso => isPlausibleEpochISO(iso)).sort();
 
-        // Hist at the same date as first expense is redundant — the active period should start there
-        for (const iso of histIsos.filter(h => h === trackingISO)) {
-            await deleteHistEpochFromDb(iso);
-            delete histMap[iso];
-            changed = true;
-        }
-        histIsos = Object.keys(histMap).filter(iso => isPlausibleEpochISO(iso)).sort();
-
-        if (histIsos.length && histIsos[0] > trackingISO) {
+        if (histIsos.length && histIsos[0] > trackingISO && !histEpochHasArchivedData(histMap[histIsos[0]])) {
             const fromISO = histIsos[0];
             retargetHistMap(histMap, fromISO, trackingISO);
             await retargetHistEpochInDb(fromISO, trackingISO);
@@ -3616,14 +3641,18 @@
         if (!histIsos.length) {
             activeEpochISO = trackingISO;
         } else {
-            activeEpochISO = resolveActiveEpochStartISO(
+            const resolved = resolveActiveEpochStartISO(
                 histMap,
                 state.budget.epochStart || '',
                 state.budget.startDate || ''
             ) || trackingISO;
-            const anniversary = addOneYearISO(histIsos[histIsos.length - 1]);
-            if (anniversary && localDateToISO() < anniversary) {
-                activeEpochISO = histIsos[histIsos.length - 1];
+            const latestHist = histIsos[histIsos.length - 1];
+            const storedEpoch = parseStartDateToISO(state.budget.epochStart);
+            const anniversary = addOneYearISO(latestHist);
+            if (anniversary && localDateToISO() < anniversary && (!storedEpoch || storedEpoch <= latestHist)) {
+                activeEpochISO = latestHist;
+            } else {
+                activeEpochISO = resolved;
             }
         }
 
@@ -3638,7 +3667,7 @@
         const sel = state.selectedBudgetStart;
         if (sel && sel !== 'active' && sel !== 'all' && sel !== 'future') {
             const selISO = parseStartDateToISO(sel);
-            if (!selISO || selISO < trackingISO || !histMap[selISO]) {
+            if (!selISO || !histMap[selISO]) {
                 state.selectedBudgetStart = 'active';
                 state.budgetMode = 'active';
                 state.editingBudgetStart = null;
@@ -8183,6 +8212,9 @@
         if (startDateISO) {
             state.trackingStartDate = startDateISO;
             const epochChanged = await reconcileBudgetEpochWithTracking();
+            if (epochChanged) {
+                try { await window.fetchBudgetData(); } catch (e) { console.error('fetchBudgetData after reconcile:', e); }
+            }
             const currentTrack = parseStartDateToISO(state.budget.startDate);
             if (startDateISO !== currentTrack) {
                 const { error } = await sbClient.rpc('update_daily_budget', {
