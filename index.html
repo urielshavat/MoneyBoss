@@ -1927,6 +1927,10 @@
     // Token length constant
     var TOKEN_LEN = 6;
 
+    const TX_SELECT_FIELDS = 'id, amount, name, category, created_at, external_id, expense_category_id';
+    const BUDGET_SELECT_FIELDS = 'id, category_name, parent_group, budget_amount, type';
+    let _virtualBudgetCache = null;
+
     // Generate a random token
     function generateToken() {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
@@ -2822,13 +2826,13 @@
 
     window.fetchTransactionsOnly = async function(isManual = false) {
         if (!sbClient || !USER_TOKEN) return;
-        setLoading(true);
+        if (!state._suppressPaint) setLoading(true);
         try {
             // Fetch transactions list and balance in parallel
             const [txRes, balance] = await Promise.all([
                 sbClient
                     .from('transactions')
-                    .select('*')
+                    .select(TX_SELECT_FIELDS)
                     .eq('user_token', USER_TOKEN)
                     .order('created_at', { ascending: false }),
                 fetchBalance()
@@ -2852,36 +2856,17 @@
 
             localStorage.setItem('expense_history', JSON.stringify(state.transactions));
             localStorage.setItem('cached_balance', state.balance.toString());
+            _virtualBudgetCache = null;
 
-            // Tracking start = first real expense (not budget markers). Align epoch after txs load.
             const startDateISO = getFirstTrackingExpenseDateISO();
-            if (startDateISO) {
-                const prevTrack = parseStartDateToISO(state.trackingStartDate);
-                state.trackingStartDate = startDateISO;
-                const epochChanged = await reconcileBudgetEpochWithTracking();
-                const currentTrack = parseStartDateToISO(state.budget.startDate);
-                if (startDateISO !== currentTrack || startDateISO !== prevTrack) {
-                    sbClient.rpc('update_daily_budget', {
-                        p_user_token:   USER_TOKEN,
-                        p_daily_budget: state.budget.g4 / 30,
-                        p_start_date:   startDateISO
-                    }).then(async ({ error }) => {
-                        if (!error) {
-                            state.balance = await fetchBalance();
-                            if (window.calculateClientSideBalance && window.calculateAccumulatedBudget) {
-                                const acc = window.calculateAccumulatedBudget(new Date());
-                                if (acc > 0) state.balance = window.calculateClientSideBalance();
-                            }
-                            localStorage.setItem('cached_balance', state.balance.toString());
-                            if (!state._suppressPaint) render();
-                        }
-                    });
-                }
-                if (epochChanged) invalidateEpochIndex();
+            if (startDateISO) state.trackingStartDate = startDateISO;
+
+            if (isManual) {
+                window._budgetHistoryCleanedUp = false;
+                state._transactionsLoaded = true;
+                schedulePostLoadMaintenance(window._lastServerBalance ?? state.balance);
             }
 
-            // Allow cleanup to re-run if user manually refreshed
-            if (isManual) window._budgetHistoryCleanedUp = false;
             if (!state._suppressPaint) render();
             if (isManual) window.showToast('עודכן בהצלחה', 'check');
         } catch (e) {
@@ -3075,6 +3060,15 @@
         const history = state.budget.dailyBudgetHistory || [];
         if (history.length === 0) return [];
 
+        const cacheKey = [
+            state.budget.startDate || '',
+            history.map(h => `${h.startDate}:${h.dailyBudget}`).join(','),
+            relevantTxs.map(t => `${t.id || t.row || ''}:${t.date}:${t.amount}`).join('|')
+        ].join('::');
+        if (_virtualBudgetCache && _virtualBudgetCache.key === cacheKey) {
+            return _virtualBudgetCache.entries;
+        }
+
         // Helper: sum daily budgets from startDateStr (inclusive) to endDateStr (inclusive).
         // Uses calculateAccumulatedBudget for efficiency (segment-based, not day-by-day).
         function accumulateBudget(startDateStr, endDateStr) {
@@ -3223,6 +3217,7 @@
             }
         }
 
+        _virtualBudgetCache = { key: cacheKey, entries: virtualEntries };
         return virtualEntries;
     };
 
@@ -3661,9 +3656,9 @@
     }
 
     async function runBudgetTransitionsIfNeeded() {
-        if (!state._transactionsLoaded || _budgetTransitionLock) return;
+        if (!state._transactionsLoaded || _budgetTransitionLock) return false;
         const trackingISO = getTrackingStartISO();
-        if (!trackingISO) return;
+        if (!trackingISO) return false;
 
         const todayStr = localDateToISO();
         const futureStartISO = getFutureBudgetStartISO();
@@ -3671,12 +3666,13 @@
         const anniversary = activeStart ? addOneYearISO(activeStart) : '';
         if (futureStartISO && todayStr >= futureStartISO) {
             await window.activateFutureBudget();
-            return;
+            return true;
         }
-        if (_budgetRolloverAttempted || !anniversary || todayStr < anniversary || !isPlausibleEpochISO(activeStart)) return;
+        if (_budgetRolloverAttempted || !anniversary || todayStr < anniversary || !isPlausibleEpochISO(activeStart)) return false;
 
         _budgetRolloverAttempted = true;
         _budgetTransitionLock = true;
+        let didRollover = false;
         try {
             let start = archiveStartForCurrentPeriod() || activeStart;
             let guard = 0;
@@ -3686,14 +3682,18 @@
                 await window.rolloverBudgetYear(start, next);
                 start = next;
                 guard++;
+                didRollover = true;
             }
-            await reconcileBudgetEpochWithTracking();
+            if (didRollover) await reconcileBudgetEpochWithTracking();
         } catch (e) {
             console.error('budget rollover error:', e);
         } finally {
             _budgetTransitionLock = false;
-            try { await window.fetchBudgetData(); } catch (e2) { console.error(e2); }
+            if (didRollover) {
+                try { await window.fetchBudgetData(); } catch (e2) { console.error(e2); }
+            }
         }
+        return didRollover;
     }
 
     function resolveActiveEpochStartISO(histMap, epochRowISO, startDateISO) {
@@ -3752,7 +3752,7 @@
         try {
             const { data, error } = await sbClient
                 .from('budget_settings')
-                .select('*')
+                .select(BUDGET_SELECT_FIELDS)
                 .eq('user_token', USER_TOKEN)
                 .order('category_name');
             if (error) throw error;
@@ -3953,6 +3953,7 @@
             state.futureBudget.startDate = futureStartRow ? (futureStartRow.parent_group || '') : '';
 
             rebuildBudgetEpochs(histMap);
+            _virtualBudgetCache = null;
 
             // __month_start_day__ stored as a special budget_setting row
             const cycleStartRow = rows.find(r => r.category_name === '__month_start_day__' || (r.category_name && r.category_name.endsWith('__month_start_day__')));
@@ -4101,20 +4102,18 @@
 
     window.fetchData = async function() {
         if (!sbClient || !USER_TOKEN) return;
+        showCachedUIIfAvailable();
         setLoading(true);
         state.displayedTransactionsCount = 30;
         state._suppressPaint = true;
         state._transactionsLoaded = false;
+        window._budgetHistoryCleanedUp = false;
         try {
             // fetchBudgetData must complete first so dailyBudgetHistory is available
             // before fetchTransactionsOnly calls calculateClientSideBalance
             await window.fetchBudgetData();
             await Promise.all([window.fetchTransactionsOnly(), window.fetchExpenseCategories()]);
             state._transactionsLoaded = true;
-            await reconcileBudgetEpochWithTracking();
-            // Clean up stale budget history entries only if server/client balance mismatch detected
-            await cleanupDailyBudgetHistory(window._lastServerBalance ?? state.balance);
-            await runBudgetTransitionsIfNeeded();
             state.isDirty = false;
         } catch (e) {
             console.error(e);
@@ -4123,6 +4122,7 @@
             setLoading(false);
             try { render(); } catch (e) { console.error(e); }
             revealApp();
+            schedulePostLoadMaintenance(window._lastServerBalance ?? state.balance);
         }
     };
 
@@ -8162,8 +8162,62 @@
     // =====================================================
     // RENDER MAIN
     // =====================================================
+    function hasCachedAppData() {
+        return (state.transactions && state.transactions.length > 0) ||
+            (state.balance !== undefined && state.balance !== null && !isNaN(state.balance));
+    }
+
+    function showCachedUIIfAvailable() {
+        if (!hasCachedAppData()) return;
+        try { render(); } catch (e) { console.error('cached render error:', e); }
+        revealApp();
+    }
+
     function revealApp() {
         document.body.classList.add('app-ready');
+    }
+
+    async function runPostLoadMaintenance(serverBalance) {
+        if (!state._transactionsLoaded || !sbClient || !USER_TOKEN) return;
+        const startDateISO = getFirstTrackingExpenseDateISO();
+        if (startDateISO) {
+            state.trackingStartDate = startDateISO;
+            const epochChanged = await reconcileBudgetEpochWithTracking();
+            const currentTrack = parseStartDateToISO(state.budget.startDate);
+            if (startDateISO !== currentTrack) {
+                const { error } = await sbClient.rpc('update_daily_budget', {
+                    p_user_token: USER_TOKEN,
+                    p_daily_budget: state.budget.g4 / 30,
+                    p_start_date: startDateISO
+                });
+                if (!error) {
+                    state.balance = await fetchBalance();
+                    if (window.calculateClientSideBalance && window.calculateAccumulatedBudget) {
+                        const acc = window.calculateAccumulatedBudget(new Date());
+                        if (acc > 0) state.balance = window.calculateClientSideBalance();
+                    }
+                    localStorage.setItem('cached_balance', state.balance.toString());
+                }
+            }
+            if (epochChanged) invalidateEpochIndex();
+        }
+        await cleanupDailyBudgetHistory(serverBalance ?? window._lastServerBalance ?? state.balance);
+        await runBudgetTransitionsIfNeeded();
+        const hasUsd = Object.values(state.budget.savingsMeta || {}).some(m => m && m.currency === 'USD');
+        if (hasUsd) ensureUsdIlsRate(true).catch(() => {});
+        if (!state._suppressPaint) {
+            try { render(); } catch (e) { console.error(e); }
+            if (typeof window.renderBudgetSubmenu === 'function') window.renderBudgetSubmenu();
+        }
+    }
+
+    function schedulePostLoadMaintenance(serverBalance) {
+        const defer = typeof requestIdleCallback === 'function'
+            ? (cb) => requestIdleCallback(cb, { timeout: 3000 })
+            : (cb) => setTimeout(cb, 0);
+        defer(() => {
+            runPostLoadMaintenance(serverBalance).catch(e => console.error('postLoadMaintenance error:', e));
+        });
     }
 
     function render() {
@@ -8363,21 +8417,27 @@
             ? txsAfterDate.filter(tx => (tx.name || '').toLowerCase().includes(searchQ))
             : txsAfterDate;
 
+        const txRenderMeta = new Map();
+        txsForFilter.forEach(tx => {
+            txRenderMeta.set(tx, {
+                belongs: txBelongsToSelectedBudget(tx),
+                isPlanned: txIsPlanned(tx),
+                isFixed: txIsFixedLike(tx),
+                isCurrent: txHitsCurrentBalance(tx)
+            });
+        });
+
         const filteredTxs = txsForFilter.filter(tx => {
-            if (!txBelongsToSelectedBudget(tx)) return false;
+            const meta = txRenderMeta.get(tx);
+            if (!meta || !meta.belongs) return false;
             // Adjustment txs only in "שוטף" or "הכל"
             if (tx.isAdjustment) {
                 return state.mainViewFilter === 'all' || state.mainViewFilter === 'current';
             }
-            
-            // Filter by type
-            const isPlanned = txIsPlanned(tx);
-            const isFixed   = txIsFixedLike(tx);
-            const isCurrent = txHitsCurrentBalance(tx);
 
-            if (state.mainViewFilter === 'current' && !isCurrent) return false;
-            if (state.mainViewFilter === 'planned' && !isPlanned) return false;
-            if (state.mainViewFilter === 'fixed'   && !isFixed)   return false;
+            if (state.mainViewFilter === 'current' && !meta.isCurrent) return false;
+            if (state.mainViewFilter === 'planned' && !meta.isPlanned) return false;
+            if (state.mainViewFilter === 'fixed'   && !meta.isFixed)   return false;
 
             // Apply expense category filter (the pill strip filter)
             if (state.activeCategoryFilter) {
@@ -8402,12 +8462,6 @@
             }
             return true;
         });
-        if (state.showAnnualInMain) {
-            const adj = state.transactions.filter(t => t.isAdjustment);
-            console.log('🔍 adjustment txs in state:', adj.length, adj.map(t => ({ name: t.name, amount: t.amount, tag: t.tag, isAdj: t.isAdjustment })));
-            const adjInFiltered = filteredTxs.filter(t => t.isAdjustment);
-            console.log('🔍 adjustment in filteredTxs:', adjInFiltered.length, 'total filtered:', filteredTxs.length, 'paginated:', state.displayedTransactionsCount);
-        }
         const paginatedTxs = (useDatePagination && !searchQ) ? filteredTxs.slice(0, state.displayedTransactionsCount) : filteredTxs;
         const grouped = {};
         paginatedTxs.forEach(tx => {
@@ -14167,9 +14221,6 @@
     // =====================================================
     document.addEventListener('DOMContentLoaded', () => {
         try {
-        // Prefetch USD/ILS rate early (for USD savings display)
-        ensureUsdIlsRate(true).catch(() => {});
-
         // Initialize flatpickr on transaction edit date input
         if (typeof flatpickr !== 'undefined') {
             flatpickr("#editRowDate", {
