@@ -2254,14 +2254,24 @@
             synthetic: false
         }, partial || {});
     }
+    function isTrackingExpenseTx(t) {
+        if (!t || !t.date || t.isVirtual) return false;
+        if (t.isAdjustment || t.category === 'איזון עדכון תקציב') return false;
+        if (t.name === 'תקציב יומי' || (t.name && t.name.startsWith('שינוי תקציב יומי'))) return false;
+        return true;
+    }
+    function getFirstTrackingExpenseDateISO() {
+        if (!state.transactions || !state.transactions.length) return '';
+        const sorted = [...state.transactions].filter(isTrackingExpenseTx)
+            .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
+        return sorted.length ? parseStartDateToISO(sorted[0].date) : '';
+    }
     function getTrackingStartISO() {
+        const fromTx = getFirstTrackingExpenseDateISO();
+        if (fromTx) return fromTx;
         if (state.trackingStartDate) {
             const iso = parseStartDateToISO(state.trackingStartDate);
             if (iso) return iso;
-        }
-        if (state.transactions && state.transactions.length > 0) {
-            const sorted = [...state.transactions].filter(t => t && t.date && !t.isVirtual).sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
-            if (sorted.length) return parseStartDateToISO(sorted[0].date);
         }
         // Do not fall back to dailyBudgetHistory / epoch startDate — those can be g4 rate changes.
         return '';
@@ -2505,6 +2515,16 @@
         }
         return '';
     }
+    function getEpochInclusiveEndISO(startISO) {
+        const s = parseStartDateToISO(startISO);
+        if (!s) return '';
+        const endExclusive = getEpochEndISO(s);
+        const refISO = endExclusive || addOneYearISO(s);
+        if (!refISO) return '';
+        const d = parseLocalDate(refISO);
+        d.setDate(d.getDate() - 1);
+        return localDateToISO(d);
+    }
     function isViewingHistPlannedBudget() {
         const sel = state.selectedBudgetStart || 'active';
         if (sel === 'active' || sel === 'all' || sel === 'future') return false;
@@ -2674,8 +2694,9 @@
     }
 
     function formatDateFromSupabase(isoDate) {
-        // Convert ISO date to DD/MM/YYYY
         if (!isoDate) return '';
+        const raw = String(isoDate).trim();
+        if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return isoToDDMMYYYY(raw.slice(0, 10));
         const d = new Date(isoDate);
         const day = String(d.getDate()).padStart(2, '0');
         const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -2832,36 +2853,31 @@
             localStorage.setItem('expense_history', JSON.stringify(state.transactions));
             localStorage.setItem('cached_balance', state.balance.toString());
 
-            // Tracking start = first real expense. Align the first budget period to that date.
-            if (state.transactions.length > 0) {
-                const sorted = [...state.transactions].filter(t => t && t.date && !t.isVirtual).sort((a, b) =>
-                    parseLocalDate(a.date) - parseLocalDate(b.date)
-                );
-                const firstTxDate = sorted[0] && sorted[0].date;
-                const startDateISO = parseStartDateToISO(firstTxDate);
-                if (startDateISO) {
-                    state.trackingStartDate = startDateISO;
-                    const currentTrack = parseStartDateToISO(state.budget.startDate);
-                    // Keep user_tokens.start_date at tracking start so accumulated מאזן is continuous
-                    if (startDateISO !== currentTrack) {
-                        sbClient.rpc('update_daily_budget', {
-                            p_user_token:   USER_TOKEN,
-                            p_daily_budget: state.budget.g4 / 30,
-                            p_start_date:   startDateISO
-                        }).then(async ({ error }) => {
-                            if (!error) {
-                                state.balance = await fetchBalance();
-                                if (window.calculateClientSideBalance && window.calculateAccumulatedBudget) {
-                                    const acc = window.calculateAccumulatedBudget(new Date());
-                                    if (acc > 0) state.balance = window.calculateClientSideBalance();
-                                }
-                                localStorage.setItem('cached_balance', state.balance.toString());
-                                if (!state._suppressPaint) render();
+            // Tracking start = first real expense (not budget markers). Align epoch after txs load.
+            const startDateISO = getFirstTrackingExpenseDateISO();
+            if (startDateISO) {
+                const prevTrack = parseStartDateToISO(state.trackingStartDate);
+                state.trackingStartDate = startDateISO;
+                const epochChanged = await reconcileBudgetEpochWithTracking();
+                const currentTrack = parseStartDateToISO(state.budget.startDate);
+                if (startDateISO !== currentTrack || startDateISO !== prevTrack) {
+                    sbClient.rpc('update_daily_budget', {
+                        p_user_token:   USER_TOKEN,
+                        p_daily_budget: state.budget.g4 / 30,
+                        p_start_date:   startDateISO
+                    }).then(async ({ error }) => {
+                        if (!error) {
+                            state.balance = await fetchBalance();
+                            if (window.calculateClientSideBalance && window.calculateAccumulatedBudget) {
+                                const acc = window.calculateAccumulatedBudget(new Date());
+                                if (acc > 0) state.balance = window.calculateClientSideBalance();
                             }
-                        });
-                    }
-                    invalidateEpochIndex();
+                            localStorage.setItem('cached_balance', state.balance.toString());
+                            if (!state._suppressPaint) render();
+                        }
+                    });
                 }
+                if (epochChanged) invalidateEpochIndex();
             }
 
             // Allow cleanup to re-run if user manually refreshed
@@ -3410,8 +3426,27 @@
                 type: 'hist_' + r.type,
                 user_token: USER_TOKEN
             }));
-            const { error } = await sbClient.from('budget_settings').insert(histRows);
+            const { data: insertedHist, error } = await sbClient.from('budget_settings').insert(histRows).select('id, category_name, type');
             if (error) throw error;
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            for (let i = 0; i < (insertedHist || []).length; i++) {
+                const histRow = insertedHist[i];
+                const origRow = rows[i];
+                if (!origRow || !histRow) continue;
+                const baseType = String(origRow.type || '');
+                if (baseType === 'savings') {
+                    const meta = (state.budget.savingsMeta || {})[origRow.id] || {};
+                    if (meta.balance > 0 || meta.yield > 0 || meta.currency) {
+                        await window.saveSavingsMetaToDB(histRow.id, { ...meta, last_update: currentMonth });
+                    }
+                } else if (baseType === 'loan') {
+                    const meta = (state.budget.loanMeta || {})[origRow.id] || {};
+                    if (meta.balance > 0 || meta.rate > 0 || meta.months > 0) {
+                        await window.saveLoanMetaToDB(histRow.id, { ...meta, last_update: currentMonth });
+                    }
+                }
+            }
         }
         await persistSystemRow('__hist_g4__:' + iso, iso, safeParseFloat(state.budget.g4) || 0);
     }
@@ -3471,6 +3506,33 @@
         });
     }
 
+    async function deleteHistEpochFromDb(iso) {
+        if (!sbClient || !USER_TOKEN || !iso) return;
+        const prefix = `__hist__:${iso}:`;
+        const { data: rows } = await sbClient
+            .from('budget_settings')
+            .select('id')
+            .eq('user_token', USER_TOKEN)
+            .like('category_name', prefix + '%');
+        if (rows && rows.length) {
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('id', rows.map(r => r.id));
+        }
+        await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).eq('category_name', '__hist_g4__:' + iso);
+        const { data: overrides } = await sbClient
+            .from('budget_settings')
+            .select('id')
+            .eq('user_token', USER_TOKEN)
+            .eq('type', 'system')
+            .eq('parent_group', iso)
+            .like('category_name', '__tx_budget__:%');
+        for (const r of (overrides || [])) {
+            await sbClient.from('budget_settings').delete().eq('id', r.id).eq('user_token', USER_TOKEN);
+            Object.keys(state.txBudgetOverrides || {}).forEach(id => {
+                if (state.txBudgetOverrides[id] === iso) delete state.txBudgetOverrides[id];
+            });
+        }
+    }
+
     function collectHistMapFromEpochs() {
         const histMap = {};
         (state.budgetEpochs || []).forEach(e => {
@@ -3489,6 +3551,149 @@
         const fromISO = histIsos[0];
         retargetHistMap(histMap, fromISO, trackingISO);
         await retargetHistEpochInDb(fromISO, trackingISO);
+    }
+
+    async function alignEarliestDailyBudgetHistory(trackingISO) {
+        const iso = parseStartDateToISO(trackingISO);
+        if (!iso || !sbClient) return false;
+        let history = [...(state.budget.dailyBudgetHistory || [])].sort((a, b) => a.startDate.localeCompare(b.startDate));
+        if (!history.length) return false;
+        let changed = false;
+        const staleBefore = history.filter(h => h.startDate < iso);
+        if (staleBefore.length) {
+            const staleKeys = staleBefore.map(h => `__daily_budget_history__:${h.startDate}`);
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('category_name', staleKeys);
+            history = history.filter(h => h.startDate >= iso);
+            state.budget.dailyBudgetHistory = history;
+            changed = true;
+        }
+        if (!history.length) return changed;
+        const earliest = history[0];
+        if (!earliest || earliest.startDate <= iso) return changed;
+        await insertDailyHistoryAt(iso, earliest.dailyBudget);
+        await sbClient.from('budget_settings').delete()
+            .eq('user_token', USER_TOKEN)
+            .eq('category_name', '__daily_budget_history__:' + earliest.startDate);
+        const staleKeys = history.filter(h => h.startDate < iso).map(h => `__daily_budget_history__:${h.startDate}`);
+        if (staleKeys.length) {
+            await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN).in('category_name', staleKeys);
+        }
+        state.budget.dailyBudgetHistory = [
+            { startDate: iso, dailyBudget: earliest.dailyBudget },
+            ...history.filter(h => h.startDate > earliest.startDate)
+        ];
+        return true;
+    }
+
+    async function reconcileBudgetEpochWithTracking() {
+        const trackingISO = getTrackingStartISO();
+        if (!trackingISO || !isPlausibleEpochISO(trackingISO)) return false;
+
+        const histMap = collectHistMapFromEpochs();
+        let changed = false;
+        let histIsos = Object.keys(histMap).filter(iso => isPlausibleEpochISO(iso)).sort();
+
+        // Hist periods that start before the first real expense are phantom (e.g. rollover before tracking began)
+        for (const iso of histIsos.filter(h => h < trackingISO)) {
+            await deleteHistEpochFromDb(iso);
+            delete histMap[iso];
+            changed = true;
+        }
+        histIsos = Object.keys(histMap).filter(iso => isPlausibleEpochISO(iso)).sort();
+
+        // Hist at the same date as first expense is redundant — the active period should start there
+        for (const iso of histIsos.filter(h => h === trackingISO)) {
+            await deleteHistEpochFromDb(iso);
+            delete histMap[iso];
+            changed = true;
+        }
+        histIsos = Object.keys(histMap).filter(iso => isPlausibleEpochISO(iso)).sort();
+
+        if (histIsos.length && histIsos[0] > trackingISO) {
+            const fromISO = histIsos[0];
+            retargetHistMap(histMap, fromISO, trackingISO);
+            await retargetHistEpochInDb(fromISO, trackingISO);
+            changed = true;
+            histIsos = Object.keys(histMap).filter(iso => isPlausibleEpochISO(iso)).sort();
+        }
+
+        let activeEpochISO;
+        if (!histIsos.length) {
+            activeEpochISO = trackingISO;
+        } else {
+            activeEpochISO = resolveActiveEpochStartISO(
+                histMap,
+                state.budget.epochStart || '',
+                state.budget.startDate || ''
+            ) || trackingISO;
+            const anniversary = addOneYearISO(histIsos[histIsos.length - 1]);
+            if (anniversary && localDateToISO() < anniversary) {
+                activeEpochISO = histIsos[histIsos.length - 1];
+            }
+        }
+
+        const prevEpoch = parseStartDateToISO(state.budget.epochStart);
+        const prevStart = parseStartDateToISO(state.budget.startDate);
+        if (activeEpochISO && (activeEpochISO !== prevEpoch || activeEpochISO !== prevStart)) {
+            await persistEpochStart(activeEpochISO);
+            changed = true;
+        }
+        if (await alignEarliestDailyBudgetHistory(trackingISO)) changed = true;
+
+        const sel = state.selectedBudgetStart;
+        if (sel && sel !== 'active' && sel !== 'all' && sel !== 'future') {
+            const selISO = parseStartDateToISO(sel);
+            if (!selISO || selISO < trackingISO || !histMap[selISO]) {
+                state.selectedBudgetStart = 'active';
+                state.budgetMode = 'active';
+                state.editingBudgetStart = null;
+                localStorage.setItem('selected_budget_period', 'active');
+                changed = true;
+            }
+        }
+
+        state.budget.epochStart = activeEpochISO;
+        state.budget.startDate = isoToDDMMYYYY(activeEpochISO);
+        state.trackingStartDate = trackingISO;
+        rebuildBudgetEpochs(histMap);
+        invalidateEpochIndex();
+        return changed;
+    }
+
+    async function runBudgetTransitionsIfNeeded() {
+        if (!state._transactionsLoaded || _budgetTransitionLock) return;
+        const trackingISO = getTrackingStartISO();
+        if (!trackingISO) return;
+
+        const todayStr = localDateToISO();
+        const futureStartISO = getFutureBudgetStartISO();
+        const activeStart = getActiveEpochStartISO();
+        const anniversary = activeStart ? addOneYearISO(activeStart) : '';
+        if (futureStartISO && todayStr >= futureStartISO) {
+            await window.activateFutureBudget();
+            return;
+        }
+        if (_budgetRolloverAttempted || !anniversary || todayStr < anniversary || !isPlausibleEpochISO(activeStart)) return;
+
+        _budgetRolloverAttempted = true;
+        _budgetTransitionLock = true;
+        try {
+            let start = archiveStartForCurrentPeriod() || activeStart;
+            let guard = 0;
+            while (start && localDateToISO() >= addOneYearISO(start) && guard < 15) {
+                const next = addOneYearISO(start);
+                if (!next || next === start) break;
+                await window.rolloverBudgetYear(start, next);
+                start = next;
+                guard++;
+            }
+            await reconcileBudgetEpochWithTracking();
+        } catch (e) {
+            console.error('budget rollover error:', e);
+        } finally {
+            _budgetTransitionLock = false;
+            try { await window.fetchBudgetData(); } catch (e2) { console.error(e2); }
+        }
     }
 
     function resolveActiveEpochStartISO(histMap, epochRowISO, startDateISO) {
@@ -3702,9 +3907,15 @@
             if (!activeEpochISO) activeEpochISO = trackingISO;
             const prevStored = epochRow ? parseStartDateToISO(epochRow.parent_group) : '';
             const histIsosAfter = Object.keys(histMap).filter(iso => isPlausibleEpochISO(iso)).sort();
-            const shouldPersist = activeEpochISO && activeEpochISO !== prevStored &&
+            let shouldPersist = activeEpochISO && activeEpochISO !== prevStored &&
                 (!histIsosAfter.length || activeEpochISO > histIsosAfter[histIsosAfter.length - 1]);
-            if (shouldPersist) persistEpochStart(activeEpochISO);
+            // First budget: don't lock epoch until first real expense is known
+            if (!histIsosAfter.length && !trackingISO) shouldPersist = false;
+            if (!histIsosAfter.length && trackingISO) {
+                activeEpochISO = trackingISO;
+                shouldPersist = activeEpochISO !== prevStored;
+            }
+            if (shouldPersist) await persistEpochStart(activeEpochISO);
             state.budget.epochStart = activeEpochISO;
             if (activeEpochISO) state.budget.startDate = isoToDDMMYYYY(activeEpochISO);
 
@@ -3776,34 +3987,8 @@
             }
             if (isManual) window.showToast('תקציב סונכרן', 'check');
 
-            // Transitions after first paint so a rollover/activation never blanks the page
-            const todayStr = localDateToISO();
-            const futureStartISO = getFutureBudgetStartISO();
-            const activeStart = getActiveEpochStartISO();
-            const anniversary = activeStart ? addOneYearISO(activeStart) : '';
-            if (!_budgetTransitionLock && futureStartISO && todayStr >= futureStartISO) {
-                setTimeout(() => { window.activateFutureBudget(); }, 500);
-            } else if (!_budgetRolloverAttempted && !_budgetTransitionLock && anniversary && todayStr >= anniversary && isPlausibleEpochISO(activeStart)) {
-                _budgetRolloverAttempted = true;
-                _budgetTransitionLock = true;
-                setTimeout(async () => {
-                    try {
-                        let start = archiveStartForCurrentPeriod() || activeStart;
-                        let guard = 0;
-                        while (start && localDateToISO() >= addOneYearISO(start) && guard < 15) {
-                            const next = addOneYearISO(start);
-                            if (!next || next === start) break;
-                            await window.rolloverBudgetYear(start, next);
-                            start = next;
-                            guard++;
-                        }
-                    } catch (e) {
-                        console.error('budget rollover error:', e);
-                    } finally {
-                        _budgetTransitionLock = false;
-                        try { await window.fetchBudgetData(); } catch (e2) { console.error(e2); }
-                    }
-                }, 500);
+            if (state._transactionsLoaded) {
+                setTimeout(() => { runBudgetTransitionsIfNeeded(); }, 500);
             }
         } catch (e) {
             console.error(e);
@@ -3919,13 +4104,17 @@
         setLoading(true);
         state.displayedTransactionsCount = 30;
         state._suppressPaint = true;
+        state._transactionsLoaded = false;
         try {
             // fetchBudgetData must complete first so dailyBudgetHistory is available
             // before fetchTransactionsOnly calls calculateClientSideBalance
             await window.fetchBudgetData();
             await Promise.all([window.fetchTransactionsOnly(), window.fetchExpenseCategories()]);
+            state._transactionsLoaded = true;
+            await reconcileBudgetEpochWithTracking();
             // Clean up stale budget history entries only if server/client balance mismatch detected
             await cleanupDailyBudgetHistory(window._lastServerBalance ?? state.balance);
+            await runBudgetTransitionsIfNeeded();
             state.isDirty = false;
         } catch (e) {
             console.error(e);
@@ -5087,6 +5276,63 @@
         ]);
     };
 
+    async function loadLoanMetaFromDB(id) {
+        const cached = (state.budget.loanMeta || {})[id];
+        if (cached && (cached.balance > 0 || cached.rate > 0 || cached.months > 0)) return cached;
+        if (!sbClient || !USER_TOKEN || !id) return null;
+        const { data } = await sbClient.from('budget_settings')
+            .select('category_name, budget_amount, parent_group')
+            .eq('user_token', USER_TOKEN)
+            .like('category_name', `__loan_meta__:${id}:%`);
+        if (!data || !data.length) return null;
+        const meta = {};
+        data.forEach(r => {
+            const field = (r.category_name || '').split(':').pop();
+            if (field === 'last_update') meta.last_update = r.parent_group || '';
+            else meta[field] = safeParseFloat(r.budget_amount) || 0;
+        });
+        return (meta.balance > 0 || meta.rate > 0 || meta.months > 0) ? meta : null;
+    }
+
+    async function loadSavingsMetaFromDB(id) {
+        const cached = (state.budget.savingsMeta || {})[id];
+        if (cached && (cached.balance > 0 || cached.yield > 0 || cached.currency)) return cached;
+        if (!sbClient || !USER_TOKEN || !id) return null;
+        const { data } = await sbClient.from('budget_settings')
+            .select('category_name, budget_amount, parent_group')
+            .eq('user_token', USER_TOKEN)
+            .like('category_name', `__savings_meta__:${id}:%`);
+        if (!data || !data.length) return null;
+        const meta = {};
+        data.forEach(r => {
+            const field = (r.category_name || '').split(':').pop();
+            if (field === 'last_update' || field === 'initial_date' || field === 'currency') {
+                meta[field] = r.parent_group || '';
+            } else {
+                meta[field] = safeParseFloat(r.budget_amount) || 0;
+            }
+        });
+        return (meta.balance > 0 || meta.yield > 0 || meta.currency) ? meta : null;
+    }
+
+    async function copyEpochMetaToInsertedRows(sourceEpoch, insertedRows) {
+        if (!insertedRows || !insertedRows.length || !sourceEpoch) return;
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        for (const row of insertedRows.filter(r => r.type === 'loan')) {
+            const sourceItem = (sourceEpoch.loans || []).find(s => s.category_name === row.category_name);
+            if (!sourceItem) continue;
+            const meta = await loadLoanMetaFromDB(sourceItem.id);
+            if (meta) await window.saveLoanMetaToDB(row.id, { ...meta, last_update: currentMonth });
+        }
+        for (const row of insertedRows.filter(r => r.type === 'savings')) {
+            const sourceItem = (sourceEpoch.savings || []).find(s => s.category_name === row.category_name);
+            if (!sourceItem) continue;
+            const meta = await loadSavingsMetaFromDB(sourceItem.id);
+            if (meta) await window.saveSavingsMetaToDB(row.id, { ...meta, last_update: currentMonth });
+        }
+    }
+
     window.deleteBudgetItem = async function() {
         if (!sbClient || !state.pendingBudgetItem) return;
         const { item, itemId } = state.pendingBudgetItem;
@@ -5688,8 +5934,9 @@
                 .in('type', ['income', 'fixed', 'annual', 'savings', 'loan']);
             if (deleteError) throw deleteError;
             if (rows.length) {
-                const { error: insertError } = await sbClient.from('budget_settings').insert(rows);
+                const { data: insertedRows, error: insertError } = await sbClient.from('budget_settings').insert(rows).select('id, category_name, type');
                 if (insertError) throw insertError;
+                await copyEpochMetaToInsertedRows(previous, insertedRows);
             }
             await persistSystemRow('__g4__', null, previousG4);
             await insertDailyHistoryAt(activeStartISO, previousG4 / 30);
@@ -5737,8 +5984,9 @@
                 .in('type', ['income', 'fixed', 'annual', 'savings', 'loan']);
             if (deleteActiveError) throw deleteActiveError;
             if (rows.length) {
-                const { error: insertActiveError } = await sbClient.from('budget_settings').insert(rows);
+                const { data: insertedRows, error: insertActiveError } = await sbClient.from('budget_settings').insert(rows).select('id, category_name, type');
                 if (insertActiveError) throw insertActiveError;
+                await copyEpochMetaToInsertedRows(previous, insertedRows);
             }
 
             const histPrefix = `__hist__:${previousStartISO}:`;
@@ -10061,6 +10309,7 @@
         const startISO = getPlannedEpochStartISO();
         const isHist = isViewingHistPlannedBudget();
         const epochEndISO = getEpochEndISO(startISO);
+        const epochInclusiveEndISO = getEpochInclusiveEndISO(startISO);
         const monthsPassed = countReserveMonths(startISO);
 
         const monthlySetAside = annualTotal / 12;
@@ -10081,7 +10330,7 @@
             }
             return s;
         }, 0);
-        return { monthsPassed, annualTotal, monthlySetAside, totalAccruedBudget, actualSpent, reserve: totalAccruedBudget - actualSpent, isHist, epochEndISO, startISO };
+        return { monthsPassed, annualTotal, monthlySetAside, totalAccruedBudget, actualSpent, reserve: totalAccruedBudget - actualSpent, isHist, epochEndISO, epochInclusiveEndISO, startISO };
     }
 
     // פונקציית עזר: האם תנועה שייכת לקטגוריה מתוכננת?
@@ -10105,13 +10354,11 @@
             const valEl = document.getElementById('annualReserveValue');
             const badgeEl = document.getElementById('reserveStatusBadge');
             const reserveLabel = document.getElementById('annualReserveLabel');
-            const { reserve, isHist, epochEndISO, startISO } = reserveDetails;
+            const { reserve, isHist, epochInclusiveEndISO, startISO } = reserveDetails;
             if (reserveLabel) {
                 let label = 'שריון בצד (יתרה מצטברת)';
                 if (isHist && startISO) {
-                    const endPart = epochEndISO
-                        ? isoToDDMMYYYY(epochEndISO)
-                        : (addOneYearISO(startISO) ? isoToDDMMYYYY(addOneYearISO(startISO)) : '');
+                    const endPart = epochInclusiveEndISO ? isoToDDMMYYYY(epochInclusiveEndISO) : '';
                     label += endPart ? ` · תקופה עד ${endPart}` : ' · תקציב קודם';
                 }
                 reserveLabel.textContent = label;
@@ -11013,9 +11260,9 @@
         const details = calculateAnnualReserveDetails();
         const content = document.getElementById('explainContent'), overlay = document.getElementById('explainOverlay');
         if (!details || !content || !overlay) return;
-        const { monthsPassed, monthlySetAside, totalAccruedBudget, actualSpent, reserve, isHist, epochEndISO, startISO } = details;
+        const { monthsPassed, monthlySetAside, totalAccruedBudget, actualSpent, reserve, isHist, epochInclusiveEndISO, startISO } = details;
         const periodNote = isHist && startISO
-            ? `<p class="text-[10px] text-indigo-600 font-bold">תקציב קודם${epochEndISO ? ` · חישוב עד ${isoToDDMMYYYY(epochEndISO)}` : ''} (עד ${monthsPassed} חודשים)</p>`
+            ? `<p class="text-[10px] text-indigo-600 font-bold">תקציב קודם${epochInclusiveEndISO ? ` · חישוב עד ${isoToDDMMYYYY(epochInclusiveEndISO)}` : ''} (עד ${monthsPassed} חודשים)</p>`
             : `<p class="text-[10px] text-slate-400">חישוב לפי ${monthsPassed} חודשים מתחילת התקופה (מקסימום 12)</p>`;
         content.innerHTML = `
             <div class="space-y-4">
