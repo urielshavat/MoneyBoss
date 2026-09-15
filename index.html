@@ -2204,16 +2204,43 @@
         const c = s.replace(/[^\d.-]/g, '');
         return parseFloat(c) || 0;
     }
-    function parseLocalDate(s) {
-        if (!s) return new Date();
+    const _parseLocalDateMsCache = Object.create(null);
+    const _parseStartDateToISOCache = Object.create(null);
+
+    function parseLocalDateMs(s) {
+        if (!s) return Date.now();
         const str = String(s).trim();
-        if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-            const p = str.slice(0, 10).split('-');
-            return new Date(+p[0], +p[1] - 1, +p[2]);
+        let ms = _parseLocalDateMsCache[str];
+        if (ms === undefined) {
+            if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+                const p = str.slice(0, 10).split('-');
+                ms = new Date(+p[0], +p[1] - 1, +p[2]).getTime();
+            } else {
+                const p = str.split('/');
+                if (p.length === 3) ms = new Date(+p[2], +p[1] - 1, +p[0]).getTime();
+                else ms = new Date(str).getTime();
+            }
+            _parseLocalDateMsCache[str] = ms;
         }
-        const p = str.split('/');
-        if (p.length === 3) return new Date(p[2], p[1] - 1, p[0]);
-        return new Date(str);
+        return ms;
+    }
+
+    function parseLocalDate(s) {
+        return new Date(parseLocalDateMs(s));
+    }
+
+    function txDateMs(tx) {
+        if (!tx) return 0;
+        if (tx._dateMs != null) return tx._dateMs;
+        const ms = parseLocalDateMs(tx.date);
+        tx._dateMs = ms;
+        return ms;
+    }
+
+    function ensureTxDateMsList(txs) {
+        (txs || []).forEach(tx => {
+            if (tx && tx._dateMs == null && tx.date) tx._dateMs = parseLocalDateMs(tx.date);
+        });
     }
     function localDateToISO(d = new Date()) {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -2221,12 +2248,18 @@
     function parseStartDateToISO(s) {
         if (!s) return '';
         const str = String(s).trim();
-        if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
-        const p = str.split('/');
-        if (p.length === 3 && p[0] && p[1] && p[2]) {
-            return `${String(p[2]).padStart(4, '0')}-${String(p[1]).padStart(2, '0')}-${String(p[0]).padStart(2, '0')}`;
+        const cached = _parseStartDateToISOCache[str];
+        if (cached !== undefined) return cached;
+        let iso = '';
+        if (/^\d{4}-\d{2}-\d{2}/.test(str)) iso = str.slice(0, 10);
+        else {
+            const p = str.split('/');
+            if (p.length === 3 && p[0] && p[1] && p[2]) {
+                iso = `${String(p[2]).padStart(4, '0')}-${String(p[1]).padStart(2, '0')}-${String(p[0]).padStart(2, '0')}`;
+            }
         }
-        return '';
+        _parseStartDateToISOCache[str] = iso;
+        return iso;
     }
     function isoToDDMMYYYY(iso) {
         if (!iso) return '';
@@ -2264,11 +2297,29 @@
         if (t.name === 'תקציב יומי' || (t.name && t.name.startsWith('שינוי תקציב יומי'))) return false;
         return true;
     }
+    let _firstTrackCache = { ref: null, iso: '' };
+
     function getFirstTrackingExpenseDateISO() {
-        if (!state.transactions || !state.transactions.length) return '';
-        const sorted = [...state.transactions].filter(isTrackingExpenseTx)
-            .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
-        return sorted.length ? parseStartDateToISO(sorted[0].date) : '';
+        const txs = state.transactions;
+        if (_firstTrackCache.ref === txs) return _firstTrackCache.iso;
+        if (!txs || !txs.length) {
+            _firstTrackCache = { ref: txs, iso: '' };
+            return '';
+        }
+        let minMs = Infinity;
+        let minDate = '';
+        for (let i = 0; i < txs.length; i++) {
+            const tx = txs[i];
+            if (!isTrackingExpenseTx(tx)) continue;
+            const ms = txDateMs(tx);
+            if (ms < minMs) {
+                minMs = ms;
+                minDate = tx.date;
+            }
+        }
+        const iso = minDate ? parseStartDateToISO(minDate) : '';
+        _firstTrackCache = { ref: txs, iso };
+        return iso;
     }
     function getTrackingStartISO() {
         const fromTx = getFirstTrackingExpenseDateISO();
@@ -2839,7 +2890,8 @@
             ]);
             if (txRes.error) throw txRes.error;
             state.transactions = (txRes.data || []).map(mapSupabaseTx);
-            
+            ensureTxDateMsList(state.transactions);
+
             // Keep the raw server balance for the mismatch check in cleanupDailyBudgetHistory
             window._lastServerBalance = balance;
             state.balance = balance;
@@ -2885,12 +2937,14 @@
             const sep = rawCategory.indexOf(' > ');
             tag = sep !== -1 ? rawCategory.slice(sep + 3).trim() : rawCategory;
         }
+        const date = formatDateFromSupabase(t.created_at);
         return {
             row: t.id,
             id: t.id,
             name: t.name,
             amount: t.amount,
-            date: formatDateFromSupabase(t.created_at),
+            date,
+            _dateMs: parseLocalDateMs(date),
             time: new Date(t.created_at).toLocaleTimeString('he-IL'),
             tag,
             isAdjustment,
@@ -8198,6 +8252,7 @@
 
     function showCachedUIIfAvailable() {
         if (!hasCachedAppData()) return;
+        ensureTxDateMsList(state.transactions);
         try { render(); } catch (e) { console.error('cached render error:', e); }
         revealApp();
     }
@@ -8267,6 +8322,8 @@
         const cycleStart = cycle.startDate;
         const cycleEnd = cycle.endDate;
         const cycleTotalDays = Math.round((cycleEnd - cycleStart) / (1000 * 3600 * 24)) + 1;
+        const cycleStartMs = cycleStart.getTime();
+        const cycleEndMs = cycleEnd.getTime();
 
         const balVal = formatDisplayAmount(state.balance);
         const dailyVal = (safeParseFloat(state.budget.g4) || 0) / 30;
@@ -8274,8 +8331,8 @@
         // Month total for current (flexible) spending
         const currentSpent = state.transactions.reduce((acc, tx) => {
             if (tx.isAdjustment) return acc;
-            const d = parseLocalDate(tx.date);
-            if (d < cycleStart || d > cycleEnd) return acc;
+            const dMs = txDateMs(tx);
+            if (dMs < cycleStartMs || dMs > cycleEndMs) return acc;
             if (!txHitsCurrentBalance(tx)) return acc;
             return acc + safeParseFloat(tx.amount);
         }, 0);
@@ -8567,21 +8624,20 @@
             const allTxsSorted = [...state.transactions]
                 .filter(tx => txHitsCurrentBalance(tx))
                 .sort((a, b) => {
-                    const da = parseLocalDate(a.date);
-                    const db = parseLocalDate(b.date);
-                    if (da.getTime() !== db.getTime()) {
-                        return db - da;
-                    }
+                    const da = txDateMs(a);
+                    const db = txDateMs(b);
+                    if (da !== db) return db - da;
                     return (b.row || 0) - (a.row || 0);
                 });
             const today = new Date();
             today.setHours(0,0,0,0);
+            const todayMs = today.getTime();
             
             let currentDateLocal = new Date(today);
             if (allTxsSorted.length > 0) {
-                const newestTxDate = parseLocalDate(allTxsSorted[0].date);
-                if (newestTxDate > currentDateLocal) {
-                    currentDateLocal = new Date(newestTxDate);
+                const newestTxMs = txDateMs(allTxsSorted[0]);
+                if (newestTxMs > todayMs) {
+                    currentDateLocal = new Date(newestTxMs);
                 }
             }
             
@@ -8597,9 +8653,10 @@
             window._dbgWalkStartBal = walkStartBalance;
             window._dbgWalkToday = new Date(currentDateLocal);
             allTxsSorted.forEach(tx => {
-                const txDate = parseLocalDate(tx.date);
+                const txDateMsVal = txDateMs(tx);
+                const txDate = new Date(txDateMsVal);
                 
-                if (currentDateLocal > txDate) {
+                if (currentDateLocal.getTime() > txDateMsVal) {
                     // Use calculateAccumulatedBudget for gap: acc(A) - acc(B).
                     // This mirrors the exact formula used to compute state.balance, so the
                     // backward walk arrives at acc(firstTxDate) on the first day (= 42 for 09/06).
