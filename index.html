@@ -245,7 +245,6 @@
                     <button onclick="window.setMainViewFilter('current')" id="filterCurrentBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
                     <button onclick="window.setMainViewFilter('planned')" id="filterPlannedBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all text-slate-400">מתוכנן</button>
                     <button onclick="window.setMainViewFilter('fixed')" id="filterFixedBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
-                    <button onclick="window.setMainViewFilter('all')" id="filterAllBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all text-slate-400">הכל</button>
                 </div>
             </div>
 
@@ -1036,7 +1035,6 @@
 
     <div id="addExpenseOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-            <h3 class="text-lg font-bold text-slate-900 mb-6 text-center">תיעוד הוצאה חדשה</h3>
             <form id="expenseFormModal" onsubmit="window.handleAddExpense(event)" class="space-y-4">
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -1059,7 +1057,7 @@
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תאריך</label>
-                        <input type="text" id="addExpenseDateInput" placeholder="dd/mm/yyyy" class="appearance-none bg-white border border-slate-200 w-full px-2 py-0 rounded-xl text-[11px] font-bold text-slate-700 h-[48px] leading-[48px] text-center outline-none">
+                        <input type="text" id="addExpenseDateInput" placeholder="dd/mm/yyyy" class="input-field w-full px-4 py-0 rounded-xl h-[48px] text-center">
                     </div>
                 </div>
                 <div>
@@ -1114,7 +1112,6 @@
     <!-- Edit Row Modal -->
     <div id="editRowOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 class="text-lg font-bold text-slate-900 mb-5 text-center">עריכת הוצאה</h3>
             <div class="space-y-3">
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -1137,19 +1134,26 @@
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תאריך</label>
-                        <input type="text" id="editRowDate" placeholder="dd/mm/yyyy" class="appearance-none bg-white border border-slate-200 w-full px-2 py-0 rounded-xl text-[11px] font-bold text-slate-700 h-[48px] leading-[48px] text-center">
+                        <input type="text" id="editRowDate" placeholder="dd/mm/yyyy" class="input-field w-full px-4 py-0 rounded-xl h-[48px] text-center">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">סוג הוצאה</label>
-                    <div id="editExpenseBudgetPickerWrap" class="hidden mb-3">
-                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">תקופת תקציב</label>
-                        <select id="editExpenseBudgetSelect" onchange="window.onEditExpenseBudgetChange()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 text-right outline-none"></select>
+                    <div class="flex items-center justify-between gap-3 mb-1 mr-1">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">סוג הוצאה</label>
+                        <label id="editExpenseBudgetLabel" class="hidden text-[10px] font-bold text-slate-400 uppercase">תקופת תקציב</label>
                     </div>
-                    <div class="flex bg-slate-100 p-1 rounded-xl mb-3">
-                        <button type="button" id="editCatTypeCurrentBtn" onclick="window.setEditCategoryType('current')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
-                        <button type="button" id="editCatTypeFixedBtn" onclick="window.setEditCategoryType('fixed')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
-                        <button type="button" id="editCatTypePlannedBtn" onclick="window.setEditCategoryType('planned')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">מתוכנן</button>
+                    <div class="flex items-stretch gap-3 mb-3">
+                        <div class="flex-1 min-w-0 flex bg-slate-100 p-1 rounded-xl">
+                            <button type="button" id="editCatTypeCurrentBtn" onclick="window.setEditCategoryType('current')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
+                            <button type="button" id="editCatTypeFixedBtn" onclick="window.setEditCategoryType('fixed')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
+                            <button type="button" id="editCatTypePlannedBtn" onclick="window.setEditCategoryType('planned')" class="flex-1 py-2 text-[10px] font-bold rounded-lg transition-all text-slate-400">מתוכנן</button>
+                        </div>
+                        <div id="editExpenseBudgetBtnWrap" class="hidden flex-shrink-0 relative flex bg-slate-100 p-1 rounded-xl">
+                            <div class="py-2 px-3 text-[10px] font-bold rounded-lg text-slate-400 whitespace-nowrap pointer-events-none">
+                                <span id="editExpenseBudgetBtnLabel">תקופה</span>
+                            </div>
+                            <select id="editExpenseBudgetSelect" onchange="window.onEditExpenseBudgetChange()" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" aria-label="תקופת תקציב"></select>
+                        </div>
                     </div>
                     <input type="hidden" id="editCategoryTypeInput" value="current">
 
@@ -2806,7 +2810,7 @@
         dirtyBudgetItems: {},
         isDirty: true,
         showAnnualInMain: false,
-        mainViewFilter: 'current', // 'all', 'current', 'fixed', 'planned'
+        mainViewFilter: 'current', // 'current', 'fixed', 'planned'
         statsFilter: 'current',    // 'current', 'fixed', 'planned'
         isPrivacyMode: localStorage.getItem('isPrivacyMode') === 'true',
         showZeroSections: { income: false, fixed: false, annual: false, savings: false, loan: false },
@@ -6565,14 +6569,6 @@
 
         const filter = state.mainViewFilter;
 
-        // Requirement: Categories should not appear when the selector is on "All"
-        if (filter === 'all') {
-            summarySection.classList.add('hidden');
-            const nudge = document.getElementById('noCategoriesNudge');
-            if (nudge) nudge.classList.add('hidden');
-            return;
-        }
-
         let catsShown = [];
         const monthStart = currentMonthStart();
         const monthEnd = currentMonthEnd();
@@ -6604,7 +6600,7 @@
         if (nudge) nudge.classList.add('hidden');
 
         // 2. Update View Switcher Button Appearances
-        ['current', 'planned', 'fixed', 'all'].forEach(f => {
+        ['current', 'planned', 'fixed'].forEach(f => {
             const btn = document.getElementById(`filter${f.charAt(0).toUpperCase() + f.slice(1)}Btn`);
             if (btn) {
                 if (filter === f) {
@@ -6654,13 +6650,11 @@
         state.viewCategoryColors = {}; 
         
         // Sort catsShown by spent amount descending
-        if (filter !== 'all') {
-            catsShown.sort((a, b) => {
-                const keyA = a.$type + ':' + (a.id || a.category_name);
-                const keyB = b.$type + ':' + (b.id || b.category_name);
-                return (totals[keyB] || 0) - (totals[keyA] || 0);
-            });
-        }
+        catsShown.sort((a, b) => {
+            const keyA = a.$type + ':' + (a.id || a.category_name);
+            const keyB = b.$type + ':' + (b.id || b.category_name);
+            return (totals[keyB] || 0) - (totals[keyA] || 0);
+        });
         
         // Calculate max label width for the current view to align bars
         let maxChars = 15;
@@ -8486,7 +8480,7 @@
                     </div>
                 `;
             } else {
-                // fixed or all
+                // fixed
                 headerRow.innerHTML = '';
                 headerRow.classList.add('hidden');
                 if (sep) sep.classList.add('hidden');
@@ -8519,12 +8513,11 @@
         const filteredTxs = txsForFilter.filter(tx => {
             const meta = txRenderMeta.get(tx);
             if (!meta || !meta.belongs) return false;
-            // Adjustment txs only in "שוטף" or "הכל"
+            // Adjustment txs only in "שוטף"
             if (tx.isAdjustment) {
-                return state.mainViewFilter === 'all' || state.mainViewFilter === 'current';
+                return state.mainViewFilter === 'current';
             }
 
-            if (state.mainViewFilter === 'current' && !meta.isCurrent) return false;
             if (state.mainViewFilter === 'planned' && !meta.isPlanned) return false;
             if (state.mainViewFilter === 'fixed'   && !meta.isFixed)   return false;
 
@@ -8556,7 +8549,10 @@
         paginatedTxs.forEach(tx => {
             grouped[tx.date] = grouped[tx.date] || { items: [], total: 0 };
             grouped[tx.date].items.push(tx);
-            grouped[tx.date].total += safeParseFloat(tx.amount);
+            // Daily header totals count only שוטף expenses (not fixed/planned)
+            if (tx.isVirtual || txHitsCurrentBalance(tx)) {
+                grouped[tx.date].total += safeParseFloat(tx.amount);
+            }
         });
 
         // Inject virtual "תקציב יומי" income entries (Phase 1 — frontend only, no DB).
@@ -8833,7 +8829,11 @@
                 let textContent = onlyMarkers ? '' : `${sign}₪${displayTotal.toLocaleString()}`;
                 if (!onlyMarkers && state.mainViewFilter === 'current') {
                     const dailyBal = dailyBalanceMap[date] !== undefined ? dailyBalanceMap[date] : state.balance;
-                    textContent = `${sign}₪${displayTotal.toLocaleString()} | ₪${Math.round(formatDisplayAmount(dailyBal)).toLocaleString()}`;
+                    const balStr = `₪${Math.round(formatDisplayAmount(dailyBal)).toLocaleString()}`;
+                    // Show expense total only when שוטף activity exists; fixed/planned don't affect header
+                    textContent = g.total !== 0
+                        ? `${sign}₪${displayTotal.toLocaleString()} | ${balStr}`
+                        : balStr;
                 }
                 
                 h.innerHTML = `<span>${date}</span><span class="ltr-num">${textContent}</span>`;
@@ -8942,8 +8942,8 @@
             }
 
             let style = '';
-            if (filter === 'all') {
-                // All view: dark gray tags
+            if (filter === 'current') {
+                // שוטף view: gray tags for fixed/planned (like former "הכל" view)
                 style = `style="background:#f1f5f9; color:#475569; border: 1px solid #e2e8f0"`;
             } else if (cat) {
                  const isFixedCat = (budgetForTag.fixed || []).some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name)
@@ -9828,10 +9828,10 @@
     };
 
     window.setMainViewFilter = function(filter) {
+        if (filter === 'all') filter = 'current';
         state.mainViewFilter = filter;
         state.activeCategoryFilter = null; // Clear category filter when switching view types
         const btns = {
-            all: document.getElementById('filterAllBtn'),
             current: document.getElementById('filterCurrentBtn'),
             fixed: document.getElementById('filterFixedBtn'),
             planned: document.getElementById('filterPlannedBtn')
@@ -10114,30 +10114,59 @@
         render();
     };
 
-    function fillExpenseBudgetSelect(selectId, wrapId, currentKey, dateStr) {
+    function formatEpochDateDDMYY(iso) {
+        if (!iso) return 'תקופה';
+        const parts = iso.split('-');
+        if (parts.length !== 3) return 'תקופה';
+        const day = parseInt(parts[2], 10);
+        const month = parseInt(parts[1], 10);
+        const year = parts[0].slice(-2);
+        if (!day || !month) return 'תקופה';
+        return `${day}/${month}/${year}`;
+    }
+
+    function updateEditExpenseBudgetBtnLabel(epochKey) {
+        const label = document.getElementById('editExpenseBudgetBtnLabel');
+        if (!label) return;
+        const epochs = listBudgetEpochs();
+        const ep = epochs.find(e => (e.startDate || (e.kind === 'future' ? 'future' : '')) === epochKey);
+        if (ep) {
+            const startISO = ep.kind === 'future' ? getFutureBudgetStartISO() : parseStartDateToISO(ep.startDate);
+            label.textContent = formatEpochDateDDMYY(startISO);
+        } else {
+            label.textContent = 'תקופה';
+        }
+    }
+
+    function fillExpenseBudgetSelect(selectId, btnWrapId, currentKey, dateStr) {
         const sel = document.getElementById(selectId);
-        const wrap = document.getElementById(wrapId);
+        const btnWrap = document.getElementById(btnWrapId);
+        const budgetLabel = document.getElementById('editExpenseBudgetLabel');
         if (!sel) return '';
         const epochs = listBudgetEpochs();
         const inferred = inferBudgetStartFromDate(dateStr || localDateToISO());
         const options = epochs.filter(e => e.startDate || e.kind === 'future');
         if (options.length <= 1) {
-            if (wrap) wrap.classList.add('hidden');
+            if (btnWrap) btnWrap.classList.add('hidden');
+            if (budgetLabel) budgetLabel.classList.add('hidden');
             return inferred || getActiveEpochStartISO();
         }
-        if (wrap) wrap.classList.remove('hidden');
+        if (btnWrap) btnWrap.classList.remove('hidden');
+        if (budgetLabel) budgetLabel.classList.remove('hidden');
         const chosen = currentKey || inferred || getActiveEpochStartISO();
         sel.innerHTML = options.map(e => {
             const key = e.startDate || (e.kind === 'future' ? 'future' : '');
             const selected = key === chosen ? ' selected' : '';
             return `<option value="${key}"${selected}>${formatEpochMenuLabel(e)}</option>`;
         }).join('');
+        updateEditExpenseBudgetBtnLabel(chosen);
         return chosen;
     }
 
     window.onEditExpenseBudgetChange = function() {
         const sel = document.getElementById('editExpenseBudgetSelect');
         state.editExpenseBudgetStart = sel ? sel.value : '';
+        updateEditExpenseBudgetBtnLabel(state.editExpenseBudgetStart);
         window.populateEditRowCategoryPicker(null, null, true);
     };
 
@@ -10642,11 +10671,7 @@
         }
         window.setEditTxType(safeParseFloat(tx.amount) < 0 ? 'income' : 'expense');
         if (eDateInp && tx.date) {
-            if (eDateInp._flatpickr) {
-                eDateInp._flatpickr.setDate(tx.date, true, "d/m/Y");
-            } else {
-                eDateInp.value = tx.date;
-            }
+            initExpenseDatePicker(eDateInp, tx.date);
         }
 
         if (expInpEdit) expInpEdit.value = tx.expense_category_id || '';
@@ -10659,7 +10684,7 @@
         if (isPlanned) initialType = 'planned';
         else if (isFixed) initialType = 'fixed';
         
-        state.editExpenseBudgetStart = fillExpenseBudgetSelect('editExpenseBudgetSelect', 'editExpenseBudgetPickerWrap', getTxBudgetStart(tx), tx.date);
+        state.editExpenseBudgetStart = fillExpenseBudgetSelect('editExpenseBudgetSelect', 'editExpenseBudgetBtnWrap', getTxBudgetStart(tx), tx.date);
 
         window.setEditCategoryType(initialType);
 
@@ -10685,7 +10710,10 @@
         }
     };
 
-    window.closeEditRowModal = () => { const o = document.getElementById('editRowOverlay'); if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); } };
+    window.closeEditRowModal = () => {
+        const o = document.getElementById('editRowOverlay');
+        if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
+    };
     window.initTagModalByRow = (row) => { state.pendingActionRow = { row }; window.initTagModal(); };
 
     window.handleDeleteByRow = (row) => {
@@ -14219,9 +14247,36 @@
         const o = document.getElementById('budgetHelpOverlay');
         if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
     };
+    function initExpenseDatePicker(inputEl, dateVal) {
+        if (!inputEl) return;
+        let d;
+        if (dateVal instanceof Date) {
+            d = dateVal;
+        } else if (dateVal) {
+            d = parseLocalDate(dateVal);
+            if (!(d instanceof Date) || isNaN(d.getTime())) d = new Date();
+        } else {
+            d = new Date();
+        }
+        const dateStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+        try {
+            if (inputEl._flatpickr) inputEl._flatpickr.destroy();
+            if (typeof flatpickr !== 'undefined') {
+                const fp = flatpickr(inputEl, {
+                    dateFormat: 'd/m/Y',
+                    locale: 'he',
+                    maxDate: 'today',
+                    disableMobile: true,
+                    allowInput: true
+                });
+                fp.setDate(d, true, 'd/m/Y');
+            }
+        } catch (e) { /* flatpickr unavailable */ }
+        inputEl.value = dateStr;
+    }
+
     window.openAddExpenseModal = (prefillType, prefillCatName, prefillCatId, prefillName) => {
         try {
-            const now = new Date();
             window.setTxType('expense');
             window.setCategoryType(prefillType || 'current');
             // After setCategoryType populates the picker with no selection, re-populate with prefill
@@ -14236,21 +14291,17 @@
         } catch(e) { console.warn('picker init error:', e); }
         const nameInp = document.getElementById('nameInput');
         if (nameInp) nameInp.value = prefillName || '';
-        // Initialize date picker with today's date
         const dateInp = document.getElementById('addExpenseDateInput');
-        if (dateInp) {
-            const now = new Date();
-            const todayStr = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
-            // Destroy any stale flatpickr instance (form.reset() leaves it empty) and recreate
-            try {
-                if (dateInp._flatpickr) dateInp._flatpickr.destroy();
-                flatpickr(dateInp, { dateFormat: 'd/m/Y', maxDate: 'today', defaultDate: now });
-            } catch(e2) { /* flatpickr unavailable */ }
-            // Always set text value as fallback (also fixes flatpickr clearing on init)
-            dateInp.value = todayStr;
-        }
+        const today = new Date();
         const o = document.getElementById('addExpenseOverlay');
-        if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
+        if (o) {
+            o.classList.remove('hidden');
+            // Init date after modal is visible — iOS Safari clears hidden inputs
+            setTimeout(() => {
+                o.classList.add('opacity-100');
+                initExpenseDatePicker(dateInp, today);
+            }, 10);
+        }
     };
     window.closeAddExpenseModal = () => { const o = document.getElementById('addExpenseOverlay'); if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); } };
 
@@ -14311,13 +14362,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         try {
         // Initialize flatpickr on transaction edit date input
-        if (typeof flatpickr !== 'undefined') {
-            flatpickr("#editRowDate", {
-                dateFormat: "d/m/Y",
-                locale: "he",
-                disableMobile: true
-            });
-        }
+        initExpenseDatePicker(document.getElementById('editRowDate'));
 
         // Init Supabase — use stored override or fallback to hardcoded
         const storedUrl = localStorage.getItem('supabase_url') || SUPABASE_URL;
