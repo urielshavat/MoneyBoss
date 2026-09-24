@@ -499,10 +499,7 @@
                             </div>
                         </div>
                         <div class="flex justify-between items-center px-1">
-                            <div class="flex flex-col gap-0.5">
-                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">יום תחילת חודש תקציבי</span>
-                                <span id="cycleStartOshHint" class="text-[9px] text-slate-400 font-semibold hidden">גם יום חיוב האשראי (לחישוב יתרת עו״ש)</span>
-                            </div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">יום תחילת חודש תקציבי</span>
                             <div class="flex gap-2 items-center">
                                 <div class="bg-slate-50 rounded-lg border border-slate-200 flex items-center px-2 py-1.5">
                                     <select id="cycleStartDaySelect" onchange="window.checkCycleStartDayChange()" class="bg-transparent border-none text-slate-800 font-bold text-xs text-right outline-none p-0 cursor-pointer">
@@ -546,6 +543,41 @@
                         </div>
                         <div id="oshSettingsFields" class="hidden pt-1 px-1">
                             <div class="flex flex-wrap items-center justify-end gap-2">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-[10px] font-bold text-slate-400 whitespace-nowrap">יום חיוב אשראי</span>
+                                    <div class="bg-slate-50 rounded-lg border border-slate-200 flex items-center px-2 py-1.5">
+                                        <select id="oshCreditDaySelect" onchange="window.checkOshSettingsChange()" class="bg-transparent border-none text-slate-800 font-bold text-xs text-right outline-none p-0 cursor-pointer">
+                                            <option value="1">1</option>
+                                            <option value="2">2</option>
+                                            <option value="3">3</option>
+                                            <option value="4">4</option>
+                                            <option value="5">5</option>
+                                            <option value="6">6</option>
+                                            <option value="7">7</option>
+                                            <option value="8">8</option>
+                                            <option value="9">9</option>
+                                            <option value="10">10</option>
+                                            <option value="11">11</option>
+                                            <option value="12">12</option>
+                                            <option value="13">13</option>
+                                            <option value="14">14</option>
+                                            <option value="15">15</option>
+                                            <option value="16">16</option>
+                                            <option value="17">17</option>
+                                            <option value="18">18</option>
+                                            <option value="19">19</option>
+                                            <option value="20">20</option>
+                                            <option value="21">21</option>
+                                            <option value="22">22</option>
+                                            <option value="23">23</option>
+                                            <option value="24">24</option>
+                                            <option value="25">25</option>
+                                            <option value="26">26</option>
+                                            <option value="27">27</option>
+                                            <option value="28">28</option>
+                                        </select>
+                                    </div>
+                                </div>
                                 <div class="flex items-center gap-1.5">
                                     <span class="text-[10px] font-bold text-slate-400 whitespace-nowrap">יום כניסת משכורת</span>
                                     <div class="bg-slate-50 rounded-lg border border-slate-200 flex items-center px-2 py-1.5">
@@ -1479,7 +1511,7 @@
                     <ul class="text-xs space-y-1.5 mr-3" style="list-style:disc">
                         <li><b>יתרה לפני משכורת</b> — מההיסטוריה בבנק, היתרה ביום שלפני כניסת המשכורת האחרונה</li>
                         <li><b>יום כניסת משכורת</b> — היום בחודש שבו נכנסת המשכורת</li>
-                        <li><b>יום תחילת חודש תקציבי</b> — משמש גם כיום חיוב האשראי לחישוב</li>
+                        <li><b>יום חיוב אשראי</b> — היום בחודש שבו יורד חיוב האשראי (נפרד מיום תחילת חודש תקציבי)</li>
                     </ul>
                 </div>
 
@@ -2258,7 +2290,7 @@
         state.transactions = [];
         state.balance = 0;
         state.budget = { incomes: [], fixed: [], annual: [], g4: 0, startDate: '' };
-        state.osh = { enabled: false, preSalaryBalance: null, salaryDay: null };
+        state.osh = { enabled: false, preSalaryBalance: null, salaryDay: null, creditDay: null };
         window.toggleSettings(); // close settings
         document.getElementById('loginScreen').classList.remove('hidden');
         // Reset new account panel
@@ -2952,11 +2984,12 @@
         selectedTxIds: new Set(),     // for bulk categorization
         categoriesCollapsed: localStorage.getItem('categoriesCollapsed') === 'true',
         // עו״ש: יתרה לפני משכורת אחרונה → יתרה צפויה לפני המשכורת הבאה
-        // יום חיוב אשראי = יום תחילת חודש תקציבי (cycleStartDay)
+        // יום חיוב אשראי נפרד מיום תחילת חודש תקציבי (cycleStartDay)
         osh: {
             enabled: false,
             preSalaryBalance: null, // null = טרם הוגדר
-            salaryDay: null         // 1–28
+            salaryDay: null,        // 1–28
+            creditDay: null         // 1–28, יום חיוב אשראי
         }
     };
 
@@ -3010,27 +3043,24 @@
         const pageSize = 1000;
         const all = [];
         let from = 0;
-        let pages = 0;
-        while (true) {
+        for (let pages = 0; pages < 50; pages++) {
             let q = sbClient.from(table).select(selectFields);
             if (typeof buildQuery === 'function') q = buildQuery(q);
             const { data, error } = await q.range(from, from + pageSize - 1);
             if (error) throw error;
             const batch = data || [];
-            pages++;
             all.push(...batch);
             if (batch.length < pageSize) break;
             from += pageSize;
-            if (pages > 50) break; // safety cap
         }
         return all;
     }
 
-    window.fetchTransactionsOnly = async function(isManual = false) {
+    window.fetchTransactionsOnly = async function(isManual = false, opts = {}) {
         if (!sbClient || !USER_TOKEN) return;
-        if (!state._suppressPaint) setLoading(true);
+        const quiet = !!(opts && opts.quiet);
+        if (!quiet && !state._suppressPaint) setLoading(true);
         try {
-            // Fetch transactions list and balance in parallel
             const [txRows, balance] = await Promise.all([
                 fetchAllRowsPaged('transactions', TX_SELECT_FIELDS, q =>
                     q.eq('user_token', USER_TOKEN).order('created_at', { ascending: false })
@@ -3040,13 +3070,9 @@
             state.transactions = (txRows || []).map(mapSupabaseTx);
             ensureTxDateMsList(state.transactions);
 
-            // Keep the raw server balance for the mismatch check in cleanupDailyBudgetHistory
             window._lastServerBalance = balance;
             state.balance = balance;
 
-            // If dailyBudgetHistory is loaded and the clipped accumulated is positive,
-            // recalculate balance client-side so it uses the clipped accumulated.
-            // Guard: if accumulated = 0 (empty/fully-filtered history), keep the server balance.
             if (window.calculateClientSideBalance && window.calculateAccumulatedBudget) {
                 const accToday = window.calculateAccumulatedBudget(new Date());
                 if (accToday > 0) {
@@ -3071,11 +3097,24 @@
             if (isManual) window.showToast('עודכן בהצלחה', 'check');
         } catch (e) {
             console.error(e);
-            window.showToast('שגיאה בטעינת נתונים', 'circle-xmark');
+            if (!quiet) window.showToast('שגיאה בטעינת נתונים', 'circle-xmark');
         } finally {
-            if (!state._suppressPaint) setLoading(false);
+            if (!quiet && !state._suppressPaint) setLoading(false);
         }
     };
+
+    function recalculateBalanceAfterLocalTxChange() {
+        _virtualBudgetCache = null;
+        _firstTrackCache = { ref: null, iso: '' };
+        if (window.calculateClientSideBalance && window.calculateAccumulatedBudget) {
+            const acc = window.calculateAccumulatedBudget(new Date());
+            if (acc > 0) {
+                state.balance = window.calculateClientSideBalance();
+                localStorage.setItem('cached_balance', state.balance.toString());
+                return;
+            }
+        }
+    }
 
     function mapSupabaseTx(t) {
         const rawCategory = (t.category || '').trim();
@@ -3289,6 +3328,15 @@
         return next;
     }
 
+    function getOshCreditDay() {
+        const o = state.osh || {};
+        const d = parseInt(o.creditDay, 10);
+        if (d >= 1 && d <= 28) return d;
+        // Backward compat: before credit day was separate, cycle start was used
+        const cycle = parseInt(state.budget && state.budget.cycleStartDay, 10);
+        return (cycle >= 1 && cycle <= 28) ? cycle : 1;
+    }
+
     function isOshConfigured() {
         const o = state.osh || {};
         return !!o.enabled
@@ -3299,10 +3347,8 @@
     function syncOshSettingsVisibility() {
         const enabled = !!(state.osh && state.osh.enabled);
         const fields = document.getElementById('oshSettingsFields');
-        const hint = document.getElementById('cycleStartOshHint');
         const cb = document.getElementById('oshEnabledCheckbox');
         if (fields) fields.classList.toggle('hidden', !enabled);
-        if (hint) hint.classList.toggle('hidden', !enabled);
         if (cb) cb.checked = enabled;
     }
 
@@ -3352,13 +3398,13 @@
     /**
      * יתרה צפויה בעו״ש רגע לפני המשכורת הבאה =
      * יתרה לפני משכורת אחרונה + מאזן שהצטבר מאז חיוב האשראי האחרון
-     * (יום חיוב אשראי = יום תחילת חודש תקציבי)
+     * (יום חיוב אשראי = state.osh.creditDay, נפרד מיום תחילת חודש תקציבי)
      */
     window.computePreSalaryOshBalance = function() {
         if (!isOshConfigured()) return null;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const creditDay = state.budget.cycleStartDay || 1;
+        const creditDay = getOshCreditDay();
         const lastCredit = getLastOccurrenceOfDay(creditDay, today);
         const nextSalary = getNextOccurrenceOfDay(state.osh.salaryDay, today);
         const periodBalance = window.calculatePeriodBalanceSince(lastCredit, today);
@@ -3368,6 +3414,7 @@
             periodBalance,
             lastCredit,
             nextSalary,
+            creditDay,
             preSalaryBalance: safeParseFloat(state.osh.preSalaryBalance)
         };
     };
@@ -3385,25 +3432,30 @@
         const btn = document.getElementById('oshUpdateBtn');
         const balInp = document.getElementById('oshPreBalanceInput');
         const salSel = document.getElementById('oshSalaryDaySelect');
+        const credSel = document.getElementById('oshCreditDaySelect');
         if (!btn || !balInp || !salSel) return;
         const balRaw = (balInp.value || '').replace(/,/g, '').trim();
         if (balRaw === '') { btn.disabled = true; return; }
         const enteredBal = Math.round(safeParseFloat(balRaw));
         const enteredSal = parseInt(salSel.value, 10) || 1;
+        const enteredCred = parseInt(credSel && credSel.value, 10) || getOshCreditDay();
         const curBal = state.osh.preSalaryBalance;
         const curSal = state.osh.salaryDay;
+        const curCred = getOshCreditDay();
         const displayCurBal = (curBal === null || curBal === undefined)
             ? null
             : Math.round(formatDisplayAmount(safeParseFloat(curBal)));
         const balChanged = displayCurBal === null || enteredBal !== displayCurBal;
         const salChanged = !curSal || enteredSal !== curSal;
-        btn.disabled = !(balChanged || salChanged);
+        const credChanged = enteredCred !== curCred;
+        btn.disabled = !(balChanged || salChanged || credChanged);
     };
 
     window.saveOshSettings = async function() {
         if (!sbClient || !USER_TOKEN) return window.toggleSettings();
         const balInp = document.getElementById('oshPreBalanceInput');
         const salSel = document.getElementById('oshSalaryDaySelect');
+        const credSel = document.getElementById('oshCreditDaySelect');
         const balRawStr = (balInp && balInp.value || '').replace(/,/g, '').trim();
         if (!balRawStr) {
             window.showToast('יש להזין יתרה', 'xmark');
@@ -3416,11 +3468,14 @@
         }
         if (state.isPrivacyMode) raw = denormalizeAmount(raw);
         const salaryDay = parseInt(salSel && salSel.value, 10) || 1;
+        const creditDay = parseInt(credSel && credSel.value, 10) || getOshCreditDay();
         state.osh.preSalaryBalance = raw;
         state.osh.salaryDay = salaryDay;
+        state.osh.creditDay = creditDay;
         try {
             await persistSystemRow('__osh_pre_salary_balance__', null, raw);
             await persistSystemRow('__salary_day__', null, salaryDay);
+            await persistSystemRow('__credit_day__', null, creditDay);
             const btn = document.getElementById('oshUpdateBtn');
             if (btn) btn.disabled = true;
             window.showToast('יתרת עו״ש נשמרה', 'check');
@@ -4382,11 +4437,12 @@
             if (!state.budget.cycleStartDay || isNaN(state.budget.cycleStartDay)) state.budget.cycleStartDay = 1;
             state.stats.startDay = state.budget.cycleStartDay;
 
-            // עו״ש: הצגה + יתרה לפני משכורת + יום משכורת (יום אשראי = cycleStartDay)
+            // עו״ש: הצגה + יתרה לפני משכורת + יום משכורת + יום חיוב אשראי
             const oshEnabledRow = rows.find(r => r.category_name === '__osh_enabled__');
             const oshBalRow = rows.find(r => r.category_name === '__osh_pre_salary_balance__');
             const oshSalRow = rows.find(r => r.category_name === '__salary_day__');
-            if (!state.osh) state.osh = { enabled: false, preSalaryBalance: null, salaryDay: null };
+            const oshCredRow = rows.find(r => r.category_name === '__credit_day__');
+            if (!state.osh) state.osh = { enabled: false, preSalaryBalance: null, salaryDay: null, creditDay: null };
             state.osh.enabled = oshEnabledRow ? safeParseFloat(oshEnabledRow.budget_amount) > 0 : false;
             state.osh.preSalaryBalance = oshBalRow ? safeParseFloat(oshBalRow.budget_amount) : null;
             if (oshBalRow && (state.osh.preSalaryBalance === null || isNaN(state.osh.preSalaryBalance))) {
@@ -4394,6 +4450,11 @@
             }
             const salDay = oshSalRow ? parseInt(oshSalRow.budget_amount, 10) : null;
             state.osh.salaryDay = (salDay && salDay >= 1 && salDay <= 28) ? salDay : null;
+            const credDay = oshCredRow ? parseInt(oshCredRow.budget_amount, 10) : null;
+            // Fallback to cycle start for users who haven't set credit day yet
+            state.osh.creditDay = (credDay && credDay >= 1 && credDay <= 28)
+                ? credDay
+                : (state.budget.cycleStartDay || 1);
 
             localStorage.setItem('cached_g4', state.budget.g4.toString());
             localStorage.setItem('cached_start_date', state.budget.startDate);
@@ -4941,12 +5002,11 @@
                 if (state.currentView === 'budget') renderBudget();
             }
 
-            // רענן לקבלת ID אמיתי, ואז בדוק חריגה בקטגוריה מתוכננת
-            setTimeout(async () => {
-                await window.fetchTransactionsOnly();
-                if (category !== 'שוטף') {
-                    window.checkAnnualOverspend(category);
-                }
+            // רענון שקט ברקע (בלי לחסום UI) — לקבלת ID/סנכרון מלא
+            setTimeout(() => {
+                window.fetchTransactionsOnly(false, { quiet: true }).then(() => {
+                    if (category !== 'שוטף') window.checkAnnualOverspend(category);
+                }).catch(() => {});
             }, 800);
         } catch (e) {
             console.error(e);
@@ -5010,12 +5070,37 @@
             if (pickedBudget === 'active' || !pickedBudget) resolvedISO = getActiveEpochStartISO();
             resolvedISO = parseStartDateToISO(resolvedISO);
             const txId = state.pendingActionRow.row;
-            if (resolvedISO && resolvedISO !== inferred) {
-                await persistTxBudgetOverride(txId, resolvedISO);
-            } else if (txId) {
-                await persistTxBudgetOverride(txId, '');
+            const wantOverride = !!(resolvedISO && resolvedISO !== inferred);
+            const prevOverride = state.txBudgetOverrides[String(txId)] || '';
+            const nextOverride = wantOverride ? resolvedISO : '';
+            // Avoid slow budget_settings delete/insert when override unchanged (was ~4s each call)
+            if (prevOverride !== nextOverride) {
+                await persistTxBudgetOverride(txId, nextOverride);
             }
-            await window.fetchTransactionsOnly();
+
+            // Optimistic local update — full transactions reload was ~10–14s per edit
+            const idx = state.transactions.findIndex(t => t.row === txId || t.id === txId);
+            if (idx >= 0) {
+                const prev = state.transactions[idx];
+                const nextDate = dateVal || prev.date;
+                const tag = category !== 'שוטף' ? category : null;
+                state.transactions[idx] = {
+                    ...prev,
+                    name,
+                    amount,
+                    date: nextDate,
+                    _dateMs: parseLocalDateMs(nextDate),
+                    tag,
+                    expense_category_id,
+                    budgetStart: nextOverride || resolvedISO || prev.budgetStart || null
+                };
+                if (!nextOverride) delete state.transactions[idx]._epochStart;
+            }
+            ensureTxDateMsList(state.transactions);
+            recalculateBalanceAfterLocalTxChange();
+            localStorage.setItem('expense_history', JSON.stringify(state.transactions));
+            render();
+
             const savingsItem = findSavingsByTag(category);
             if (savingsItem) {
                 await syncSavingsAfterDeposit(savingsItem, dateVal || new Date().toLocaleDateString('en-GB'));
@@ -5125,7 +5210,18 @@
                 .eq('id', state.pendingActionRow.row)
                 .eq('user_token', USER_TOKEN);
             if (error) throw error;
-            await window.fetchTransactionsOnly();
+            const txId = state.pendingActionRow.row;
+            const idx = state.transactions.findIndex(t => t.row === txId || t.id === txId);
+            if (idx >= 0) {
+                state.transactions[idx] = {
+                    ...state.transactions[idx],
+                    tag: categoryName !== 'שוטף' ? categoryName : null,
+                    expense_category_id: null
+                };
+            }
+            recalculateBalanceAfterLocalTxChange();
+            localStorage.setItem('expense_history', JSON.stringify(state.transactions));
+            render();
             window.showToast('שויך', 'check');
         } catch (e) {
             console.error(e);
@@ -5146,7 +5242,17 @@
                 .eq('id', state.pendingActionRow.row)
                 .eq('user_token', USER_TOKEN);
             if (error) throw error;
-            await window.fetchTransactionsOnly();
+            const txId = state.pendingActionRow.row;
+            const idx = state.transactions.findIndex(t => t.row === txId || t.id === txId);
+            if (idx >= 0) {
+                state.transactions[idx] = {
+                    ...state.transactions[idx],
+                    tag: null
+                };
+            }
+            recalculateBalanceAfterLocalTxChange();
+            localStorage.setItem('expense_history', JSON.stringify(state.transactions));
+            render();
             window.showToast('הוסר', 'check');
         } catch (e) {
             console.error(e);
@@ -8972,11 +9078,20 @@
                     if (oshRes) {
                         const oshDisp = Math.round(formatDisplayAmount(oshRes.expected));
                         const oshColor = oshRes.expected < 0 ? 'text-red-500' : 'text-slate-700';
+                        const nextSal = oshRes.nextSalary;
+                        const oshDateStr = nextSal
+                            ? `${nextSal.getDate()}/${nextSal.getMonth() + 1}`
+                            : '';
                         oshUnderHtml = `
-                            <div class="mt-1.5 pt-1.5 border-t border-slate-100 w-full flex items-baseline justify-center gap-1" dir="rtl">
-                                <span class="text-[9px] font-bold text-slate-400">עו״ש צפוי</span>
-                                <span class="text-sm font-black ${oshColor} ltr-num">${oshDisp.toLocaleString()}</span>
-                                <span class="text-[9px] font-bold text-slate-400">₪</span>
+                            <div class="mt-1.5 pt-1.5 border-t border-slate-100 w-full flex flex-col items-center gap-0.5" dir="rtl">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-[9px] font-bold text-slate-400">עו״ש צפוי</span>
+                                    ${oshDateStr ? `<span class="text-[9px] font-bold text-slate-400 ltr-num">${oshDateStr}</span>` : ''}
+                                </div>
+                                <div class="flex items-baseline gap-0.5">
+                                    <span class="text-sm font-black ${oshColor} ltr-num">${oshDisp.toLocaleString()}</span>
+                                    <span class="text-[9px] font-bold text-slate-400">₪</span>
+                                </div>
                             </div>
                         `;
                     }
@@ -9665,6 +9780,10 @@
             cycleStartEl.value = (b.cycleStartDay || 1).toString();
         }
         syncOshSettingsVisibility();
+        const oshCredEl = document.getElementById('oshCreditDaySelect');
+        if (oshCredEl) {
+            oshCredEl.value = getOshCreditDay().toString();
+        }
         const oshSalEl = document.getElementById('oshSalaryDaySelect');
         if (oshSalEl) {
             oshSalEl.value = (state.osh && state.osh.salaryDay ? state.osh.salaryDay : 1).toString();
