@@ -228,6 +228,15 @@
                 </div>
             </div>
 
+            <!-- Goal ready banner — same size as the health alert -->
+            <div id="goalsReadyBanner" class="hidden mb-3 cursor-pointer" onclick="window.setMainViewFilter('goals')">
+                <div class="flex items-center gap-3 bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold text-xs px-4 py-3 rounded-2xl">
+                    <i class="fa-solid fa-bullseye text-emerald-600 flex-shrink-0"></i>
+                    <span id="goalsReadyBannerText" class="flex-1"></span>
+                    <i class="fa-solid fa-chevron-left text-emerald-400 text-[10px]"></i>
+                </div>
+            </div>
+
             <!-- Search bar -->
             <div id="mainSearchBar" class="hidden mb-3 px-1">
                 <div class="flex items-center gap-2 bg-white rounded-xl shadow-sm border border-slate-200 px-3 py-2">
@@ -245,6 +254,9 @@
                     <button onclick="window.setMainViewFilter('current')" id="filterCurrentBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all bg-white text-slate-700 shadow-sm">שוטף</button>
                     <button onclick="window.setMainViewFilter('planned')" id="filterPlannedBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all text-slate-400">מתוכנן</button>
                     <button onclick="window.setMainViewFilter('fixed')" id="filterFixedBtn" class="flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all text-slate-400">קבוע</button>
+                    <button onclick="window.setMainViewFilter('goals')" id="filterGoalsBtn" title="יעדים" aria-label="יעדים" class="w-9 shrink-0 py-1.5 rounded-lg transition-all text-slate-400 flex items-center justify-center">
+                        <i class="fa-solid fa-bullseye text-sm"></i>
+                    </button>
                 </div>
             </div>
 
@@ -279,7 +291,14 @@
             <!-- Savings reminders -->
             <div id="savingsRemindersContainer"></div>
 
-            <section class="flex flex-col pb-6">
+            <div id="goalsPanel" class="hidden pb-6">
+                <div id="goalsList" class="space-y-2"></div>
+                <button type="button" onclick="window.openGoalModal()" class="w-full mt-2 py-3 bg-white rounded-xl border border-dashed border-slate-200 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition-colors" title="הוסף יעד" aria-label="הוסף יעד">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+
+            <section id="mainTxSection" class="flex flex-col pb-6">
                 <div class="flex justify-between items-center mb-1 px-1">
                     <div class="flex items-center gap-1.5">
                         <button id="noCategoriesNudge" onclick="window.openManageCategoriesModal()" class="btn-toggle-annual hidden">
@@ -1308,6 +1327,21 @@
         </div>
     </div>
 
+    <!-- Add goal -->
+    <div id="goalOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
+        <div class="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl">
+            <h3 class="text-md font-bold mb-4 text-center text-slate-900">יעד חדש</h3>
+            <label class="block text-[10px] font-bold text-slate-400 mb-1">שם</label>
+            <input id="goalNameInput" type="text" maxlength="80" placeholder="למשל: אופניים" class="input-field w-full px-3 py-3 rounded-xl text-sm mb-3" onkeydown="if(event.key==='Enter') document.getElementById('goalCostInput').focus()">
+            <label class="block text-[10px] font-bold text-slate-400 mb-1">עלות</label>
+            <input id="goalCostInput" type="number" min="1" step="1" inputmode="numeric" placeholder="0" class="input-field w-full px-3 py-3 rounded-xl text-sm mb-5 no-spin ltr-num" onkeydown="if(event.key==='Enter') window.saveGoal()">
+            <div class="flex gap-2">
+                <button type="button" onclick="window.saveGoal()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl text-sm">הוסף</button>
+                <button type="button" onclick="window.closeGoalModal()" class="flex-1 bg-slate-100 py-3 rounded-xl text-sm font-bold text-slate-600">ביטול</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Confirm Delete Modal -->
     <div id="confirmOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl text-center">
@@ -2283,6 +2317,7 @@
         localStorage.removeItem('cached_balance');
         localStorage.removeItem('cached_g4');
         localStorage.removeItem('cached_start_date');
+        localStorage.removeItem('cached_goals');
         const url = new URL(window.location.href);
         url.searchParams.delete('token');
         window.history.replaceState({}, '', url.toString());
@@ -2290,6 +2325,7 @@
         state.transactions = [];
         state.balance = 0;
         state.budget = { incomes: [], fixed: [], annual: [], g4: 0, startDate: '' };
+        state.goals = [];
         state.osh = { enabled: false, preSalaryBalance: null, salaryDay: null, creditDay: null };
         window.toggleSettings(); // close settings
         document.getElementById('loginScreen').classList.remove('hidden');
@@ -2959,7 +2995,8 @@
         dirtyBudgetItems: {},
         isDirty: true,
         showAnnualInMain: false,
-        mainViewFilter: 'current', // 'current', 'fixed', 'planned'
+        mainViewFilter: 'current', // 'current', 'fixed', 'planned', 'goals'
+        goals: (v => Array.isArray(v) ? v : [])(safeJsonParse(localStorage.getItem('cached_goals'), [])),
         statsFilter: 'current',    // 'current', 'fixed', 'planned'
         isPrivacyMode: localStorage.getItem('isPrivacyMode') === 'true',
         showZeroSections: { income: false, fixed: false, annual: false, savings: false, loan: false },
@@ -4455,6 +4492,22 @@
             state.osh.creditDay = (credDay && credDay >= 1 && credDay <= 28)
                 ? credDay
                 : (state.budget.cycleStartDay || 1);
+
+            const goalRows = rawRows.filter(r => r && r.type === 'system' && r.category_name && r.category_name.startsWith('__goal__:'));
+            state.goals = goalRows.map(r => {
+                const rest = r.category_name.slice('__goal__:'.length);
+                const sep = rest.indexOf(':');
+                const order = sep === -1 ? 0 : parseInt(rest.slice(0, sep), 10);
+                const id = sep === -1 ? rest : rest.slice(sep + 1);
+                return {
+                    id: id || rest,
+                    name: r.parent_group || '',
+                    cost: safeParseFloat(r.budget_amount),
+                    order: Number.isFinite(order) ? order : 0
+                };
+            }).filter(g => g.name && g.cost > 0)
+              .sort((a, b) => a.order - b.order || String(a.id).localeCompare(String(b.id)));
+            localStorage.setItem('cached_goals', JSON.stringify(state.goals.map(g => ({ id: g.id, name: g.name, cost: g.cost }))));
 
             localStorage.setItem('cached_g4', state.budget.g4.toString());
             localStorage.setItem('cached_start_date', state.budget.startDate);
@@ -8940,6 +8993,7 @@
         if (state.currentView === 'budget') return;
         if (state.currentView !== 'main') return;
         if (window.renderHealthCard) window.renderHealthCard();
+        updateGoalsBanner();
 
         // --- Summary Stats Preparation ---
         const filter = state.mainViewFilter;
@@ -9020,7 +9074,7 @@
                         </div>
                     </div>
                 `;
-            } else if (filter === 'current') {
+            } else if (filter === 'current' || filter === 'goals') {
                 headerRow.classList.remove('hidden');
                 if (sep) sep.classList.remove('hidden');
                 const spending = currentSpent;
@@ -9147,6 +9201,23 @@
 
         renderCategorySummary();
         updateBulkBar();
+        syncMainFilterButtons();
+        if (state.mainViewFilter === 'goals') {
+            const sav = document.getElementById('savingsRemindersContainer');
+            if (sav) { sav.innerHTML = ''; sav.classList.add('hidden'); }
+            const txSec = document.getElementById('mainTxSection');
+            if (txSec) txSec.classList.add('hidden');
+            const panel = document.getElementById('goalsPanel');
+            if (panel) panel.classList.remove('hidden');
+            renderGoalsPanel();
+            return;
+        }
+        const savBox = document.getElementById('savingsRemindersContainer');
+        if (savBox) savBox.classList.remove('hidden');
+        const txSec = document.getElementById('mainTxSection');
+        if (txSec) txSec.classList.remove('hidden');
+        const goalsPanel = document.getElementById('goalsPanel');
+        if (goalsPanel) goalsPanel.classList.add('hidden');
         renderSavingsReminders();
 
         const dateFiltered = applyDateFilter(state.transactions);
@@ -10504,27 +10575,221 @@
         renderBudget();
     };
 
-    window.setMainViewFilter = function(filter) {
-        if (filter === 'all') filter = 'current';
-        state.mainViewFilter = filter;
-        state.activeCategoryFilter = null; // Clear category filter when switching view types
+    function syncMainFilterButtons() {
+        const filter = state.mainViewFilter;
         const btns = {
             current: document.getElementById('filterCurrentBtn'),
             fixed: document.getElementById('filterFixedBtn'),
             planned: document.getElementById('filterPlannedBtn')
         };
-        
         Object.entries(btns).forEach(([k, b]) => {
-            if (b) {
-                b.classList.remove('bg-white', 'text-slate-700', 'shadow-sm');
-                b.classList.add('text-slate-400');
-            }
+            if (!b) return;
+            const on = filter === k;
+            b.classList.toggle('bg-white', on);
+            b.classList.toggle('text-slate-700', on);
+            b.classList.toggle('shadow-sm', on);
+            b.classList.toggle('text-slate-400', !on);
         });
-        
-        if (btns[filter]) {
-            btns[filter].classList.add('bg-white', 'text-slate-700', 'shadow-sm');
-            btns[filter].classList.remove('text-slate-400');
+        const goalsBtn = document.getElementById('filterGoalsBtn');
+        if (goalsBtn) {
+            const on = filter === 'goals';
+            goalsBtn.classList.toggle('bg-white', on);
+            goalsBtn.classList.toggle('shadow-sm', on);
+            goalsBtn.classList.toggle('text-emerald-600', on);
+            goalsBtn.classList.toggle('text-slate-400', !on);
         }
+    }
+
+    function escapeGoalText(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, ch => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+        ));
+    }
+
+    function goalMoney(amount) {
+        return Math.round(formatDisplayAmount(safeParseFloat(amount) || 0));
+    }
+
+    // Surplus after keeping 3 daily budgets. Items are marked from the top of the
+    // priority list; a cheaper later item is not marked if an earlier one does not fit.
+    function goalAffordability() {
+        const goals = Array.isArray(state.goals) ? state.goals : [];
+        const daily = goalMoney((safeParseFloat(state.budget.g4) || 0) / 30);
+        let available = goalMoney(state.balance) - daily * 3;
+        const affordable = [];
+        for (let i = 0; i < goals.length; i++) {
+            const cost = goalMoney(goals[i].cost);
+            if (!(cost > 0) || available < cost) break;
+            affordable.push(i);
+            available -= cost;
+        }
+        return { goals, affordable, firstReady: affordable.includes(0) };
+    }
+
+    function updateGoalsBanner() {
+        const banner = document.getElementById('goalsReadyBanner');
+        const text = document.getElementById('goalsReadyBannerText');
+        if (!banner || !text) return;
+        const { goals, firstReady } = goalAffordability();
+        const first = goals[0];
+        if (!firstReady || !first) {
+            banner.classList.add('hidden');
+            return;
+        }
+        const cost = goalMoney(first.cost).toLocaleString();
+        text.textContent = `אפשר לממש את היעד ${first.name} בעלות ₪${cost}`;
+        banner.classList.remove('hidden');
+    }
+
+    function renderGoalsPanel() {
+        const list = document.getElementById('goalsList');
+        if (!list) return;
+        const { goals, affordable } = goalAffordability();
+        const ready = new Set(affordable);
+        if (!goals.length) {
+            list.innerHTML = '<p class="text-center text-xs text-slate-400 font-semibold py-6">אין יעדים עדיין</p>';
+            return;
+        }
+        list.innerHTML = goals.map((g, i) => {
+            const on = ready.has(i);
+            const upOff = i === 0;
+            const downOff = i === goals.length - 1;
+            const cost = goalMoney(g.cost).toLocaleString();
+            return `<div class="flex items-center gap-2 rounded-xl px-3 py-2.5 border ${on ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}">
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-bold text-slate-800 truncate">${escapeGoalText(g.name)}</p>
+                    <p class="text-xs font-bold text-slate-500 ltr-num">₪${cost}</p>
+                </div>
+                <button type="button" onclick="window.moveGoal(${i}, -1)" ${upOff ? 'disabled' : ''} class="w-8 h-8 rounded-lg flex items-center justify-center ${upOff ? 'text-slate-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}" title="עדיפות גבוהה יותר" aria-label="העלה עדיפות">
+                    <i class="fa-solid fa-chevron-up text-[11px]"></i>
+                </button>
+                <button type="button" onclick="window.moveGoal(${i}, 1)" ${downOff ? 'disabled' : ''} class="w-8 h-8 rounded-lg flex items-center justify-center ${downOff ? 'text-slate-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}" title="עדיפות נמוכה יותר" aria-label="הורד עדיפות">
+                    <i class="fa-solid fa-chevron-down text-[11px]"></i>
+                </button>
+                <button type="button" onclick="window.deleteGoal(${i})" class="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100" title="מחק" aria-label="מחק יעד">
+                    <i class="fa-solid fa-trash-can text-[11px]"></i>
+                </button>
+            </div>`;
+        }).join('');
+    }
+
+    function newGoalId() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+
+    let goalsSaveChain = Promise.resolve();
+    async function persistGoals() {
+        const run = goalsSaveChain.then(() => writeGoalsToServer());
+        goalsSaveChain = run.catch(() => {});
+        return run;
+    }
+
+    async function writeGoalsToServer() {
+        const payload = (state.goals || []).map(g => ({
+            id: String(g.id || newGoalId()).replace(/[^a-z0-9]/gi, '').slice(0, 16) || newGoalId(),
+            name: String(g.name || '').trim().slice(0, 80),
+            cost: safeParseFloat(g.cost) || 0
+        })).filter(g => g.name && g.cost > 0);
+        state.goals = payload;
+        localStorage.setItem('cached_goals', JSON.stringify(payload));
+        if (!sbClient || !USER_TOKEN) return;
+        const { data, error: selErr } = await sbClient.from('budget_settings')
+            .select('id, category_name')
+            .eq('user_token', USER_TOKEN)
+            .eq('type', 'system');
+        if (selErr) throw selErr;
+        const ids = (data || [])
+            .filter(r => r.category_name && r.category_name.startsWith('__goal__:'))
+            .map(r => r.id);
+        if (ids.length) {
+            const { error: delErr } = await sbClient.from('budget_settings')
+                .delete()
+                .eq('user_token', USER_TOKEN)
+                .in('id', ids);
+            if (delErr) throw delErr;
+        }
+        if (!payload.length) return;
+        const rows = payload.map((g, i) => ({
+            category_name: `__goal__:${String(i).padStart(4, '0')}:${g.id}`,
+            budget_amount: g.cost,
+            parent_group: g.name,
+            type: 'system',
+            user_token: USER_TOKEN
+        }));
+        const { error: insErr } = await sbClient.from('budget_settings').insert(rows);
+        if (insErr) throw insErr;
+    }
+
+    window.openGoalModal = function() {
+        const name = document.getElementById('goalNameInput');
+        const cost = document.getElementById('goalCostInput');
+        if (name) name.value = '';
+        if (cost) cost.value = '';
+        const o = document.getElementById('goalOverlay');
+        if (o) { o.classList.remove('hidden'); setTimeout(() => o.classList.add('opacity-100'), 10); }
+        if (name) setTimeout(() => name.focus(), 50);
+    };
+
+    window.closeGoalModal = function() {
+        const o = document.getElementById('goalOverlay');
+        if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); }
+    };
+
+    window.saveGoal = async function() {
+        const name = (document.getElementById('goalNameInput')?.value || '').trim();
+        const cost = safeParseFloat(document.getElementById('goalCostInput')?.value);
+        if (!name || !(cost > 0)) {
+            window.showToast('יש למלא שם ועלות', 'exclamation');
+            return;
+        }
+        state.goals = [...(state.goals || []), { id: newGoalId(), name, cost }];
+        try {
+            await persistGoals();
+            window.closeGoalModal();
+            if (state.currentView === 'main') render();
+            window.showToast('היעד נוסף', 'check');
+        } catch (e) {
+            console.error(e);
+            window.showToast('שמירת היעד נכשלה', 'exclamation');
+        }
+    };
+
+    window.moveGoal = async function(index, dir) {
+        const goals = [...(state.goals || [])];
+        const j = index + dir;
+        if (index < 0 || j < 0 || index >= goals.length || j >= goals.length) return;
+        const tmp = goals[index];
+        goals[index] = goals[j];
+        goals[j] = tmp;
+        state.goals = goals;
+        try {
+            await persistGoals();
+            if (state.currentView === 'main') render();
+        } catch (e) {
+            console.error(e);
+            window.showToast('שינוי הסדר נכשל', 'exclamation');
+        }
+    };
+
+    window.deleteGoal = async function(index) {
+        const goals = [...(state.goals || [])];
+        if (index < 0 || index >= goals.length) return;
+        goals.splice(index, 1);
+        state.goals = goals;
+        try {
+            await persistGoals();
+            if (state.currentView === 'main') render();
+        } catch (e) {
+            console.error(e);
+            window.showToast('מחיקת היעד נכשלה', 'exclamation');
+        }
+    };
+
+    window.setMainViewFilter = function(filter) {
+        if (filter === 'all') filter = 'current';
+        state.mainViewFilter = filter;
+        state.activeCategoryFilter = null; // Clear category filter when switching view types
+        syncMainFilterButtons();
 
         // Hide balance chart when switching away from שוטף
         if (filter !== 'current') {
