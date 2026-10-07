@@ -296,6 +296,11 @@
                 <button type="button" onclick="window.openGoalModal()" class="w-full mt-2 py-3 bg-white rounded-xl border border-dashed border-slate-200 text-blue-600 flex items-center justify-center hover:bg-blue-50 transition-colors" title="הוסף יעד" aria-label="הוסף יעד">
                     <i class="fa-solid fa-plus"></i>
                 </button>
+                <div class="mt-3 px-1 text-right space-y-1.5">
+                    <p class="text-xs font-bold text-slate-600">למה יעדים?</p>
+                    <p class="text-[10px] text-slate-500 leading-relaxed">כדי לדעת מתי בטוח לקנות משהו שרציתם — בלי לפגוע בתקציב השוטף.</p>
+                    <p class="text-[10px] text-slate-500 leading-relaxed">הוסיפו פריטים עם שם ועלות, וסדרו לפי עדיפות (חצים). כשהמאזן מספיק ל־3 ימי תקציב ועוד עלות היעד הראשון — יופיע באנר ואפשר לממש. פריט בירוק = יש תקציב לקנות אותו לפי הסדר.</p>
+                </div>
             </div>
 
             <section id="mainTxSection" class="flex flex-col pb-6">
@@ -1996,10 +2001,15 @@
                 <!-- Monthly budget -->
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">תקציב חודשי (₪) — רשות</label>
-                    <div class="input-field w-full px-4 py-3 rounded-xl flex items-center gap-2">
+                    <label class="flex items-center gap-2 mb-2 cursor-pointer select-none">
+                        <input type="checkbox" id="catEditRemainder" onchange="window.onCatEditRemainderToggle()" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                        <span class="text-xs font-bold text-slate-600">כל השאר</span>
+                    </label>
+                    <div id="catEditBudgetWrap" class="input-field w-full px-4 py-3 rounded-xl flex items-center gap-2">
                         <span class="text-slate-400 font-bold text-sm">₪</span>
                         <input type="number" inputmode="decimal" id="catEditBudget" placeholder="0" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm">
                     </div>
+                    <p id="catEditRemainderHint" class="hidden text-[10px] text-slate-400 mt-1.5 leading-relaxed">התקציב = מה שנשאר מהשוטף אחרי שאר הקטגוריות, עם התחשבות במאזן ובחריגות קצב.</p>
                 </div>
                 <!-- Color picker -->
                 <div>
@@ -2326,6 +2336,7 @@
         state.balance = 0;
         state.budget = { incomes: [], fixed: [], annual: [], g4: 0, startDate: '' };
         state.goals = [];
+        state.remainderCatIds = new Set();
         state.osh = { enabled: false, preSalaryBalance: null, salaryDay: null, creditDay: null };
         window.toggleSettings(); // close settings
         document.getElementById('loginScreen').classList.remove('hidden');
@@ -3017,6 +3028,7 @@
             specificMonth: ''
         },
         expenseCategories: (v => Array.isArray(v) ? v : [])(safeJsonParse(localStorage.getItem('expense_categories'), [])),
+        remainderCatIds: new Set(),   // expense categories marked as "כל השאר"
         activeCategoryFilter: null,  // null = show all
         selectedTxIds: new Set(),     // for bulk categorization
         categoriesCollapsed: localStorage.getItem('categoriesCollapsed') === 'true',
@@ -3181,7 +3193,7 @@
 
     function catsInBudget(budget) {
         const b = budget || state.budget || {};
-        return [...(b.annual || []), ...(b.fixed || []), ...(b.savings || [])];
+        return [...(b.annual || []), ...(b.fixed || []), ...(b.savings || []), ...(b.incomes || [])];
     }
 
     // מוצא קטגוריה לפי tag בתקציב של התקופה — לא תמיד בתקציב הנוכחי
@@ -3319,13 +3331,105 @@
     };
 
     window.calculateClientSideBalance = function() {
-        const accumulated = window.calculateAccumulatedBudget(new Date());
-        
-        const currentTxs = state.transactions.filter(tx => txHitsCurrentBalance(tx));
-        
-        const sumTxs = currentTxs.reduce((sum, tx) => sum + safeParseFloat(tx.amount), 0);
-        return accumulated - sumTxs;
+        return calculateBalanceAsOf(new Date());
     };
+
+    function calculateBalanceAsOf(untilDate) {
+        if (!window.calculateAccumulatedBudget) return 0;
+        const end = new Date(untilDate);
+        end.setHours(23, 59, 59, 999);
+        const accumulated = window.calculateAccumulatedBudget(end);
+        const endMs = end.getTime();
+        const sumTxs = (state.transactions || []).reduce((sum, tx) => {
+            if (!txHitsCurrentBalance(tx)) return sum;
+            if (txDateMs(tx) > endMs) return sum;
+            return sum + safeParseFloat(tx.amount);
+        }, 0);
+        return accumulated - sumTxs;
+    }
+
+    function isRemainderCat(catId) {
+        return !!(state.remainderCatIds && state.remainderCatIds.has(String(catId)));
+    }
+
+    async function persistCatRemainder(catId, enabled) {
+        if (!catId) return;
+        const key = '__cat_remainder__:' + catId;
+        if (enabled) {
+            await persistSystemRow(key, null, 1);
+            if (!state.remainderCatIds) state.remainderCatIds = new Set();
+            state.remainderCatIds.add(String(catId));
+        } else if (sbClient && USER_TOKEN) {
+            await sbClient.from('budget_settings').delete()
+                .eq('user_token', USER_TOKEN)
+                .eq('category_name', key);
+            if (state.remainderCatIds) state.remainderCatIds.delete(String(catId));
+        }
+    }
+
+    // Effective monthly budgets for שוטף categories (supports "כל השאר").
+    // spentByCatId: { [catId]: spentInCurrentCycle }
+    function computeCurrentCategoryBudgets(spentByCatId) {
+        const cats = state.expenseCategories || [];
+        const spentMap = spentByCatId || {};
+        const cycleNow = new Date();
+        const cycleDates = getCurrentCycleDates(cycleNow, state.budget.cycleStartDay || 1);
+        const cycleTotalDays = getCycleLengthDays(cycleDates.startDate, cycleDates.endDate);
+        const cycleDayNum = getCycleDayNumber(cycleNow, cycleDates.startDate, cycleTotalDays);
+
+        const monthlyG4 = safeParseFloat(state.budget.g4) || 0;
+        let fixedSum = 0;
+        let paceDeficit = 0;
+        const remainderIds = [];
+
+        cats.forEach(cat => {
+            const id = String(cat.id);
+            if (isRemainderCat(id)) {
+                remainderIds.push(id);
+                return;
+            }
+            const budget = safeParseFloat(cat.monthly_budget || 0);
+            if (!(budget > 0)) return;
+            fixedSum += budget;
+            const spent = Math.round(safeParseFloat(spentMap[id] || spentMap[cat.id] || 0));
+            const pacedSoFar = Math.round(budget / cycleTotalDays) * cycleDayNum;
+            const catBalance = pacedSoFar - spent;
+            if (catBalance < 0) paceDeficit += -catBalance;
+        });
+
+        let carryIn = 0;
+        if (cycleDates.startDate) {
+            const prevEnd = new Date(cycleDates.startDate);
+            prevEnd.setDate(prevEnd.getDate() - 1);
+            try { carryIn = calculateBalanceAsOf(prevEnd); } catch (e) { carryIn = 0; }
+        }
+
+        const pool = monthlyG4 - fixedSum + carryIn - paceDeficit;
+        const n = remainderIds.length;
+        const each = n > 0 ? pool / n : 0;
+        const budgets = {};
+        cats.forEach(cat => {
+            const id = String(cat.id);
+            budgets[id] = isRemainderCat(id) ? each : (safeParseFloat(cat.monthly_budget || 0) || 0);
+        });
+        return { budgets, pool, carryIn, paceDeficit, fixedSum, remainderCount: n, monthlyG4 };
+    }
+
+    function getCurrentCycleSpentByCatId() {
+        const monthStart = currentMonthStart();
+        const monthEnd = currentMonthEnd();
+        const spent = {};
+        (state.transactions || []).forEach(tx => {
+            if (tx.isAdjustment) return;
+            if (tx.tag) return;
+            const d = parseLocalDate(tx.date);
+            if (d < monthStart || d > monthEnd) return;
+            const cid = tx.expense_category_id;
+            if (!cid) return;
+            spent[String(cid)] = (spent[String(cid)] || 0) + safeParseFloat(tx.amount);
+        });
+        return spent;
+    }
 
     /** Last calendar occurrence of dayOfMonth on or before fromDate (clamped to month length). */
     function getLastOccurrenceOfDay(dayOfMonth, fromDate) {
@@ -4509,6 +4613,15 @@
               .sort((a, b) => a.order - b.order || String(a.id).localeCompare(String(b.id)));
             localStorage.setItem('cached_goals', JSON.stringify(state.goals.map(g => ({ id: g.id, name: g.name, cost: g.cost }))));
 
+            state.remainderCatIds = new Set();
+            rawRows.forEach(r => {
+                const cname = r && r.category_name;
+                if (!cname || !cname.startsWith('__cat_remainder__:')) return;
+                if (safeParseFloat(r.budget_amount) > 0) {
+                    state.remainderCatIds.add(cname.slice('__cat_remainder__:'.length));
+                }
+            });
+
             localStorage.setItem('cached_g4', state.budget.g4.toString());
             localStorage.setItem('cached_start_date', state.budget.startDate);
 
@@ -4973,8 +5086,13 @@
         const type = tInp ? tInp.value : 'expense';
         const amount = type === 'income' ? -Math.abs(rawAmount) : Math.abs(rawAmount);
 
-        const name = nInp.value.trim();
         const category = (cInp ? cInp.value : null) || 'שוטף';
+        let name = nInp.value.trim();
+        // Auto-fill expense name from fixed/planned category when empty
+        if (!name && category && category !== 'שוטף') {
+            name = category;
+            nInp.value = category;
+        }
         if (rawAmount === null || rawAmount === undefined || isNaN(rawAmount) || !name) return;
 
         setLoading(true, false, true);
@@ -7154,6 +7272,7 @@
     let _isConfirmingDeleteId = null; // New state for custom delete confirmation
     let _tempInlineName = '';
     let _tempInlineBudget = null;
+    let _tempInlineRemainder = false;
     let _editingCatColor = CAT_COLORS[0].id;
     let _editingCatIcon  = CAT_ICONS[0].id;
     let _selectedPresets = [];
@@ -7225,6 +7344,19 @@
         return { startDate, endDate };
     }
 
+    // Calendar days only — millisecond diffs pick up DST (e.g. October in Israel)
+    // and wrongly count 32 days in a 31-day month.
+    function calendarDayUtc(d) {
+        return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    function getCycleLengthDays(startDate, endDate) {
+        return Math.max(1, Math.round((calendarDayUtc(endDate) - calendarDayUtc(startDate)) / 86400000) + 1);
+    }
+    function getCycleDayNumber(now, startDate, cycleTotalDays) {
+        const passed = Math.round((calendarDayUtc(now) - calendarDayUtc(startDate)) / 86400000) + 1;
+        return Math.min(cycleTotalDays, Math.max(1, passed));
+    }
+
     // Get current month start according to dynamic cycle start day
     window.getCurrentCycleDates = getCurrentCycleDates; // export just in case
 
@@ -7251,6 +7383,7 @@
         const strip = document.getElementById('categorySummaryStrip');
         if (!summarySection || !strip) return;
         strip.innerHTML = '';
+        window._currentCatEffBudgets = null;
 
         const filter = state.mainViewFilter;
 
@@ -7259,6 +7392,10 @@
         const monthEnd = currentMonthEnd();
         const yearStart = currentYearStart();
         const viewBudget = getViewBudget();
+        const cycleNow = new Date();
+        const cycleDates = getCurrentCycleDates(cycleNow, state.budget.cycleStartDay || 1);
+        const cycleTotalDays = getCycleLengthDays(cycleDates.startDate, cycleDates.endDate);
+        const cycleDayNum = getCycleDayNumber(cycleNow, cycleDates.startDate, cycleTotalDays);
 
         // 1. Collect and filter categories based on state.mainViewFilter
         if (filter === 'current') {
@@ -7266,6 +7403,7 @@
         } else if (filter === 'fixed') {
             catsShown.push(...(viewBudget.fixed || []).map(c => ({ ...c, $type: 'fixed' })));
             catsShown.push(...(viewBudget.savings || []).map(c => ({ ...c, $type: 'fixed', $isSavings: true })));
+            catsShown.push(...(viewBudget.incomes || []).map(c => ({ ...c, $type: 'income', $isIncome: true })));
         } else if (filter === 'planned') {
             catsShown.push(...(viewBudget.annual || []).filter(c => safeParseFloat(c.budget_amount || 0) > 0 || viewBudget.synthetic).map(c => ({ ...c, $type: 'planned' })));
         }
@@ -7316,11 +7454,15 @@
             } else {
                 const fixed = (vb.fixed || []).find(f => tagMatchesCat(tx.tag, f));
                 const savings = !fixed ? (vb.savings || []).find(s => tagMatchesCat(tx.tag, s)) : null;
+                const income = (!fixed && !savings) ? (vb.incomes || []).find(i => tagMatchesCat(tx.tag, i)) : null;
                 if (fixed && d >= monthStart && d <= monthEnd) {
                     const key = 'fixed:' + (fixed.id || fixed.category_name);
                     totals[key] = (totals[key] || 0) + amt;
                 } else if (savings && d >= monthStart && d <= monthEnd) {
                     const key = 'fixed:' + (savings.id || savings.category_name);
+                    totals[key] = (totals[key] || 0) + amt;
+                } else if (income && d >= monthStart && d <= monthEnd) {
+                    const key = 'income:' + (income.id || income.category_name);
                     totals[key] = (totals[key] || 0) + amt;
                 } else {
                     const planned = (vb.annual || []).find(a => tagMatchesCat(tx.tag, a));
@@ -7334,11 +7476,11 @@
         // 4. Render category rows
         state.viewCategoryColors = {}; 
         
-        // Sort catsShown by spent amount descending
+        // Sort catsShown by spent amount descending (abs so incomes sort by magnitude)
         catsShown.sort((a, b) => {
             const keyA = a.$type + ':' + (a.id || a.category_name);
             const keyB = b.$type + ':' + (b.id || b.category_name);
-            return (totals[keyB] || 0) - (totals[keyA] || 0);
+            return Math.abs(totals[keyB] || 0) - Math.abs(totals[keyA] || 0);
         });
         
         // Calculate max label width for the current view to align bars
@@ -7397,14 +7539,25 @@
                 const spent = Math.round(totals[cat.$type + ':' + catId] || 0);
                 return spent > 0;
             });
+            const spentForEff = {};
+            if (filter === 'current') {
+                catsShown.forEach(cat => {
+                    spentForEff[String(cat.id)] = Math.round(totals['current:' + cat.id] || 0);
+                });
+            }
+            const currentEff = filter === 'current' ? computeCurrentCategoryBudgets(spentForEff) : null;
+
             visibleCats.forEach(cat => {
                 const displayName = (cat.$type === 'fixed') 
                     ? cat.category_name 
                     : (cat.parent_group ? `${cat.parent_group} > ${cat.category_name}` : (cat.name || cat.category_name));
-                const budget = cat.$type === 'current' 
+                let budget = cat.$type === 'current' 
                     ? safeParseFloat(cat.monthly_budget || 0)
                     : safeParseFloat(cat.budget_amount || 0);
-                const budgetLen = budget > 0 ? String(Math.round(budget)).length + 5 : 0;
+                if (cat.$type === 'current' && currentEff) {
+                    budget = safeParseFloat(currentEff.budgets[String(cat.id)] || 0);
+                }
+                const budgetLen = (budget !== 0 || isRemainderCat(cat.id)) ? String(Math.round(Math.abs(budget))).length + 5 : 0;
                 maxChars = Math.max(maxChars, displayName.length + budgetLen);
             });
             labelsWidth = Math.max(100, Math.min(180, maxChars * 5.0 + 16));
@@ -7412,6 +7565,8 @@
                 // Apply slightly more width for the 'Fixed' tab to prevent name/bar overlap
                 labelsWidth = Math.max(110, Math.min(200, maxChars * 5.8 + 24));
             }
+            // stash for row render below
+            window._currentCatEffBudgets = currentEff ? currentEff.budgets : null;
         }
 
         let visibleIdx = 0;
@@ -7623,10 +7778,12 @@
                 const type = cat.$type;
                 const catId = cat.id || cat.category_name;
                 const key = type + ':' + catId;
-                const spent = Math.round(totals[key] || 0);
+                const rawTotal = Math.round(totals[key] || 0);
+                // Incomes are stored as negative amounts — show absolute received
+                const spent = type === 'income' ? Math.abs(rawTotal) : rawTotal;
 
-                // Hide 0-spent categories (Planned and Current should always show, Fixed hide if 0)
-                if (type === 'fixed' && spent === 0) return;
+                // Hide 0-spent categories (Planned and Current should always show, Fixed/Income hide if 0)
+                if ((type === 'fixed' || type === 'income') && spent === 0) return;
 
                 let color, icon;
                 if (type === 'current') {
@@ -7636,28 +7793,55 @@
                     // Color distribution based on visible index as requested (cycling among shown items)
                     const colorIdx = visibleIdx % BUDGET_COLORS.length;
                     color = BUDGET_COLORS[colorIdx];
-                    icon = { fa: type === 'fixed' ? 'fa-circle-arrow-down' : 'fa-calendar-check' };
+                    icon = {
+                        fa: type === 'income' ? 'fa-circle-arrow-up'
+                            : (type === 'fixed' ? 'fa-circle-arrow-down' : 'fa-calendar-check')
+                    };
                     state.viewCategoryColors[key] = colorIdx;
                     visibleIdx++;
                 }
 
-                const budget = type === 'current' 
+                const isRemCat = type === 'current' && isRemainderCat(catId);
+                let budget = type === 'current' 
                     ? safeParseFloat(cat.monthly_budget || 0)
                     : safeParseFloat(cat.budget_amount || 0);
+                if (type === 'current' && window._currentCatEffBudgets) {
+                    budget = safeParseFloat(window._currentCatEffBudgets[String(catId)] || 0);
+                }
                 
-                const hasBudget = budget > 0;
-                const remaining = budget - spent;
-                const pct = hasBudget ? Math.round((spent / budget) * 100) : 0;
-                const barPct = Math.min(100, pct);
-                const isOver = hasBudget && spent > budget;
+                const hasBudget = type === 'current' ? (isRemCat || budget !== 0 || safeParseFloat(cat.monthly_budget || 0) > 0) : budget > 0;
+                const showBudgetMetrics = type === 'current' ? (isRemCat || Math.abs(budget) > 0.0001 || safeParseFloat(cat.monthly_budget || 0) > 0) : budget > 0;
+                // Income: remaining = actual − planned (surplus when received more)
+                const remaining = type === 'income' ? (spent - budget) : (budget - spent);
+                const pct = showBudgetMetrics && budget !== 0 ? Math.round((spent / budget) * 100) : 0;
+                const barPct = Math.min(100, Math.max(0, pct));
+                const isOver = showBudgetMetrics && (
+                    type === 'income' ? spent < budget : spent > budget
+                );
+                const pacedSoFar = showBudgetMetrics ? Math.round(budget / cycleTotalDays) * cycleDayNum : 0;
+                const catBalance = Math.round(pacedSoFar - spent);
+                const catBalanceStr = `${catBalance < 0 ? '-₪' : '₪'}${Math.abs(catBalance).toLocaleString()}`;
+                let remainingHtml;
+                if (type === 'current') {
+                    remainingHtml = `<span class="${catBalance < 0 ? 'text-red-500' : 'text-slate-400'}">מאזן <span class="ltr-num">${catBalanceStr}</span></span>`;
+                } else if (type === 'income') {
+                    remainingHtml = remaining >= 0
+                        ? `עודף ₪${Math.round(Math.abs(remaining)).toLocaleString()}`
+                        : `חסר ₪${Math.round(Math.abs(remaining)).toLocaleString()}`;
+                } else {
+                    remainingHtml = `${isOver ? 'חריגה ' : 'נותר '}₪${Math.round(Math.abs(remaining)).toLocaleString()}`;
+                }
                 
                 const filterId = type === 'current' ? catId : 'budget:' + catId;
                 const isActive = state.activeCategoryFilter === filterId;
 
-                // Show only child category for fixed
-                const displayName = (type === 'fixed') 
+                // Show only child category for fixed/income
+                const displayName = (type === 'fixed' || type === 'income') 
                     ? cat.category_name 
                     : (cat.parent_group ? `${cat.parent_group} > ${cat.category_name}` : (cat.name || cat.category_name));
+                const budgetLabel = type === 'current' && showBudgetMetrics
+                    ? ` (₪${Math.round(budget).toLocaleString()})`
+                    : (hasBudget && type !== 'current' ? ` (₪${Math.round(budget).toLocaleString()})` : '');
                 
                 const iconHtml = (type === 'current')
                     ? `<div class="w-6 h-6 flex items-center justify-center flex-shrink-0">
@@ -7667,7 +7851,7 @@
                             <i class="fa-solid ${icon.fa} text-[11px]" style="color:${color.hex}"></i>
                        </div>`;
 
-                const showBarAndRemaining = type !== 'current' || hasBudget;
+                const showBarAndRemaining = type !== 'current' || showBudgetMetrics;
 
                 // Layout (Single Line): Icon+Name (Right) | Data/Bar (Left)
                 const row = document.createElement('div');
@@ -7679,20 +7863,20 @@
                     <!-- Right Part: Icon/Name -->
                     <div class="flex items-center gap-1 flex-shrink-0 overflow-hidden" style="width: ${labelsWidth}px">
                         ${iconHtml}
-                        <span class="text-[10px] sm:text-xs text-slate-700 whitespace-nowrap">${displayName}${hasBudget ? ` (₪${Math.round(budget).toLocaleString()})` : ''}</span>
+                        <span class="text-[10px] sm:text-xs text-slate-700 whitespace-nowrap">${displayName}${budgetLabel}</span>
                     </div>
 
                     <!-- Left Part: Data/Bar -->
                     <div class="flex-1 min-w-0 flex flex-col justify-center px-1">
-                        <div class="flex items-center justify-between text-[11px] sm:text-xs ${showBarAndRemaining && hasBudget ? 'mb-0.5' : ''}">
+                        <div class="flex items-center justify-between text-[11px] sm:text-xs ${showBarAndRemaining && showBudgetMetrics ? 'mb-0.5' : ''}">
                             <span class="font-black ltr-num" style="color:${color.hex}">₪${spent.toLocaleString()}</span>
-                            ${showBarAndRemaining && hasBudget ? `
-                                <span class="font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} ltr-num">
-                                    ${isOver ? 'חריגה ' : 'נותר '}₪${Math.round(Math.abs(remaining)).toLocaleString()}
+                            ${showBarAndRemaining && showBudgetMetrics ? `
+                                <span class="font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap">
+                                    ${remainingHtml}
                                 </span>
                             ` : ''}
                         </div>
-                        ${showBarAndRemaining && hasBudget ? `
+                        ${showBarAndRemaining && showBudgetMetrics ? `
                             <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                 <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
                             </div>
@@ -7871,27 +8055,35 @@
         list.innerHTML = '';
 
         const cats = state.expenseCategories || [];
+        const spentByCat = getCurrentCycleSpentByCatId();
+        const eff = computeCurrentCategoryBudgets(spentByCat);
 
-        // Render budget summary bar
+        // Render budget summary bar — fixed allocations vs g4; remainder fills the rest
         const summaryBar = document.getElementById('catBudgetSummaryBar');
         const g4 = safeParseFloat(state.budget.g4);
-        const totalCatBudget = cats.reduce((s, c) => s + safeParseFloat(c.monthly_budget || 0), 0);
-        const hasBudgets = cats.some(c => safeParseFloat(c.monthly_budget || 0) > 0);
+        const fixedAllocated = eff.fixedSum;
+        const hasBudgets = cats.some(c => isRemainderCat(c.id) || safeParseFloat(c.monthly_budget || 0) > 0);
 
         if (summaryBar) {
             if (hasBudgets && g4 > 0) {
                 summaryBar.classList.remove('hidden');
-                const pct = Math.min(100, Math.round((totalCatBudget / g4) * 100));
-                const diff = g4 - totalCatBudget;
+                const pct = Math.min(100, Math.round((fixedAllocated / g4) * 100));
+                const diff = g4 - fixedAllocated;
                 const isOver = diff < 0;
                 document.getElementById('catBudgetG4').textContent = `₪${Math.round(g4).toLocaleString()}`;
-                document.getElementById('catBudgetTotal').textContent = `₪${Math.round(totalCatBudget).toLocaleString()}`;
+                document.getElementById('catBudgetTotal').textContent = `₪${Math.round(fixedAllocated).toLocaleString()}`;
                 const bar = document.getElementById('catBudgetBar');
                 if (bar) { bar.style.width = pct + '%'; bar.style.background = isOver ? '#ef4444' : pct > 90 ? '#f59e0b' : '#3b82f6'; }
                 const diffEl = document.getElementById('catBudgetDiff');
                 if (diffEl) {
-                    diffEl.textContent = isOver ? `חריגה של ₪${Math.round(Math.abs(diff)).toLocaleString()}` : `נותר ₪${Math.round(diff).toLocaleString()}`;
-                    diffEl.style.color = isOver ? '#ef4444' : '#64748b';
+                    if (eff.remainderCount > 0) {
+                        const poolDisp = Math.round(eff.pool);
+                        diffEl.textContent = `כל השאר: ₪${poolDisp.toLocaleString()}${eff.remainderCount > 1 ? ` (${eff.remainderCount} קטגוריות)` : ''}`;
+                        diffEl.style.color = poolDisp < 0 ? '#ef4444' : '#64748b';
+                    } else {
+                        diffEl.textContent = isOver ? `חריגה של ₪${Math.round(Math.abs(diff)).toLocaleString()}` : `נותר ₪${Math.round(diff).toLocaleString()}`;
+                        diffEl.style.color = isOver ? '#ef4444' : '#64748b';
+                    }
                 }
                 document.getElementById('catBudgetPct').textContent = pct + '%';
             } else {
@@ -7937,21 +8129,27 @@
                     <div class="text-[10px] font-bold text-slate-400 mb-1">אייקון</div>
                     ${iconHtml}
                 </div>
-                <div class="flex items-center justify-between gap-2 pt-1 px-1">
-                    <div class="flex items-center gap-1.5">
-                        <span class="text-[10px] font-bold text-slate-400">תקציב:</span>
-                        <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 w-20">
-                            <span class="text-slate-400 text-[10px]">₪</span>
-                            <input type="number" id="inlineAddBudget" value="${_tempInlineBudget}" oninput="_tempInlineBudget=this.value" placeholder="חודשי" class="w-full bg-transparent border-none outline-none text-xs text-slate-700">
+                <div class="flex flex-col gap-2 pt-1 px-1">
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" ${_tempInlineRemainder ? 'checked' : ''} onchange="_tempInlineRemainder=this.checked; renderCategoriesListModal()" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                        <span class="text-[10px] font-bold text-slate-600">כל השאר</span>
+                    </label>
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-1.5 ${_tempInlineRemainder ? 'opacity-40 pointer-events-none' : ''}">
+                            <span class="text-[10px] font-bold text-slate-400">תקציב:</span>
+                            <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 w-20">
+                                <span class="text-slate-400 text-[10px]">₪</span>
+                                <input type="number" id="inlineAddBudget" value="${_tempInlineRemainder ? '' : _tempInlineBudget}" oninput="_tempInlineBudget=this.value" placeholder="חודשי" ${_tempInlineRemainder ? 'disabled' : ''} class="w-full bg-transparent border-none outline-none text-xs text-slate-700">
+                            </div>
                         </div>
-                    </div>
-                    <div class="flex gap-1 flex-shrink-0">
-                        <button onclick="window.saveInline(null)" class="w-7 h-7 bg-blue-600 text-white rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors">
-                            <i class="fa-solid fa-check text-xs"></i>
-                        </button>
-                        <button onclick="window.cancelInline()" class="w-7 h-7 bg-slate-200 text-slate-600 rounded-lg flex items-center justify-center hover:bg-slate-300 transition-colors">
-                            <i class="fa-solid fa-xmark text-xs"></i>
-                        </button>
+                        <div class="flex gap-1 flex-shrink-0">
+                            <button onclick="window.saveInline(null)" class="w-7 h-7 bg-blue-600 text-white rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors">
+                                <i class="fa-solid fa-check text-xs"></i>
+                            </button>
+                            <button onclick="window.cancelInline()" class="w-7 h-7 bg-slate-200 text-slate-600 rounded-lg flex items-center justify-center hover:bg-slate-300 transition-colors">
+                                <i class="fa-solid fa-xmark text-xs"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -8000,6 +8198,8 @@
             const color = isEditing ? getCatColor(_editingCatColor) : getCatColor(cat.color);
             const icon = isEditing ? getCatIcon(_editingCatIcon) : getCatIcon(cat.icon);
             const budget = safeParseFloat(cat.monthly_budget || 0);
+            const isRem = isRemainderCat(cat.id);
+            const effBudget = Math.round(safeParseFloat(eff.budgets[String(cat.id)] || 0));
 
             const div = document.createElement('div');
             if (isEditing) {
@@ -8037,34 +8237,43 @@
                         <div class="text-[10px] font-bold text-slate-400 mb-1">אייקון</div>
                         ${iconHtml}
                     </div>
-                    <div class="flex items-center justify-between gap-2 pt-1 px-1">
-                        <div class="flex items-center gap-1.5">
-                            <span class="text-[10px] font-bold text-slate-400">תקציב:</span>
-                            <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 w-20">
-                                <span class="text-slate-400 text-[10px]">₪</span>
-                                <input type="number" id="inlineEditBudget" value="${_tempInlineBudget !== null ? _tempInlineBudget : (budget > 0 ? Math.round(budget) : '')}" oninput="_tempInlineBudget=this.value" placeholder="חודשי" class="w-full bg-transparent border-none outline-none text-xs text-slate-700">
+                    <div class="flex flex-col gap-2 pt-1 px-1">
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" ${_tempInlineRemainder ? 'checked' : ''} onchange="_tempInlineRemainder=this.checked; renderCategoriesListModal()" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-[10px] font-bold text-slate-600">כל השאר</span>
+                        </label>
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-1.5 ${_tempInlineRemainder ? 'opacity-40 pointer-events-none' : ''}">
+                                <span class="text-[10px] font-bold text-slate-400">תקציב:</span>
+                                <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 w-20">
+                                    <span class="text-slate-400 text-[10px]">₪</span>
+                                    <input type="number" id="inlineEditBudget" value="${_tempInlineRemainder ? '' : (_tempInlineBudget !== null ? _tempInlineBudget : (budget > 0 ? Math.round(budget) : ''))}" oninput="_tempInlineBudget=this.value" placeholder="חודשי" ${_tempInlineRemainder ? 'disabled' : ''} class="w-full bg-transparent border-none outline-none text-xs text-slate-700">
+                                </div>
                             </div>
-                        </div>
-                        <div class="flex gap-1 flex-shrink-0">
-                            <button type="button" onclick="window.saveInline('${cat.id}')" class="w-7 h-7 bg-blue-600 text-white rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors">
-                                <i class="fa-solid fa-check text-xs"></i>
-                            </button>
-                            ${_isConfirmingDeleteId === cat.id ? `
-                                <button type="button" onclick="window.deleteCategory('${cat.id}')" class="px-2 h-7 bg-red-600 text-white rounded-lg flex items-center justify-center hover:bg-red-700 transition-all text-[9px] font-bold animate-pulse">
-                                    בטוח? מחק
+                            <div class="flex gap-1 flex-shrink-0">
+                                <button type="button" onclick="window.saveInline('${cat.id}')" class="w-7 h-7 bg-blue-600 text-white rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors">
+                                    <i class="fa-solid fa-check text-xs"></i>
                                 </button>
-                            ` : `
-                                <button type="button" onclick="window.armDelete('${cat.id}')" class="w-7 h-7 bg-red-50 text-red-500 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors">
-                                    <i class="fa-solid fa-trash text-xs"></i>
+                                ${_isConfirmingDeleteId === cat.id ? `
+                                    <button type="button" onclick="window.deleteCategory('${cat.id}')" class="px-2 h-7 bg-red-600 text-white rounded-lg flex items-center justify-center hover:bg-red-700 transition-all text-[9px] font-bold animate-pulse">
+                                        בטוח? מחק
+                                    </button>
+                                ` : `
+                                    <button type="button" onclick="window.armDelete('${cat.id}')" class="w-7 h-7 bg-red-50 text-red-500 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors">
+                                        <i class="fa-solid fa-trash text-xs"></i>
+                                    </button>
+                                `}
+                                <button type="button" onclick="window.cancelInline()" class="w-7 h-7 bg-slate-200 text-slate-600 rounded-lg flex items-center justify-center hover:bg-slate-300 transition-colors">
+                                    <i class="fa-solid fa-xmark text-xs"></i>
                                 </button>
-                            `}
-                            <button type="button" onclick="window.cancelInline()" class="w-7 h-7 bg-slate-200 text-slate-600 rounded-lg flex items-center justify-center hover:bg-slate-300 transition-colors">
-                                <i class="fa-solid fa-xmark text-xs"></i>
-                            </button>
+                            </div>
                         </div>
                     </div>
                 `;
             } else {
+                const budgetLabel = isRem
+                    ? `<span class="text-[9px] font-bold text-emerald-600 whitespace-nowrap">כל השאר · ₪${effBudget.toLocaleString()}</span>`
+                    : (budget > 0 ? `<span class="text-[9px] font-bold ltr-num text-slate-400">₪${Math.round(budget).toLocaleString()}</span>` : '');
                 div.className = 'flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-100';
                 div.innerHTML = `
                     <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
@@ -8072,7 +8281,7 @@
                     </div>
                     <div class="flex-1 min-w-0 flex items-center gap-2">
                         <span class="text-xs font-medium text-slate-700 truncate">${cat.name}</span>
-                        ${budget > 0 ? `<span class="text-[9px] font-bold ltr-num text-slate-400">₪${Math.round(budget).toLocaleString()}</span>` : ''}
+                        ${budgetLabel}
                     </div>
                     <button onclick="window.startInlineEdit('${cat.id}')" class="p-1 text-slate-300 hover:text-blue-600 transition-colors">
                         <i class="fa-solid fa-pen text-[10px]"></i>
@@ -8088,7 +8297,8 @@
         _inlineEditingId = id;
         _isInlineAdding = false;
         _tempInlineName = cat.name;
-        _tempInlineBudget = cat.monthly_budget > 0 ? Math.round(cat.monthly_budget) : '';
+        _tempInlineRemainder = isRemainderCat(cat.id);
+        _tempInlineBudget = (!_tempInlineRemainder && cat.monthly_budget > 0) ? Math.round(cat.monthly_budget) : '';
         _editingCatColor = cat.color;
         _editingCatIcon = cat.icon;
         renderCategoriesListModal();
@@ -8099,6 +8309,7 @@
         _inlineEditingId = null;
         _tempInlineName = '';
         _tempInlineBudget = '';
+        _tempInlineRemainder = false;
         // Defaults for new category
         _editingCatColor = CAT_COLORS[0].id;
         _editingCatIcon = CAT_ICONS[0].id;
@@ -8108,6 +8319,7 @@
     window.cancelInline = function() {
         _inlineEditingId = null;
         _isInlineAdding = false;
+        _tempInlineRemainder = false;
         _isConfirmingDeleteId = null;
         _tempInlineName = '';
         _tempInlineBudget = null;
@@ -8186,12 +8398,13 @@
         const name = (_tempInlineName || '').trim();
         if (!name) return window.showToast('נא להזין שם', 'circle-xmark');
         
-        const monthly_budget = safeParseFloat(_tempInlineBudget || '0');
+        const asRemainder = !!_tempInlineRemainder;
+        const monthly_budget = asRemainder ? 0 : safeParseFloat(_tempInlineBudget || '0');
         
         try {
             setLoading(true);
+            let savedId = catId;
             if (catId) {
-                // Update
                 const { error } = await sbClient.from('expense_categories')
                     .update({ 
                         name, 
@@ -8202,21 +8415,25 @@
                     .eq('id', catId).eq('user_token', USER_TOKEN);
                 if (error) throw error;
             } else {
-                // Insert
-                const { error } = await sbClient.from('expense_categories')
+                const { data, error } = await sbClient.from('expense_categories')
                     .insert({ 
                         name, 
                         monthly_budget, 
                         color: _editingCatColor, 
                         icon: _editingCatIcon,
                         user_token: USER_TOKEN 
-                    });
+                    })
+                    .select('id')
+                    .single();
                 if (error) throw error;
+                savedId = data && data.id;
             }
+            if (savedId) await persistCatRemainder(savedId, asRemainder);
             
             window.showToast('נשמר', 'check');
             _inlineEditingId = null;
             _isInlineAdding = false;
+            _tempInlineRemainder = false;
             await window.fetchExpenseCategories();
             renderCategoriesListModal();
             render();
@@ -8279,8 +8496,12 @@
         if (titleEl) titleEl.textContent = cat ? 'עריכת קטגוריה' : 'קטגוריה חדשה';
         const nameEl = document.getElementById('catEditName');
         if (nameEl) nameEl.value = cat ? cat.name : '';
+        const remCb = document.getElementById('catEditRemainder');
+        const isRem = !!(cat && isRemainderCat(cat.id));
+        if (remCb) remCb.checked = isRem;
         const budgetEl = document.getElementById('catEditBudget');
-        if (budgetEl) budgetEl.value = cat && safeParseFloat(cat.monthly_budget) > 0 ? Math.round(safeParseFloat(cat.monthly_budget)) : '';
+        if (budgetEl) budgetEl.value = (!isRem && cat && safeParseFloat(cat.monthly_budget) > 0) ? Math.round(safeParseFloat(cat.monthly_budget)) : '';
+        window.onCatEditRemainderToggle();
         const delBtn = document.getElementById('deleteCategoryBtn');
         if (delBtn) delBtn.classList.toggle('hidden', !cat);
 
@@ -8470,22 +8691,40 @@
         if (e.target.id === 'catEditName') updateCatPreview();
     });
 
+    window.onCatEditRemainderToggle = function() {
+        const remCb = document.getElementById('catEditRemainder');
+        const wrap = document.getElementById('catEditBudgetWrap');
+        const hint = document.getElementById('catEditRemainderHint');
+        const budgetEl = document.getElementById('catEditBudget');
+        const on = !!(remCb && remCb.checked);
+        if (wrap) wrap.classList.toggle('opacity-40', on);
+        if (wrap) wrap.classList.toggle('pointer-events-none', on);
+        if (budgetEl) budgetEl.disabled = on;
+        if (hint) hint.classList.toggle('hidden', !on);
+    };
+
     window.saveCategory = async function() {
         const name = (document.getElementById('catEditName')?.value || '').trim();
         if (!name) return window.showToast('נא להזין שם', 'circle-xmark');
         if (!sbClient || !USER_TOKEN) return;
-        const monthly_budget = safeParseFloat(document.getElementById('catEditBudget')?.value || '0');
+        const asRemainder = !!(document.getElementById('catEditRemainder')?.checked);
+        const monthly_budget = asRemainder ? 0 : safeParseFloat(document.getElementById('catEditBudget')?.value || '0');
         try {
+            let savedId = _editingCatId;
             if (_editingCatId) {
                 const { error } = await sbClient.from('expense_categories')
                     .update({ name, color: _editingCatColor, icon: _editingCatIcon, monthly_budget })
                     .eq('id', _editingCatId).eq('user_token', USER_TOKEN);
                 if (error) throw error;
             } else {
-                const { error } = await sbClient.from('expense_categories')
-                    .insert({ name, color: _editingCatColor, icon: _editingCatIcon, monthly_budget, user_token: USER_TOKEN });
+                const { data, error } = await sbClient.from('expense_categories')
+                    .insert({ name, color: _editingCatColor, icon: _editingCatIcon, monthly_budget, user_token: USER_TOKEN })
+                    .select('id')
+                    .single();
                 if (error) throw error;
+                savedId = data && data.id;
             }
+            if (savedId) await persistCatRemainder(savedId, asRemainder);
             window.closeEditCategoryModal();
             await window.fetchExpenseCategories();
             renderCategoriesListModal();
@@ -8528,7 +8767,10 @@
                 console.warn("Transactions update error:", txErr);
             }
 
-            // 2. Delete the category itself
+            // 2. Clear remainder flag if any
+            await persistCatRemainder(targetId, false);
+
+            // 3. Delete the category itself
             const { error: catErr } = await sbClient.from('expense_categories')
                 .delete()
                 .eq('id', targetId)
@@ -9001,7 +9243,7 @@
         const cycle = getCurrentCycleDates(now, state.budget.cycleStartDay || 1);
         const cycleStart = cycle.startDate;
         const cycleEnd = cycle.endDate;
-        const cycleTotalDays = Math.round((cycleEnd - cycleStart) / (1000 * 3600 * 24)) + 1;
+        const cycleTotalDays = getCycleLengthDays(cycleStart, cycleEnd);
         const cycleStartMs = cycleStart.getTime();
         const cycleEndMs = cycleEnd.getTime();
 
@@ -9083,9 +9325,7 @@
                 const over = spending > budget;
 
                 // Dynamic daily budget and pacing calculation based on custom cycle dates
-                const msPassed = now.getTime() - cycleStart.getTime();
-                const daysPassedInCycle = Math.floor(msPassed / (1000 * 3600 * 24)) + 1;
-                const cycleDayNum = Math.min(cycleTotalDays, Math.max(1, daysPassedInCycle));
+                const cycleDayNum = getCycleDayNumber(now, cycleStart, cycleTotalDays);
 
                 const dynamicDailyBudget = budget / cycleTotalDays;
                 const currentBudget = dynamicDailyBudget * cycleDayNum;
@@ -9256,7 +9496,7 @@
                 if (state.activeCategoryFilter.startsWith('group:')) {
                     const groupName = state.activeCategoryFilter.slice(6);
                     const vb = getViewBudget();
-                    const allBudget = [...(vb.fixed || []), ...(vb.annual || []), ...(vb.savings || [])];
+                    const allBudget = [...(vb.fixed || []), ...(vb.annual || []), ...(vb.savings || []), ...(vb.incomes || [])];
                     const catsInGroup = allBudget.filter(b => b.parent_group === groupName);
                     return catsInGroup.some(cat => tagMatchesCat(tx.tag, cat));
                 }
@@ -9264,7 +9504,7 @@
                 if (state.activeCategoryFilter.startsWith('budget:')) {
                     const catId = state.activeCategoryFilter.slice(7);
                     const vb = getViewBudget();
-                    const allBudget = [...(vb.fixed || []), ...(vb.annual || []), ...(vb.savings || [])];
+                    const allBudget = [...(vb.fixed || []), ...(vb.annual || []), ...(vb.savings || []), ...(vb.incomes || [])];
                     const cat = allBudget.find(b => String(b.id || b.category_name) === catId);
                     return cat ? tagMatchesCat(tx.tag, cat) : false;
                 }
@@ -9543,8 +9783,26 @@
         const listEl = document.getElementById('transactionList');
         if (listEl) {
             const fragment = document.createDocumentFragment();
-            Object.keys(grouped).sort((a,b) => parseLocalDate(b) - parseLocalDate(a)).forEach(date => {
+            const sortedDates = Object.keys(grouped).sort((a,b) => parseLocalDate(b) - parseLocalDate(a));
+            const startDay = state.budget.cycleStartDay || 1;
+            let lastCycleStartISO = null;
+
+            sortedDates.forEach(date => {
                 const g = grouped[date];
+
+                // Fixed view: on the newest day of each budget month, insert diff
+                // row AFTER the date header and BEFORE that day's transactions.
+                let insertDiffAfterHeader = null;
+                if (state.mainViewFilter === 'fixed') {
+                    const d = parseLocalDate(date);
+                    const cycle = getCurrentCycleDates(d, startDay);
+                    const cycleISO = localDateToISO(cycle.startDate);
+                    if (cycleISO !== lastCycleStartISO) {
+                        lastCycleStartISO = cycleISO;
+                        insertDiffAfterHeader = cycle;
+                    }
+                }
+
                 const h = document.createElement('div');
                 h.className = 'sticky-header py-0.5 px-1 text-[9px] font-bold text-slate-400 flex justify-between tracking-wider border-b border-slate-100';
                 
@@ -9566,6 +9824,12 @@
                 
                 h.innerHTML = `<span>${date}</span><span class="ltr-num">${textContent}</span>`;
                 fragment.appendChild(h);
+
+                if (insertDiffAfterHeader) {
+                    const row = createFixedMonthDiffRow(insertDiffAfterHeader.startDate, insertDiffAfterHeader.endDate);
+                    if (row) fragment.appendChild(row);
+                }
+
                 g.items.forEach((tx, idx) => {
                     const el = createTransactionEl(tx);
                     fragment.appendChild(el);
@@ -9661,9 +9925,10 @@
             
             let displayName = tx.tag;
             if (cat) {
-                const isFixed = (budgetForTag.fixed || []).some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name)
-                    || (budgetForTag.savings || []).some(s => (s.id && s.id === cat.id) || s.category_name === cat.category_name);
-                displayName = isFixed ? cat.category_name : (cat.parent_group ? cat.parent_group + ' : ' + cat.category_name : cat.category_name);
+                const isFixedOrIncome = (budgetForTag.fixed || []).some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name)
+                    || (budgetForTag.savings || []).some(s => (s.id && s.id === cat.id) || s.category_name === cat.category_name)
+                    || (budgetForTag.incomes || []).some(i => (i.id && i.id === cat.id) || i.category_name === cat.category_name);
+                displayName = isFixedOrIncome ? cat.category_name : (cat.parent_group ? cat.parent_group + ' : ' + cat.category_name : cat.category_name);
             } else {
                 const sep = String(tx.tag).indexOf(' > ');
                 if (sep !== -1) displayName = tx.tag.slice(0, sep).trim() + ' : ' + tx.tag.slice(sep + 3).trim();
@@ -9674,9 +9939,12 @@
                 // שוטף view: gray tags for fixed/planned (like former "הכל" view)
                 style = `style="background:#f1f5f9; color:#475569; border: 1px solid #e2e8f0"`;
             } else if (cat) {
-                 const isFixedCat = (budgetForTag.fixed || []).some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name)
-                    || (budgetForTag.savings || []).some(s => (s.id && s.id === cat.id) || s.category_name === cat.category_name);
-                 const categoryType = isFixedCat ? 'fixed' : 'planned';
+                 const isIncomeCat = (budgetForTag.incomes || []).some(i => (i.id && i.id === cat.id) || i.category_name === cat.category_name);
+                 const isFixedCat = !isIncomeCat && (
+                    (budgetForTag.fixed || []).some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name)
+                    || (budgetForTag.savings || []).some(s => (s.id && s.id === cat.id) || s.category_name === cat.category_name)
+                 );
+                 const categoryType = isIncomeCat ? 'income' : (isFixedCat ? 'fixed' : 'planned');
                  const key = categoryType + ':' + (cat.id || cat.category_name);
                  const idx = state.viewCategoryColors ? state.viewCategoryColors[key] : undefined;
                  
@@ -9684,9 +9952,11 @@
                      const c = BUDGET_COLORS[idx % BUDGET_COLORS.length];
                      style = `style="background:${c.bg}; color:${c.hex}; border: 1px solid ${c.hex}20"`;
                  } else {
-                     let listToSearch = (categoryType === 'fixed')
-                        ? [...(budgetForTag.fixed || []), ...(budgetForTag.savings || [])]
-                        : (budgetForTag.annual || []);
+                     let listToSearch = categoryType === 'income'
+                        ? (budgetForTag.incomes || [])
+                        : (categoryType === 'fixed')
+                            ? [...(budgetForTag.fixed || []), ...(budgetForTag.savings || [])]
+                            : (budgetForTag.annual || []);
                      let fallbackIdx = listToSearch.findIndex(item => (item.id && item.id === cat.id) || item.category_name === cat.category_name);
                      if (fallbackIdx !== -1) {
                          const c = BUDGET_COLORS[fallbackIdx % BUDGET_COLORS.length];
@@ -10105,8 +10375,183 @@
         if (!tx || !tx.tag) return false;
         const b = getBudgetForTx(tx);
         return (b.fixed || []).some(f => tagMatchesCat(tx.tag, f)) ||
-            (b.savings || []).some(s => tagMatchesCat(tx.tag, s));
+            (b.savings || []).some(s => tagMatchesCat(tx.tag, s)) ||
+            (b.incomes || []).some(i => tagMatchesCat(tx.tag, i));
     }
+
+    const FIXED_DIFF_TX_NAME = 'שינוי בהוצאות/הכנסות קבועות';
+    const FIXED_DIFF_TX_NAMES_LEGACY = ['הפרש קבוע', 'שינוי בהוצאות/בכנסות קבועות'];
+
+    function isFixedDiffTransferName(name) {
+        return name === FIXED_DIFF_TX_NAME || FIXED_DIFF_TX_NAMES_LEGACY.includes(name);
+    }
+
+    function txDateToISO(tx) {
+        if (!tx || !tx.date) return '';
+        const p = String(tx.date).split('/');
+        if (p.length !== 3) return '';
+        return `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+    }
+
+    function computeFixedMonthDiff(startDate, endDate) {
+        const vb = getViewBudget();
+        let diff = 0;
+        const txsInMonth = (state.transactions || []).filter(tx => {
+            if (!tx || tx.isAdjustment || tx.isVirtual || tx.isVirtualMarker) return false;
+            if (!txBelongsToSelectedBudget(tx)) return false;
+            if (!tx.tag) return false;
+            if (isFixedDiffTransferName(tx.name)) return false;
+            const d = parseLocalDate(tx.date);
+            return d >= startDate && d <= endDate;
+        });
+        function sumForCat(cat) {
+            return txsInMonth
+                .filter(tx => tagMatchesCat(tx.tag, cat))
+                .reduce((s, t) => s + safeParseFloat(t.amount), 0);
+        }
+        // Only categories the user actually recorded this month —
+        // untouched categories are assumed equal to budget (diff 0).
+        function hasActivity(cat) {
+            return txsInMonth.some(tx => tagMatchesCat(tx.tag, cat));
+        }
+        (vb.fixed || []).forEach(cat => {
+            if (!hasActivity(cat)) return;
+            const planned = safeParseFloat(cat.budget_amount || 0);
+            diff += planned - sumForCat(cat);
+        });
+        (vb.savings || []).forEach(cat => {
+            if (!hasActivity(cat)) return;
+            const planned = safeParseFloat(cat.budget_amount || 0);
+            diff += planned - sumForCat(cat);
+        });
+        (vb.incomes || []).forEach(cat => {
+            if (!hasActivity(cat)) return;
+            const planned = safeParseFloat(cat.budget_amount || 0);
+            const actualReceived = Math.abs(sumForCat(cat));
+            diff += actualReceived - planned;
+        });
+        return { diff };
+    }
+
+    // Find all transfer txs for a budget month (includes legacy name + day-before date bug)
+    function findFixedDiffTransferTxs(cycleStartISO) {
+        if (!cycleStartISO) return [];
+        const iso = String(cycleStartISO).slice(0, 10);
+        const [y, m, d] = iso.split('-').map(Number);
+        if (!y || !m || !d) return [];
+        const dayBeforeISO = localDateToISO(new Date(y, m - 1, d - 1));
+        return (state.transactions || []).filter(tx => {
+            if (!tx || tx.isVirtual || tx.isVirtualMarker || tx.isAdjustment) return false;
+            if (!isFixedDiffTransferName(tx.name)) return false;
+            if (tx.tag) return false;
+            const txISO = txDateToISO(tx);
+            return txISO === iso || txISO === dayBeforeISO;
+        });
+    }
+
+    function getTransferredFixedDiff(cycleStartISO) {
+        const txs = findFixedDiffTransferTxs(cycleStartISO);
+        if (!txs.length) return null;
+        return txs.reduce((s, tx) => s + (-safeParseFloat(tx.amount)), 0);
+    }
+
+    function formatFixedDiffSign(n) {
+        const r = Math.round(n);
+        return (r > 0 ? '+' : '') + r;
+    }
+
+    function createFixedMonthDiffRow(startDate, endDate) {
+        const { diff } = computeFixedMonthDiff(startDate, endDate);
+        const cycleISO = localDateToISO(startDate);
+        const existingTxs = findFixedDiffTransferTxs(cycleISO);
+        const transferred = existingTxs.length
+            ? existingTxs.reduce((s, tx) => s + (-safeParseFloat(tx.amount)), 0)
+            : null;
+        const rounded = Math.round(diff);
+        const transferredRounded = transferred !== null ? Math.round(transferred) : null;
+        const hasDupes = existingTxs.length > 1;
+
+        if (transferredRounded === null && Math.abs(rounded) < 1) return null;
+
+        const el = document.createElement('div');
+        el.className = 'bg-white compact-tx rounded-xl shadow-sm mb-0.5';
+        // Documentation only when a single matching transfer exists (no duplicates)
+        const matches = transferredRounded !== null && transferredRounded === rounded && !hasDupes;
+        const innerBase = 'w-full py-2 px-3 rounded-xl text-xs font-bold text-center';
+
+        if (matches) {
+            el.innerHTML = `
+                <div class="${innerBase} bg-slate-50 border border-slate-100 text-slate-500">
+                    הועבר לשוטף הפרש של <span class="ltr-num">${formatFixedDiffSign(rounded)}</span>
+                </div>`;
+        } else if (transferredRounded !== null) {
+            el.innerHTML = `
+                <button type="button" onclick="window.transferFixedMonthDiff('${cycleISO}', ${rounded})"
+                    class="${innerBase} bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors">
+                    עדכן הפרש מ-<span class="ltr-num">${formatFixedDiffSign(transferredRounded)}</span> ל-<span class="ltr-num">${formatFixedDiffSign(rounded)}</span>
+                </button>`;
+        } else {
+            el.innerHTML = `
+                <button type="button" onclick="window.transferFixedMonthDiff('${cycleISO}', ${rounded})"
+                    class="${innerBase} bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-colors">
+                    העבר לתקציב השוטף הפרש של <span class="ltr-num">${formatFixedDiffSign(rounded)}</span>
+                </button>`;
+        }
+        return el;
+    }
+
+    window.transferFixedMonthDiff = async function(cycleStartISO, newDiff) {
+        if (!sbClient || !USER_TOKEN) return window.toggleSettings();
+        const rounded = Math.round(safeParseFloat(newDiff));
+        setLoading(true, true);
+        try {
+            // Delete all existing transfer txs for this month (incl. duplicates / legacy)
+            const existing = findFixedDiffTransferTxs(cycleStartISO);
+            for (const tx of existing) {
+                const delId = tx.id || tx.row;
+                if (!delId) continue;
+                const { error: delErr } = await sbClient
+                    .from('transactions')
+                    .delete()
+                    .eq('id', delId)
+                    .eq('user_token', USER_TOKEN);
+                if (delErr) throw delErr;
+                state.transactions = state.transactions.filter(t => t.id !== delId && t.row !== delId);
+            }
+
+            if (Math.abs(rounded) >= 0.5) {
+                const amount = -rounded; // positive diff → income (negative amount)
+                const now = new Date();
+                const tzOffset = now.getTimezoneOffset();
+                const sign = tzOffset <= 0 ? '+' : '-';
+                const absOff = Math.abs(tzOffset);
+                const tzStr = `${sign}${String(Math.floor(absOff / 60)).padStart(2, '0')}:${String(absOff % 60).padStart(2, '0')}`;
+                // Noon local time — avoids UTC shifting the calendar day back
+                const created_at = `${String(cycleStartISO).slice(0, 10)}T12:00:00${tzStr}`;
+                const { error: insErr } = await sbClient.from('transactions').insert({
+                    amount,
+                    name: FIXED_DIFF_TX_NAME,
+                    category: 'שוטף',
+                    expense_category_id: null,
+                    user_token: USER_TOKEN,
+                    created_at
+                });
+                if (insErr) throw insErr;
+            }
+
+            await window.fetchTransactionsOnly();
+            state.isDirty = true;
+            window.showToast(
+                Math.abs(rounded) < 0.5 ? 'הפרש הקבוע עודכן (הוסר)' : `הועבר לשוטף הפרש של ${formatFixedDiffSign(rounded)}`,
+                'check'
+            );
+        } catch (e) {
+            console.error(e);
+            window.showToast('שגיאה בהעברת הפרש קבוע', 'circle-xmark');
+        } finally {
+            setLoading(false, true);
+        }
+    };
 
     function findSavingsByTag(tag) {
         if (!tag) return null;
@@ -10612,18 +11057,26 @@
 
     // Surplus after keeping 3 daily budgets. Items are marked from the top of the
     // priority list; a cheaper later item is not marked if an earlier one does not fit.
+    // missing[i] = how much more balance is needed to unlock goals 0..i in order.
     function goalAffordability() {
         const goals = Array.isArray(state.goals) ? state.goals : [];
         const daily = goalMoney((safeParseFloat(state.budget.g4) || 0) / 30);
-        let available = goalMoney(state.balance) - daily * 3;
+        const surplus = goalMoney(state.balance) - daily * 3;
+        let remaining = surplus;
+        let cumulative = 0;
         const affordable = [];
+        const missing = [];
         for (let i = 0; i < goals.length; i++) {
             const cost = goalMoney(goals[i].cost);
-            if (!(cost > 0) || available < cost) break;
-            affordable.push(i);
-            available -= cost;
+            cumulative += cost;
+            const need = Math.max(0, cumulative - surplus);
+            missing.push(need);
+            if (cost > 0 && remaining >= cost) {
+                affordable.push(i);
+                remaining -= cost;
+            }
         }
-        return { goals, affordable, firstReady: affordable.includes(0) };
+        return { goals, affordable, missing, firstReady: affordable.includes(0) };
     }
 
     function updateGoalsBanner() {
@@ -10644,7 +11097,7 @@
     function renderGoalsPanel() {
         const list = document.getElementById('goalsList');
         if (!list) return;
-        const { goals, affordable } = goalAffordability();
+        const { goals, affordable, missing } = goalAffordability();
         const ready = new Set(affordable);
         if (!goals.length) {
             list.innerHTML = '<p class="text-center text-xs text-slate-400 font-semibold py-6">אין יעדים עדיין</p>';
@@ -10655,10 +11108,15 @@
             const upOff = i === 0;
             const downOff = i === goals.length - 1;
             const cost = goalMoney(g.cost).toLocaleString();
+            const need = missing[i] || 0;
+            const statusHtml = on
+                ? `<p class="text-[10px] font-bold text-emerald-600 mt-0.5">אפשר לממש</p>`
+                : `<p class="text-[10px] font-bold text-amber-600 mt-0.5">חסר ₪<span class="ltr-num">${need.toLocaleString()}</span></p>`;
             return `<div class="flex items-center gap-2 rounded-xl px-3 py-2.5 border ${on ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'}">
                 <div class="flex-1 min-w-0">
                     <p class="text-sm font-bold text-slate-800 truncate">${escapeGoalText(g.name)}</p>
                     <p class="text-xs font-bold text-slate-500 ltr-num">₪${cost}</p>
+                    ${statusHtml}
                 </div>
                 <button type="button" onclick="window.moveGoal(${i}, -1)" ${upOff ? 'disabled' : ''} class="w-8 h-8 rounded-lg flex items-center justify-center ${upOff ? 'text-slate-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}" title="עדיפות גבוהה יותר" aria-label="העלה עדיפות">
                     <i class="fa-solid fa-chevron-up text-[11px]"></i>
@@ -11229,6 +11687,7 @@
         const activeAnnuals = (pickerBudget.annual || []).filter(a => safeParseFloat(a.budget_amount) > 0 || pickerBudget.synthetic);
         const activeFixed   = (pickerBudget.fixed || []).filter(f => safeParseFloat(f.budget_amount) > 0 || pickerBudget.synthetic);
         const activeSavings = (pickerBudget.savings || []);
+        const activeIncomes = (pickerBudget.incomes || []).filter(i => safeParseFloat(i.budget_amount) > 0 || pickerBudget.synthetic);
         const ongoingCats   = state.expenseCategories || [];
 
         function getSpent(cat) {
@@ -11238,11 +11697,17 @@
                 .reduce((s, t) => s + safeParseFloat(t.amount), 0);
         }
 
+        function autofillNameFromCat(catName) {
+            if (config.pickerId !== 'addExpenseCategoryPicker' || !catName) return;
+            const nInp = document.getElementById('nameInput');
+            if (nInp && !nInp.value.trim()) nInp.value = catName;
+        }
+
         picker.innerHTML = '';
 
         let selectedLabel = 'ללא';
         if (config.currentTag) {
-            const cat = [...activeAnnuals, ...activeFixed, ...activeSavings].find(c => c.category_name.trim() === config.currentTag.trim());
+            const cat = [...activeAnnuals, ...activeFixed, ...activeSavings, ...activeIncomes].find(c => c.category_name.trim() === config.currentTag.trim());
             if (cat) selectedLabel = (cat.parent_group ? `${cat.parent_group} › ${cat.category_name}` : cat.category_name);
         } else if (config.currentCatId) {
             const cat = ongoingCats.find(c => c.id === config.currentCatId);
@@ -11254,7 +11719,7 @@
         // but user says if no categories in current/planned - hide)
         let hasCats = false;
         if (type === 'current') hasCats = ongoingCats.length > 0;
-        else if (type === 'fixed') hasCats = activeFixed.length > 0 || activeSavings.length > 0;
+        else if (type === 'fixed') hasCats = activeFixed.length > 0 || activeSavings.length > 0 || activeIncomes.length > 0;
         else if (type === 'planned') hasCats = activeAnnuals.length > 0;
 
         const container = picker.parentElement;
@@ -11333,19 +11798,26 @@
                 if (cat.parent_group) { (savingsGroups[cat.parent_group] = savingsGroups[cat.parent_group] || []).push(cat); } else savingsStandalone.push(cat);
             });
 
-            if (activeFixed.length === 0 && activeSavings.length === 0) {
+            if (activeFixed.length === 0 && activeSavings.length === 0 && activeIncomes.length === 0) {
                 const p = document.createElement('p'); p.className = 'text-[10px] text-slate-400 text-center py-5';
                 p.textContent = 'אין קטגוריות קבועות'; expanded.appendChild(p);
             } else {
-                function makeFixedItem(cat, isChild = false, isSavings = false) {
+                function makeFixedItem(cat, isChild = false, badgeKind = null) {
                     const isSelected = config.currentTag && config.currentTag.trim() === cat.category_name.trim();
                     const btn = document.createElement('button'); btn.type = 'button';
                     btn.className = `w-full flex items-center px-4 py-2.5 text-right transition-colors border-b border-slate-50 flex-shrink-0 ${isChild ? 'pr-7' : ''} ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`;
-                    const badge = isSavings ? `<span class="text-[9px] font-bold text-purple-500 mr-2">חיסכון</span>` : '';
+                    let badge = '';
+                    if (badgeKind === 'savings') badge = `<span class="text-[9px] font-bold text-purple-500 mr-2">חיסכון</span>`;
+                    else if (badgeKind === 'income') badge = `<span class="text-[9px] font-bold text-emerald-500 mr-2">הכנסה</span>`;
                     btn.innerHTML = `<span class="text-xs font-bold ${isSelected ? 'text-blue-700' : 'text-slate-700'}">${isSelected ? '✓ ' : ''}${cat.category_name}</span>${badge}`;
                     btn.onclick = () => {
                         if (eCat) eCat.value = cat.category_name;
                         if (expInp) expInp.value = '';
+                        autofillNameFromCat(cat.category_name);
+                        // Income budget categories → auto-mark as income on add form
+                        if (badgeKind === 'income' && config.pickerId === 'addExpenseCategoryPicker' && window.setTxType) {
+                            window.setTxType('income');
+                        }
                         config.onPopulate(cat.category_name, null, false);
                     };
                     return btn;
@@ -11355,9 +11827,28 @@
                     header.className = 'px-4 py-1.5 text-[9px] font-bold text-slate-400 bg-slate-50/50 border-b border-slate-50 flex-shrink-0';
                     header.textContent = parentName;
                     expanded.appendChild(header);
-                    cats.forEach(cat => expanded.appendChild(makeFixedItem(cat, true, false)));
+                    cats.forEach(cat => expanded.appendChild(makeFixedItem(cat, true, null)));
                 });
-                standalone.forEach(cat => expanded.appendChild(makeFixedItem(cat, false, false)));
+                standalone.forEach(cat => expanded.appendChild(makeFixedItem(cat, false, null)));
+
+                if (activeIncomes.length > 0) {
+                    const incHeader = document.createElement('div');
+                    incHeader.className = 'px-4 py-1.5 text-[9px] font-bold text-emerald-600 bg-emerald-50/50 border-b border-emerald-50 flex-shrink-0';
+                    incHeader.textContent = 'הכנסות';
+                    expanded.appendChild(incHeader);
+                    const incomeGroups = {}; const incomeStandalone = [];
+                    activeIncomes.forEach(cat => {
+                        if (cat.parent_group) { (incomeGroups[cat.parent_group] = incomeGroups[cat.parent_group] || []).push(cat); } else incomeStandalone.push(cat);
+                    });
+                    Object.entries(incomeGroups).forEach(([parentName, cats]) => {
+                        const header = document.createElement('div');
+                        header.className = 'px-4 py-1.5 text-[9px] font-bold text-emerald-500 bg-emerald-50/30 border-b border-emerald-50 flex-shrink-0 pr-7';
+                        header.textContent = parentName;
+                        expanded.appendChild(header);
+                        cats.forEach(cat => expanded.appendChild(makeFixedItem(cat, true, 'income')));
+                    });
+                    incomeStandalone.forEach(cat => expanded.appendChild(makeFixedItem(cat, false, 'income')));
+                }
 
                 if (activeSavings.length > 0) {
                     const savHeader = document.createElement('div');
@@ -11369,9 +11860,9 @@
                         header.className = 'px-4 py-1.5 text-[9px] font-bold text-purple-400 bg-purple-50/30 border-b border-purple-50 flex-shrink-0 pr-7';
                         header.textContent = parentName;
                         expanded.appendChild(header);
-                        cats.forEach(cat => expanded.appendChild(makeFixedItem(cat, true, true)));
+                        cats.forEach(cat => expanded.appendChild(makeFixedItem(cat, true, 'savings')));
                     });
-                    savingsStandalone.forEach(cat => expanded.appendChild(makeFixedItem(cat, false, true)));
+                    savingsStandalone.forEach(cat => expanded.appendChild(makeFixedItem(cat, false, 'savings')));
                 }
             }
         } else if (type === 'planned') {
