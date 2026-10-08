@@ -7828,8 +7828,10 @@
                 markerRow.dir = 'rtl';
                 markerRow.innerHTML = `
                     <div class="flex-shrink-0" style="width:${labelsWidth}px"></div>
-                    <div class="flex-1 min-w-0 px-1 relative h-2.5" title="התקדמות בחודש">
-                        <div class="cat-month-marker-arrow" style="left:${monthLeftPct}%"></div>
+                    <div class="flex-1 min-w-0 px-1" title="התקדמות בחודש">
+                        <div class="relative w-full h-2.5">
+                            <div class="cat-month-marker-arrow" style="left:${monthLeftPct}%"></div>
+                        </div>
                     </div>
                 `;
                 strip.appendChild(markerRow);
