@@ -72,6 +72,20 @@
         .nav-text { font-size: 10px; font-weight: 700; }
         .cat-expand-btn { transition: transform 0.2s; cursor: pointer; color: #94a3b8; padding: 4px; margin-right: 2px; }
         .cat-expand-btn.expanded { transform: rotate(180deg); color: #2563eb; }
+        .cat-month-marker-arrow {
+            position: absolute;
+            top: 0;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid #94a3b8;
+            transform: translateX(-50%);
+            pointer-events: none;
+            z-index: 2;
+        }
+        .cat-bar-track { position: relative; width: 100%; height: 6px; background: #f1f5f9; border-radius: 9999px; overflow: hidden; }
+        .cat-bar-seg { position: absolute; top: 0; bottom: 0; border-radius: 0; }
         .btn-toggle-annual { border: 1px solid #e2e8f0; font-size: 0.65rem; color: #64748b; padding: 0.25rem 0.6rem; border-radius: 9999px; transition: all 0.2s; background: white; white-space: nowrap; }
         .btn-toggle-annual.active { background: #f1f5f9; color: #0f172a; border-color: #cbd5e1; font-weight: bold; }
         .loading-disabled { pointer-events: none; opacity: 0.6; }
@@ -3404,7 +3418,9 @@
             try { carryIn = calculateBalanceAsOf(prevEnd); } catch (e) { carryIn = 0; }
         }
 
-        const pool = monthlyG4 - fixedSum + carryIn - paceDeficit;
+        const rawPool = monthlyG4 - fixedSum + carryIn - paceDeficit;
+        // "כל השאר" budget never goes negative — floor at 0
+        const pool = Math.max(0, rawPool);
         const n = remainderIds.length;
         const each = n > 0 ? pool / n : 0;
         const budgets = {};
@@ -3412,7 +3428,7 @@
             const id = String(cat.id);
             budgets[id] = isRemainderCat(id) ? each : (safeParseFloat(cat.monthly_budget || 0) || 0);
         });
-        return { budgets, pool, carryIn, paceDeficit, fixedSum, remainderCount: n, monthlyG4 };
+        return { budgets, pool, carryIn, paceDeficit, fixedSum, remainderCount: n, monthlyG4, rawPool };
     }
 
     function getCurrentCycleSpentByCatId() {
@@ -7357,6 +7373,37 @@
         return Math.min(cycleTotalDays, Math.max(1, passed));
     }
 
+    // Month progress as % from the left of the bar (0 = end of month / left, 100 = start / right).
+    function getMonthMarkerLeftPct(cycleDayNum, cycleTotalDays) {
+        const progress = cycleTotalDays > 0 ? Math.min(1, Math.max(0, cycleDayNum / cycleTotalDays)) : 0;
+        return (1 - progress) * 100;
+    }
+
+    // Progress fill (RTL: grows right→left) with a transparent notch at the month marker.
+    function buildCategoryBarHtml(barPct, monthLeftPct, fillColor) {
+        const gapHalf = 0.55;
+        const g0 = monthLeftPct - gapHalf;
+        const g1 = monthLeftPct + gapHalf;
+        const segs = [];
+        // from/to are left-edge percentages along the track
+        const pushSeg = (from, to) => {
+            if (!(to > from + 0.05)) return;
+            segs.push(`<div class="cat-bar-seg" style="left:${from}%;width:${(to - from)}%;background:${fillColor}"></div>`);
+        };
+        const filled = Math.min(100, Math.max(0, barPct));
+        // Fill occupies the rightmost `filled`% — same as width% under dir=rtl
+        const fillStart = 100 - filled;
+        if (filled > 0) {
+            if (g1 <= fillStart || g0 >= 100) {
+                pushSeg(fillStart, 100);
+            } else {
+                pushSeg(fillStart, Math.min(100, Math.max(fillStart, g0)));
+                pushSeg(Math.min(100, Math.max(fillStart, g1)), 100);
+            }
+        }
+        return `<div class="cat-bar-track">${segs.join('')}</div>`;
+    }
+
     // Get current month start according to dynamic cycle start day
     window.getCurrentCycleDates = getCurrentCycleDates; // export just in case
 
@@ -7774,6 +7821,20 @@
                 strip.appendChild(row);
             });
         } else {
+            const monthLeftPct = getMonthMarkerLeftPct(cycleDayNum, cycleTotalDays);
+            if (filter === 'current' && !state.categoriesCollapsed) {
+                const markerRow = document.createElement('div');
+                markerRow.className = 'flex items-end gap-1 px-0 pt-0.5';
+                markerRow.dir = 'rtl';
+                markerRow.innerHTML = `
+                    <div class="flex-shrink-0" style="width:${labelsWidth}px"></div>
+                    <div class="flex-1 min-w-0 px-1 relative h-2.5" title="התקדמות בחודש">
+                        <div class="cat-month-marker-arrow" style="left:${monthLeftPct}%"></div>
+                    </div>
+                `;
+                strip.appendChild(markerRow);
+            }
+
             catsShown.forEach((cat) => {
                 const type = cat.$type;
                 const catId = cat.id || cat.category_name;
@@ -7813,17 +7874,27 @@
                 const showBudgetMetrics = type === 'current' ? (isRemCat || Math.abs(budget) > 0.0001 || safeParseFloat(cat.monthly_budget || 0) > 0) : budget > 0;
                 // Income: remaining = actual − planned (surplus when received more)
                 const remaining = type === 'income' ? (spent - budget) : (budget - spent);
-                const pct = showBudgetMetrics && budget !== 0 ? Math.round((spent / budget) * 100) : 0;
+                let pct = showBudgetMetrics && budget !== 0 ? Math.round((spent / budget) * 100) : 0;
+                // Budget 0 with spending (e.g. "כל השאר" floored) → full red bar
+                if (type === 'current' && !(budget > 0) && spent > 0) pct = 100;
                 const barPct = Math.min(100, Math.max(0, pct));
                 const isOver = showBudgetMetrics && (
-                    type === 'income' ? spent < budget : spent > budget
+                    type === 'income' ? spent < budget : (spent > budget || (!(budget > 0) && spent > 0))
                 );
                 const pacedSoFar = showBudgetMetrics ? Math.round(budget / cycleTotalDays) * cycleDayNum : 0;
-                const catBalance = Math.round(pacedSoFar - spent);
+                let catBalance = Math.round(pacedSoFar - spent);
+                // "כל השאר" balance never goes negative — floor at 0
+                if (isRemCat && catBalance < 0) catBalance = 0;
                 const catBalanceStr = `${catBalance < 0 ? '-₪' : '₪'}${Math.abs(catBalance).toLocaleString()}`;
+                
+                const filterId = type === 'current' ? catId : 'budget:' + catId;
+                const isActive = state.activeCategoryFilter === filterId;
+
                 let remainingHtml;
                 if (type === 'current') {
-                    remainingHtml = `<span class="${catBalance < 0 ? 'text-red-500' : 'text-slate-400'}">מאזן <span class="ltr-num">${catBalanceStr}</span></span>`;
+                    remainingHtml = isActive
+                        ? `<span class="${catBalance < 0 ? 'text-red-500' : 'text-slate-400'}">מאזן <span class="ltr-num">${catBalanceStr}</span></span>`
+                        : `${isOver ? 'חריגה' : 'נותר'} <span class="ltr-num">₪${Math.round(Math.abs(remaining)).toLocaleString()}</span>`;
                 } else if (type === 'income') {
                     remainingHtml = remaining >= 0
                         ? `עודף ₪${Math.round(Math.abs(remaining)).toLocaleString()}`
@@ -7831,9 +7902,6 @@
                 } else {
                     remainingHtml = `${isOver ? 'חריגה ' : 'נותר '}₪${Math.round(Math.abs(remaining)).toLocaleString()}`;
                 }
-                
-                const filterId = type === 'current' ? catId : 'budget:' + catId;
-                const isActive = state.activeCategoryFilter === filterId;
 
                 // Show only child category for fixed/income
                 const displayName = (type === 'fixed' || type === 'income') 
@@ -7852,6 +7920,12 @@
                        </div>`;
 
                 const showBarAndRemaining = type !== 'current' || showBudgetMetrics;
+                const barFillColor = isOver ? '#ef4444' : color.hex;
+                const barHtml = type === 'current'
+                    ? buildCategoryBarHtml(barPct, monthLeftPct, barFillColor)
+                    : `<div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${barFillColor}"></div>
+                       </div>`;
 
                 // Layout (Single Line): Icon+Name (Right) | Data/Bar (Left)
                 const row = document.createElement('div');
@@ -7871,16 +7945,12 @@
                         <div class="flex items-center justify-between text-[11px] sm:text-xs ${showBarAndRemaining && showBudgetMetrics ? 'mb-0.5' : ''}">
                             <span class="font-black ltr-num" style="color:${color.hex}">₪${spent.toLocaleString()}</span>
                             ${showBarAndRemaining && showBudgetMetrics ? `
-                                <span class="font-bold ${isOver ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap">
+                                <span class="font-bold ${(!isActive && isOver) || (isActive && catBalance < 0) ? 'text-red-500' : 'text-slate-400'} whitespace-nowrap">
                                     ${remainingHtml}
                                 </span>
                             ` : ''}
                         </div>
-                        ${showBarAndRemaining && showBudgetMetrics ? `
-                            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div class="h-full rounded-full transition-all duration-500" style="width:${barPct}%; background:${isOver ? '#ef4444' : color.hex}"></div>
-                            </div>
-                        ` : ''}
+                        ${showBarAndRemaining && showBudgetMetrics ? barHtml : ''}
                     </div>
                 `;
                 
