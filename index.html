@@ -574,6 +574,44 @@
                                 <button id="cycleStartDayUpdateBtn" onclick="window.updateCycleStartDay()" disabled class="bg-blue-600 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed">עדכן</button>
                             </div>
                         </div>
+                        <div class="flex justify-between items-center px-1">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">יום תזכורת הפקדה למתוכנן</span>
+                            <div class="flex gap-2 items-center">
+                                <div class="bg-slate-50 rounded-lg border border-slate-200 flex items-center px-2 py-1.5">
+                                    <select id="plannedDepositReminderDaySelect" onchange="window.checkPlannedDepositReminderDayChange()" class="bg-transparent border-none text-slate-800 font-bold text-xs text-right outline-none p-0 cursor-pointer">
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6">6</option>
+                                        <option value="7">7</option>
+                                        <option value="8">8</option>
+                                        <option value="9">9</option>
+                                        <option value="10">10</option>
+                                        <option value="11">11</option>
+                                        <option value="12">12</option>
+                                        <option value="13">13</option>
+                                        <option value="14">14</option>
+                                        <option value="15">15</option>
+                                        <option value="16">16</option>
+                                        <option value="17">17</option>
+                                        <option value="18">18</option>
+                                        <option value="19">19</option>
+                                        <option value="20">20</option>
+                                        <option value="21">21</option>
+                                        <option value="22">22</option>
+                                        <option value="23">23</option>
+                                        <option value="24">24</option>
+                                        <option value="25">25</option>
+                                        <option value="26">26</option>
+                                        <option value="27">27</option>
+                                        <option value="28">28</option>
+                                    </select>
+                                </div>
+                                <button id="plannedDepositReminderDayUpdateBtn" onclick="window.updatePlannedDepositReminderDay()" disabled class="bg-blue-600 px-3 py-1.5 rounded-lg text-[10px] font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed">עדכן</button>
+                            </div>
+                        </div>
                         <div class="flex items-center justify-start gap-2 px-1">
                             <input type="checkbox" id="oshEnabledCheckbox" class="w-4 h-4 rounded accent-blue-600 cursor-pointer flex-shrink-0" onchange="window.toggleOshEnabled()">
                             <label for="oshEnabledCheckbox" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer">הצג יתרת עו״ש צפויה</label>
@@ -2999,6 +3037,7 @@
             startDate: localStorage.getItem('cached_start_date') || '',
             epochStart: '',
             cycleStartDay: 1,
+            plannedDepositReminderDay: 10,
             dailyBudgetHistory: []
         },
         futureBudget: {
@@ -4593,6 +4632,11 @@
             state.budget.cycleStartDay = cycleStartRow ? parseInt(cycleStartRow.budget_amount) : 1;
             if (!state.budget.cycleStartDay || isNaN(state.budget.cycleStartDay)) state.budget.cycleStartDay = 1;
             state.stats.startDay = state.budget.cycleStartDay;
+
+            const plannedRemRow = rows.find(r => r.category_name === '__planned_deposit_reminder_day__');
+            let plannedRemDay = plannedRemRow ? parseInt(plannedRemRow.budget_amount, 10) : 10;
+            if (!plannedRemDay || isNaN(plannedRemDay) || plannedRemDay < 1 || plannedRemDay > 28) plannedRemDay = 10;
+            state.budget.plannedDepositReminderDay = plannedRemDay;
 
             // עו״ש: הצגה + יתרה לפני משכורת + יום משכורת + יום חיוב אשראי
             const oshEnabledRow = rows.find(r => r.category_name === '__osh_enabled__');
@@ -7894,9 +7938,12 @@
 
                 let remainingHtml;
                 if (type === 'current') {
-                    remainingHtml = isActive
-                        ? `<span class="${catBalance < 0 ? 'text-red-500' : 'text-slate-400'}">מאזן <span class="ltr-num">${catBalanceStr}</span></span>`
-                        : `${isOver ? 'חריגה' : 'נותר'} <span class="ltr-num">₪${Math.round(Math.abs(remaining)).toLocaleString()}</span>`;
+                    if (isActive) {
+                        const dailyCat = Math.round(budget / cycleTotalDays);
+                        remainingHtml = `<span class="${catBalance < 0 ? 'text-red-500' : 'text-slate-400'}">מאזן <span class="ltr-num">${catBalanceStr}</span> <span class="text-slate-400">(<span class="ltr-num">₪${dailyCat.toLocaleString()}</span> יומי)</span></span>`;
+                    } else {
+                        remainingHtml = `${isOver ? 'חריגה' : 'נותר'} <span class="ltr-num">₪${Math.round(Math.abs(remaining)).toLocaleString()}</span>`;
+                    }
                 } else if (type === 'income') {
                     remainingHtml = remaining >= 0
                         ? `עודף ₪${Math.round(Math.abs(remaining)).toLocaleString()}`
@@ -10192,6 +10239,12 @@
         if (cycleStartEl) {
             cycleStartEl.value = (b.cycleStartDay || 1).toString();
         }
+        const plannedRemEl = document.getElementById('plannedDepositReminderDaySelect');
+        if (plannedRemEl) {
+            plannedRemEl.value = (b.plannedDepositReminderDay || 10).toString();
+        }
+        const plannedRemBtn = document.getElementById('plannedDepositReminderDayUpdateBtn');
+        if (plannedRemBtn) plannedRemBtn.disabled = true;
         syncOshSettingsVisibility();
         const oshCredEl = document.getElementById('oshCreditDaySelect');
         if (oshCredEl) {
@@ -10968,20 +11021,30 @@
 
     function openConfirmModal(type, itemId, itemName) {
         const isSav = type === 'savings';
+        const isPlanned = type === 'planned';
         window._pendingSavingId = itemId;
         window._pendingSavingType = type;
 
+        const wrapBg = isSav ? 'bg-purple-100' : (isPlanned ? 'bg-orange-100' : 'bg-red-100');
+        const iconCls = isSav
+            ? 'fa-piggy-bank text-purple-600'
+            : (isPlanned ? 'fa-calendar-check text-orange-500' : 'fa-circle-arrow-down text-red-500');
+        const nameCls = isSav ? 'text-purple-700' : (isPlanned ? 'text-orange-700' : 'text-red-600');
+        const btnBg = isSav ? 'bg-purple-600 shadow-purple-200' : (isPlanned ? 'bg-orange-500 shadow-orange-200' : 'bg-red-500 shadow-red-200');
+
         document.getElementById('savingsConfirmIconWrap').className =
-            `w-14 h-14 ${isSav ? 'bg-purple-100' : 'bg-red-100'} rounded-2xl flex items-center justify-center mx-auto mb-4`;
+            `w-14 h-14 ${wrapBg} rounded-2xl flex items-center justify-center mx-auto mb-4`;
         document.getElementById('savingsConfirmIcon').className =
-            `fa-solid ${isSav ? 'fa-piggy-bank text-purple-600' : 'fa-circle-arrow-down text-red-500'} text-2xl`;
-        document.getElementById('savingsConfirmTitle').textContent = isSav ? 'האם הפקדת?' : 'האם שילמת?';
-        document.getElementById('savingsConfirmQuestion').textContent = isSav ? 'האם ביצעת הפקדה לחיסכון' : 'האם שילמת עבור';
-        document.getElementById('savingsConfirmName').className = `font-bold ${isSav ? 'text-purple-700' : 'text-red-600'}`;
+            `fa-solid ${iconCls} text-2xl`;
+        document.getElementById('savingsConfirmTitle').textContent = (isSav || isPlanned) ? 'האם הפקדת?' : 'האם שילמת?';
+        document.getElementById('savingsConfirmQuestion').textContent = isSav
+            ? 'האם ביצעת הפקדה לחיסכון'
+            : (isPlanned ? 'האם הפקדת לטובת' : 'האם שילמת עבור');
+        document.getElementById('savingsConfirmName').className = `font-bold ${nameCls}`;
         document.getElementById('savingsConfirmName').textContent = itemName;
         const yesBtn = document.getElementById('savingsConfirmYesBtn');
-        yesBtn.textContent = isSav ? 'כן, הפקדתי ✓' : 'כן, שילמתי ✓';
-        yesBtn.className = `flex-1 ${isSav ? 'bg-purple-600 shadow-purple-200' : 'bg-red-500 shadow-red-200'} text-white font-bold py-3 rounded-2xl text-sm shadow-md`;
+        yesBtn.textContent = (isSav || isPlanned) ? 'כן, הפקדתי ✓' : 'כן, שילמתי ✓';
+        yesBtn.className = `flex-1 ${btnBg} text-white font-bold py-3 rounded-2xl text-sm shadow-md`;
 
         const overlay = document.getElementById('savingsConfirmOverlay');
         if (overlay) { overlay.classList.remove('hidden'); setTimeout(() => overlay.classList.add('opacity-100'), 10); }
@@ -11006,6 +11069,10 @@
         }
         const overlay = document.getElementById('savingsConfirmOverlay');
         if (overlay) { overlay.classList.remove('opacity-100'); setTimeout(() => overlay.classList.add('hidden'), 300); }
+    };
+
+    window.confirmPlannedDeposit = function() {
+        openConfirmModal('planned', 'deposit', 'הוצאות מתוכננות');
     };
 
     window.savingsDepositNo = function() {
@@ -11069,6 +11136,34 @@
                 </div>`;
             container.appendChild(banner);
         });
+
+        // Reminder: deposit for planned (annual) expenses — from configured day until dismissed
+        const plannedRemDay = Math.max(1, Math.min(28, parseInt(state.budget.plannedDepositReminderDay, 10) || 10));
+        const plannedMonthly = (state.budget.annual || []).reduce((s, i) => s + safeParseFloat(i.budget_amount), 0) / 12;
+        const plannedDismissed = localStorage.getItem(`budget_dismissed_planned_deposit_${monthKey}`) === 'true';
+        if (plannedMonthly > 0 && dayOfMonth >= plannedRemDay && !plannedDismissed) {
+            const amount = Math.round(formatDisplayAmount(plannedMonthly));
+            const reserveDetails = typeof calculateAnnualReserveDetails === 'function' ? calculateAnnualReserveDetails() : null;
+            // Same figure as "שיריון בצד" on the planned view
+            const reserveTarget = reserveDetails
+                ? Math.round(formatDisplayAmount(reserveDetails.reserve))
+                : amount;
+            const banner = document.createElement('div');
+            banner.className = 'savings-reminder-banner';
+            banner.style.cssText = 'background:linear-gradient(135deg,#fffbeb,#ffedd5);border:1px solid #fcd34d;border-radius:1rem;padding:0.875rem 1rem;margin-bottom:0.75rem;';
+            banner.innerHTML = `
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <i class="fa-solid fa-calendar-check text-orange-500 text-sm flex-shrink-0"></i>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-orange-800">תזכורת הפקדה — הוצאות מתוכננות</p>
+                            <p class="text-[10px] text-orange-600 font-semibold leading-snug">₪${amount.toLocaleString()} לחודש או להשלים לסך של ₪${reserveTarget.toLocaleString()}</p>
+                        </div>
+                    </div>
+                    <button onclick="window.confirmPlannedDeposit()" class="bg-orange-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl flex-shrink-0">האם הפקדת?</button>
+                </div>`;
+            container.appendChild(banner);
+        }
     }
 
     window.dismissBudgetReminder = function(type, itemId) {
@@ -12526,6 +12621,35 @@
             window.showToast('עדכון יום תחילת החודש בוצע בהצלחה', 'check');
         } catch(e) {
             console.error('Error updating cycle start day:', e);
+            window.showToast('שגיאה בעדכון', 'circle-xmark');
+        } finally {
+            setLoading(false, true);
+        }
+    };
+    window.checkPlannedDepositReminderDayChange = () => {
+        const btn = document.getElementById('plannedDepositReminderDayUpdateBtn');
+        const sel = document.getElementById('plannedDepositReminderDaySelect');
+        if (!btn || !sel) return;
+        const val = parseInt(sel.value, 10);
+        const currentVal = state.budget.plannedDepositReminderDay || 10;
+        btn.disabled = val === currentVal;
+    };
+    window.updatePlannedDepositReminderDay = async function() {
+        if (!sbClient) return;
+        const sel = document.getElementById('plannedDepositReminderDaySelect');
+        if (!sel) return;
+        let val = parseInt(sel.value, 10);
+        if (!val || val < 1 || val > 28) val = 10;
+        setLoading(true, true);
+        try {
+            await persistSystemRow('__planned_deposit_reminder_day__', null, val);
+            state.budget.plannedDepositReminderDay = val;
+            const btn = document.getElementById('plannedDepositReminderDayUpdateBtn');
+            if (btn) btn.disabled = true;
+            renderSavingsReminders();
+            window.showToast('יום התזכורת עודכן', 'check');
+        } catch (e) {
+            console.error('Error updating planned deposit reminder day:', e);
             window.showToast('שגיאה בעדכון', 'circle-xmark');
         } finally {
             setLoading(false, true);
