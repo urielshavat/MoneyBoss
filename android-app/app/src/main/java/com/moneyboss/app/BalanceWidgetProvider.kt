@@ -12,6 +12,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.round
 
 class BalanceWidgetProvider : AppWidgetProvider() {
 
@@ -46,8 +48,26 @@ class BalanceWidgetProvider : AppWidgetProvider() {
 
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
+        fun formatBalance(balance: Double): String {
+            val whole = round(balance).toLong()
+            val absFormatted = NumberFormat.getIntegerInstance(Locale.US).format(abs(whole))
+            return if (whole < 0) "-₪$absFormatted" else "₪$absFormatted"
+        }
+
         fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             val views = RemoteViews(context.packageName, R.layout.widget_balance)
+
+            val openIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val openPi = PendingIntent.getActivity(
+                context,
+                appWidgetId * 10 + 3,
+                openIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_open_button, openPi)
+            views.setOnClickPendingIntent(R.id.widget_label, openPi)
 
             val addIntent = Intent(context, AddExpenseActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -71,7 +91,6 @@ class BalanceWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widget_balance_text, refreshPi)
-            views.setOnClickPendingIntent(R.id.widget_root, refreshPi)
 
             views.setTextViewText(R.id.widget_balance_text, "…")
             appWidgetManager.updateAppWidget(appWidgetId, views)
@@ -86,11 +105,7 @@ class BalanceWidgetProvider : AppWidgetProvider() {
 
             scope.launch(Dispatchers.IO) {
                 val text = try {
-                    val balance = SupabaseClient().getBalance(token)
-                    val fmt = NumberFormat.getNumberInstance(Locale("he", "IL")).apply {
-                        maximumFractionDigits = 0
-                    }
-                    "₪${fmt.format(kotlin.math.round(balance))}"
+                    formatBalance(SupabaseClient().getBalance(token))
                 } catch (_: Exception) {
                     "שגיאה"
                 }

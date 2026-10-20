@@ -4,9 +4,10 @@
         <item name="colorPrimary">@color/mb_blue</item>
         <item name="colorPrimaryVariant">@color/mb_blue_dark</item>
         <item name="colorOnPrimary">@color/white</item>
-        <item name="android:statusBarColor">@color/mb_blue_dark</item>
+        <item name="android:statusBarColor">@color/mb_bg</item>
         <item name="android:navigationBarColor">@color/mb_bg</item>
         <item name="android:windowBackground">@color/mb_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 
     <style name="Theme.MoneyBoss.Dialog" parent="Theme.MaterialComponents.DayNight.Dialog">

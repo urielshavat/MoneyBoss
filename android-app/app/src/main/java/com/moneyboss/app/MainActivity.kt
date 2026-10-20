@@ -2,18 +2,19 @@ package com.moneyboss.app
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.Menu
-import android.view.MenuItem
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
+import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -23,6 +24,7 @@ import com.moneyboss.app.databinding.ActivityMainBinding
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val store by lazy { TokenStore(this) }
+    private var askedNotificationAccess = false
 
     private val notifPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -31,31 +33,112 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val token = store.getToken()
-        if (token == null) {
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-            return
-        }
-
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        setSupportActionBar(binding.toolbar)
 
         val web = binding.webView
-        web.webViewClient = WebViewClient()
+        web.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                val url = request?.url?.toString() ?: return false
+                syncTokenFromUrl(url)
+                return false
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                syncTokenFromUrl(url)
+                injectViewportFix(view)
+            }
+
+            override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                super.doUpdateVisitedHistory(view, url, isReload)
+                syncTokenFromUrl(url)
+            }
+        }
         web.webChromeClient = WebChromeClient()
+
         val settings: WebSettings = web.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+        settings.useWideViewPort = true
+        settings.loadWithOverviewMode = true
+        settings.setSupportZoom(false)
+        settings.builtInZoomControls = false
+        settings.displayZoomControls = false
+        settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
+        // Mobile Chrome UA so the site uses full-width mobile layout
+        settings.userAgentString =
+            settings.userAgentString.replace("; wv", "") + " Mobile"
 
-        web.loadUrl("${Config.WEB_BASE_URL}?token=$token")
+        web.setInitialScale(100)
+
+        val token = store.getToken()
+        val startUrl = if (token != null) {
+            "${Config.WEB_BASE_URL}?token=$token"
+        } else {
+            Config.WEB_BASE_URL
+        }
+        web.loadUrl(startUrl)
 
         requestPostNotificationsIfNeeded()
-        maybePromptNotificationAccess()
+    }
+
+    private fun injectViewportFix(view: WebView?) {
+        view?.evaluateJavascript(
+            """
+            (function() {
+              var m = document.querySelector('meta[name=viewport]');
+              if (!m) {
+                m = document.createElement('meta');
+                m.name = 'viewport';
+                document.head.appendChild(m);
+              }
+              m.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+              document.documentElement.style.width = '100%';
+              document.body && (document.body.style.width = '100%');
+            })();
+            """.trimIndent(),
+            null
+        )
+    }
+
+    private fun syncTokenFromUrl(url: String?) {
+        if (url.isNullOrBlank()) return
+        val uri = try {
+            Uri.parse(url)
+        } catch (_: Exception) {
+            return
+        }
+        if (uri.host != null && !uri.host!!.contains("moneyboss", ignoreCase = true) &&
+            !uri.host!!.contains("netlify", ignoreCase = true)
+        ) {
+            return
+        }
+
+        val tokenParam = uri.getQueryParameter("token")?.trim()?.uppercase().orEmpty()
+        val current = store.getToken()
+
+        if (tokenParam.length == Config.TOKEN_LEN) {
+            if (current != tokenParam) {
+                store.saveToken(tokenParam)
+                refreshWidgets()
+                maybePromptNotificationAccessOnce()
+            }
+        } else if (current != null && !url.contains("token=", ignoreCase = true)) {
+            // Site logout / returned to account picker without token
+            store.clear()
+            refreshWidgets()
+        }
+    }
+
+    private fun refreshWidgets() {
+        val mgr = AppWidgetManager.getInstance(this)
+        val ids = mgr.getAppWidgetIds(ComponentName(this, BalanceWidgetProvider::class.java))
+        if (ids.isNotEmpty()) {
+            BalanceWidgetProvider.requestUpdate(this, ids)
+        }
     }
 
     private fun requestPostNotificationsIfNeeded() {
@@ -68,8 +151,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun maybePromptNotificationAccess() {
+    private fun maybePromptNotificationAccessOnce() {
+        if (askedNotificationAccess) return
         if (isNotificationServiceEnabled()) return
+        askedNotificationAccess = true
         AlertDialog.Builder(this)
             .setTitle("גישה להתראות")
             .setMessage(
@@ -91,31 +176,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.main_menu, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_notification_access -> {
-                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                true
-            }
-            R.id.action_logout -> {
-                store.clear()
-                Toast.makeText(this, "התנתקת", Toast.LENGTH_SHORT).show()
-                startActivity(Intent(this, LoginActivity::class.java))
-                finish()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
-
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (binding.webView.canGoBack()) {
+        if (::binding.isInitialized && binding.webView.canGoBack()) {
             binding.webView.goBack()
         } else {
             @Suppress("DEPRECATION")
