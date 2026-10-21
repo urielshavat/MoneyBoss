@@ -28,21 +28,21 @@
             android:layout_height="wrap_content"
             android:text="@string/widget_balance_placeholder"
             android:textColor="@color/mb_text"
+            android:textDirection="ltr"
             android:textSize="22sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <TextView
+    <!-- Same structure as working commit a429578 -->
+    <ImageView
         android:id="@+id/widget_open_button"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:layout_marginEnd="8dp"
         android:background="@drawable/bg_widget_open"
-        android:gravity="center"
-        android:text="@string/widget_open"
-        android:textColor="@color/mb_blue"
-        android:textSize="20sp"
-        android:textStyle="bold" />
+        android:contentDescription="@string/app_name"
+        android:padding="8dp"
+        android:src="@drawable/ic_open_app" />
 
     <TextView
         android:id="@+id/widget_add_button"

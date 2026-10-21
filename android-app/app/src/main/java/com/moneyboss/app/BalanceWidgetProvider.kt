@@ -15,6 +15,10 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.round
 
+/**
+ * Widget logic based on working GitHub commit a429578,
+ * plus refresh-on-open and blue-on-white button colors.
+ */
 class BalanceWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -51,14 +55,18 @@ class BalanceWidgetProvider : AppWidgetProvider() {
         fun formatBalance(balance: Double): String {
             val whole = round(balance).toLong()
             val absFormatted = NumberFormat.getIntegerInstance(Locale.US).format(abs(whole))
-            return if (whole < 0) "-₪$absFormatted" else "₪$absFormatted"
+            // Shekel via unicode escape — safe across uploads
+            val shekel = "\u20AA"
+            return if (whole < 0) "-$shekel$absFormatted" else "$shekel$absFormatted"
         }
 
         fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             val views = RemoteViews(context.packageName, R.layout.widget_balance)
 
             val openIntent = Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra(MainActivity.EXTRA_REFRESH_WEB, true)
             }
             val openPi = PendingIntent.getActivity(
@@ -93,12 +101,12 @@ class BalanceWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_balance_text, refreshPi)
 
-            views.setTextViewText(R.id.widget_balance_text, "…")
+            views.setTextViewText(R.id.widget_balance_text, "...")
             appWidgetManager.updateAppWidget(appWidgetId, views)
 
             val token = TokenStore(context).getToken()
             if (token == null) {
-                views.setTextViewText(R.id.widget_balance_text, "התחבר")
+                views.setTextViewText(R.id.widget_balance_text, "\u05D4\u05EA\u05D7\u05D1\u05E8")
                 views.setTextViewText(R.id.widget_label, "MoneyBoss")
                 appWidgetManager.updateAppWidget(appWidgetId, views)
                 return
@@ -108,14 +116,11 @@ class BalanceWidgetProvider : AppWidgetProvider() {
                 val text = try {
                     formatBalance(SupabaseClient().getBalance(token))
                 } catch (_: Exception) {
-                    "שגיאה"
+                    "\u05E9\u05D2\u05D9\u05D0\u05D4"
                 }
-                // RemoteViews updates must run on main thread
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    views.setTextViewText(R.id.widget_balance_text, text)
-                    views.setTextViewText(R.id.widget_label, "מאזן")
-                    appWidgetManager.updateAppWidget(appWidgetId, views)
-                }
+                views.setTextViewText(R.id.widget_balance_text, text)
+                views.setTextViewText(R.id.widget_label, "\u05DE\u05D0\u05D6\u05DF")
+                appWidgetManager.updateAppWidget(appWidgetId, views)
             }
         }
     }

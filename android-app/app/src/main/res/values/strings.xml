@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MoneyBoss</string>
-    <string name="widget_name">MoneyBoss מאזן</string>
+    <string name="widget_name">MoneyBoss</string>
     <string name="notification_listener_label">MoneyBoss Wallet</string>
     <string name="login_title">MoneyBoss</string>
-    <string name="login_hint">הזן טוקן בן 6 תווים</string>
-    <string name="login_button">כניסה</string>
-    <string name="add_expense_title">הוספת הוצאה</string>
-    <string name="amount_hint">סכום</string>
-    <string name="name_hint">שם ההוצאה</string>
-    <string name="confirm">אישור</string>
-    <string name="cancel">ביטול</string>
-    <string name="menu_logout">התנתקות</string>
-    <string name="menu_notifications">גישה להתראות</string>
+    <string name="login_hint">Token</string>
+    <string name="login_button">Login</string>
+    <string name="add_expense_title">&#x05D4;&#x05D5;&#x05E1;&#x05E4;&#x05EA; &#x05D4;&#x05D5;&#x05E6;&#x05D0;&#x05D4;</string>
+    <string name="amount_hint">&#x05E1;&#x05DB;&#x05D5;&#x05DD;</string>
+    <string name="name_hint">&#x05E9;&#x05DD; &#x05D4;&#x05D4;&#x05D5;&#x05E6;&#x05D0;&#x05D4;</string>
+    <string name="confirm">&#x05D0;&#x05D9;&#x05E9;&#x05D5;&#x05E8;</string>
+    <string name="cancel">&#x05D1;&#x05D9;&#x05D8;&#x05D5;&#x05DC;</string>
+    <string name="menu_logout">Logout</string>
+    <string name="menu_notifications">Notifications</string>
     <string name="widget_add">+</string>
-    <string name="widget_open">⌂</string>
-    <string name="widget_balance_placeholder">…</string>
+    <string name="widget_open">Home</string>
+    <string name="widget_balance_placeholder">...</string>
 </resources>

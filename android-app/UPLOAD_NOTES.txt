@@ -1,0 +1,7 @@
+When uploading to GitHub via the website:
+- Prefer dragging the whole android-app folder
+- Especially re-upload these if the widget breaks:
+  app/src/main/res/values/strings.xml
+  app/src/main/res/layout/widget_balance.xml
+  app/src/main/java/com/moneyboss/app/BalanceWidgetProvider.kt
+- Do NOT hand-edit Hebrew inside GitHub's editor if your browser mangles encoding
