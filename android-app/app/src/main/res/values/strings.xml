@@ -14,6 +14,6 @@
     <string name="menu_logout">התנתקות</string>
     <string name="menu_notifications">גישה להתראות</string>
     <string name="widget_add">+</string>
-    <string name="widget_open">앱</string>
+    <string name="widget_open">⌂</string>
     <string name="widget_balance_placeholder">…</string>
 </resources>

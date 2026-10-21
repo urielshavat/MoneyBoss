@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val store by lazy { TokenStore(this) }
     private var askedNotificationAccess = false
+    private var pendingWebRefresh = false
 
     private val notifPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -47,6 +48,10 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 syncTokenFromUrl(url)
                 injectViewportFix(view)
+                if (pendingWebRefresh) {
+                    pendingWebRefresh = false
+                    refreshWebData()
+                }
             }
 
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
@@ -68,7 +73,6 @@ class MainActivity : AppCompatActivity() {
         settings.builtInZoomControls = false
         settings.displayZoomControls = false
         settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
-        // Mobile Chrome UA so the site uses full-width mobile layout
         settings.userAgentString =
             settings.userAgentString.replace("; wv", "") + " Mobile"
 
@@ -82,7 +86,36 @@ class MainActivity : AppCompatActivity() {
         }
         web.loadUrl(startUrl)
 
+        if (intent.getBooleanExtra(EXTRA_REFRESH_WEB, false)) {
+            pendingWebRefresh = true
+        }
+
         requestPostNotificationsIfNeeded()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_REFRESH_WEB, false)) {
+            refreshWebData()
+        }
+    }
+
+    /** Pulls latest transactions/balance from the live site (same as the sync button). */
+    private fun refreshWebData() {
+        if (!::binding.isInitialized) return
+        binding.webView.evaluateJavascript(
+            """
+            (function() {
+              try {
+                if (typeof window.fetchTransactionsOnly === 'function') {
+                  window.fetchTransactionsOnly(true);
+                }
+              } catch (e) {}
+            })();
+            """.trimIndent(),
+            null
+        )
     }
 
     private fun injectViewportFix(view: WebView?) {
@@ -127,7 +160,6 @@ class MainActivity : AppCompatActivity() {
                 maybePromptNotificationAccessOnce()
             }
         } else if (current != null && !url.contains("token=", ignoreCase = true)) {
-            // Site logout / returned to account picker without token
             store.clear()
             refreshWidgets()
         }
@@ -184,5 +216,9 @@ class MainActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             super.onBackPressed()
         }
+    }
+
+    companion object {
+        const val EXTRA_REFRESH_WEB = "com.moneyboss.app.EXTRA_REFRESH_WEB"
     }
 }

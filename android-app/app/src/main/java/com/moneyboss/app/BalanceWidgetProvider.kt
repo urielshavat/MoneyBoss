@@ -59,6 +59,7 @@ class BalanceWidgetProvider : AppWidgetProvider() {
 
             val openIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra(MainActivity.EXTRA_REFRESH_WEB, true)
             }
             val openPi = PendingIntent.getActivity(
                 context,
@@ -109,9 +110,12 @@ class BalanceWidgetProvider : AppWidgetProvider() {
                 } catch (_: Exception) {
                     "שגיאה"
                 }
-                views.setTextViewText(R.id.widget_balance_text, text)
-                views.setTextViewText(R.id.widget_label, "מאזן")
-                appWidgetManager.updateAppWidget(appWidgetId, views)
+                // RemoteViews updates must run on main thread
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    views.setTextViewText(R.id.widget_balance_text, text)
+                    views.setTextViewText(R.id.widget_label, "מאזן")
+                    appWidgetManager.updateAppWidget(appWidgetId, views)
+                }
             }
         }
     }
