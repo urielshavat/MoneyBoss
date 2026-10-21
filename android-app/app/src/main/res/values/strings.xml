@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MoneyBoss</string>
+    <string name="widget_name">MoneyBoss מאזן</string>
+    <string name="notification_listener_label">MoneyBoss Wallet</string>
+    <string name="login_title">MoneyBoss</string>
+    <string name="login_hint">הזן טוקן בן 6 תווים</string>
+    <string name="login_button">כניסה</string>
+    <string name="add_expense_title">הוספת הוצאה</string>
+    <string name="amount_hint">סכום</string>
+    <string name="name_hint">שם ההוצאה</string>
+    <string name="confirm">אישור</string>
+    <string name="cancel">ביטול</string>
+    <string name="menu_logout">התנתקות</string>
+    <string name="menu_notifications">גישה להתראות</string>
+    <string name="widget_add">+</string>
+    <string name="widget_open">앱</string>
+    <string name="widget_balance_placeholder">…</string>
+</resources>
