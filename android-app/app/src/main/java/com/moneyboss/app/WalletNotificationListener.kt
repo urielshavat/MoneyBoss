@@ -22,7 +22,7 @@ class WalletNotificationListener : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.i(TAG, "Notification listener CONNECTED")
-        notifyDebug("MoneyBoss מאזין", "שירות קריאת התראות מחובר")
+        // Do NOT notify here — can crash the app process on startup on some OEMs
     }
 
     override fun onListenerDisconnected() {
@@ -123,6 +123,7 @@ class WalletNotificationListener : NotificationListenerService() {
     private fun ensureDebugChannel(): String {
         val channelId = "wallet_debug"
         val nm = getSystemService(NotificationManager::class.java)
+            ?: return channelId
         nm.createNotificationChannel(
             NotificationChannel(
                 channelId,
@@ -134,33 +135,41 @@ class WalletNotificationListener : NotificationListenerService() {
     }
 
     private fun notifyDebug(title: String, body: String) {
-        val channelId = ensureDebugChannel()
-        val nm = getSystemService(NotificationManager::class.java)
-        val notif = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .build()
-        nm.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notif)
+        try {
+            val channelId = ensureDebugChannel()
+            val nm = getSystemService(NotificationManager::class.java) ?: return
+            val notif = NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .build()
+            nm.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notif)
+        } catch (e: Exception) {
+            Log.e(TAG, "notifyDebug failed", e)
+        }
     }
 
     private fun notifyUser(merchant: String, amount: Double) {
-        val nm = getSystemService(NotificationManager::class.java)
-        val channelId = "wallet_expenses"
-        nm.createNotificationChannel(
-            NotificationChannel(channelId, "הוצאות Wallet", NotificationManager.IMPORTANCE_DEFAULT)
-        )
-        val rounded = kotlin.math.round(amount).toInt()
-        val notif = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("נרשמה הוצאה")
-            .setContentText("$merchant — ₪$rounded")
-            .setAutoCancel(true)
-            .build()
-        nm.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notif)
+        try {
+            val nm = getSystemService(NotificationManager::class.java) ?: return
+            val channelId = "wallet_expenses"
+            nm.createNotificationChannel(
+                NotificationChannel(channelId, "הוצאות Wallet", NotificationManager.IMPORTANCE_DEFAULT)
+            )
+            val rounded = kotlin.math.round(amount).toInt()
+            val notif = NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle("נרשמה הוצאה")
+                .setContentText("$merchant — ₪$rounded")
+                .setAutoCancel(true)
+                .build()
+            nm.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notif)
+        } catch (e: Exception) {
+            Log.e(TAG, "notifyUser failed", e)
+        }
     }
 
     private fun refreshWidgets() {

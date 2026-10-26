@@ -26,12 +26,17 @@ class MainActivity : AppCompatActivity() {
     private val store by lazy { TokenStore(this) }
     private var pendingWebRefresh = false
     private var permissionDialogShowing = false
+    private var askedPostNotificationsThisSession = false
+    private var askedListenerThisSession = false
 
     private val notifPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) {
-        // After POST_NOTIFICATIONS result, still ensure listener access
-        ensureRequiredPermissions()
+    ) { granted ->
+        askedPostNotificationsThisSession = true
+        if (granted) {
+            // Defer — never launch another UI synchronously from this callback
+            window.decorView.post { maybeAskNotificationListener() }
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -64,22 +69,23 @@ class MainActivity : AppCompatActivity() {
         }
         web.webChromeClient = WebChromeClient()
 
-        val settings: WebSettings = web.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.databaseEnabled = true
-        settings.cacheMode = WebSettings.LOAD_DEFAULT
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-        settings.useWideViewPort = true
-        settings.loadWithOverviewMode = true
-        settings.setSupportZoom(false)
-        settings.builtInZoomControls = false
-        settings.displayZoomControls = false
-        settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
-        settings.userAgentString =
-            settings.userAgentString.replace("; wv", "") + " Mobile"
-
-        web.setInitialScale(100)
+        try {
+            val settings: WebSettings = web.settings
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.cacheMode = WebSettings.LOAD_DEFAULT
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            settings.useWideViewPort = true
+            settings.loadWithOverviewMode = true
+            settings.setSupportZoom(false)
+            settings.builtInZoomControls = false
+            settings.displayZoomControls = false
+            settings.userAgentString =
+                settings.userAgentString.replace("; wv", "") + " Mobile"
+            web.setInitialScale(100)
+        } catch (_: Exception) {
+            // Some OEM WebViews throw on niche settings — keep going
+        }
 
         val token = store.getToken()
         val startUrl = if (token != null) {
@@ -92,11 +98,15 @@ class MainActivity : AppCompatActivity() {
         if (intent.getBooleanExtra(EXTRA_REFRESH_WEB, false)) {
             pendingWebRefresh = true
         }
+
+        // Ask permissions after first frame — avoids resume/lifecycle crashes
+        window.decorView.post { ensureRequiredPermissions() }
     }
 
     override fun onResume() {
         super.onResume()
-        ensureRequiredPermissions()
+        // Re-check listener only (post-notifications already handled once)
+        window.decorView.post { maybeAskNotificationListener() }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -107,56 +117,71 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Called on every app open — ask for anything still missing. */
     private fun ensureRequiredPermissions() {
+        if (isFinishing || isDestroyed) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
                 this, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            if (!granted && !askedPostNotificationsThisSession) {
+                askedPostNotificationsThisSession = true
+                try {
+                    notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } catch (_: Exception) {
+                }
                 return
             }
         }
-        if (!isNotificationServiceEnabled()) {
-            promptNotificationListenerAccess()
+        maybeAskNotificationListener()
+    }
+
+    private fun maybeAskNotificationListener() {
+        if (isFinishing || isDestroyed) return
+        if (askedListenerThisSession || permissionDialogShowing) return
+        if (isNotificationServiceEnabled()) return
+        askedListenerThisSession = true
+        promptNotificationListenerAccess()
+    }
+
+    private fun refreshWebData() {
+        if (!::binding.isInitialized) return
+        try {
+            binding.webView.evaluateJavascript(
+                """
+                (function() {
+                  try {
+                    if (typeof window.fetchTransactionsOnly === 'function') {
+                      window.fetchTransactionsOnly(true);
+                    }
+                  } catch (e) {}
+                })();
+                """.trimIndent(),
+                null
+            )
+        } catch (_: Exception) {
         }
     }
 
-    /** Pulls latest transactions/balance from the live site (same as the sync button). */
-    private fun refreshWebData() {
-        if (!::binding.isInitialized) return
-        binding.webView.evaluateJavascript(
-            """
-            (function() {
-              try {
-                if (typeof window.fetchTransactionsOnly === 'function') {
-                  window.fetchTransactionsOnly(true);
-                }
-              } catch (e) {}
-            })();
-            """.trimIndent(),
-            null
-        )
-    }
-
     private fun injectViewportFix(view: WebView?) {
-        view?.evaluateJavascript(
-            """
-            (function() {
-              var m = document.querySelector('meta[name=viewport]');
-              if (!m) {
-                m = document.createElement('meta');
-                m.name = 'viewport';
-                document.head.appendChild(m);
-              }
-              m.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-              document.documentElement.style.width = '100%';
-              document.body && (document.body.style.width = '100%');
-            })();
-            """.trimIndent(),
-            null
-        )
+        try {
+            view?.evaluateJavascript(
+                """
+                (function() {
+                  var m = document.querySelector('meta[name=viewport]');
+                  if (!m) {
+                    m = document.createElement('meta');
+                    m.name = 'viewport';
+                    document.head.appendChild(m);
+                  }
+                  m.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+                  document.documentElement.style.width = '100%';
+                  document.body && (document.body.style.width = '100%');
+                })();
+                """.trimIndent(),
+                null
+            )
+        } catch (_: Exception) {
+        }
     }
 
     private fun syncTokenFromUrl(url: String?) {
@@ -187,43 +212,57 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshWidgets() {
-        val mgr = AppWidgetManager.getInstance(this)
-        val ids = mgr.getAppWidgetIds(ComponentName(this, BalanceWidgetProvider::class.java))
-        if (ids.isNotEmpty()) {
-            BalanceWidgetProvider.requestUpdate(this, ids)
+        try {
+            val mgr = AppWidgetManager.getInstance(this)
+            val ids = mgr.getAppWidgetIds(ComponentName(this, BalanceWidgetProvider::class.java))
+            if (ids.isNotEmpty()) {
+                BalanceWidgetProvider.requestUpdate(this, ids)
+            }
+        } catch (_: Exception) {
         }
     }
 
     private fun promptNotificationListenerAccess() {
-        if (permissionDialogShowing) return
+        if (permissionDialogShowing || isFinishing || isDestroyed) return
         permissionDialogShowing = true
-        AlertDialog.Builder(this)
-            .setTitle("גישה לקריאת התראות")
-            .setMessage(
-                "כדי לרשום הוצאות מ-Google Wallet צריך לאפשר ל-MoneyBoss " +
-                    "\"גישה להתראות\" / Notification access " +
-                    "(זה שונה מהרשאת הצגת התראות של האפליקציה).\n\n" +
-                    "גם כבה \"הגבלת האפליקציה כשהיא לא בשימוש\" בהגדרות MoneyBoss."
-            )
-            .setPositiveButton("פתח הגדרות") { _, _ ->
-                permissionDialogShowing = false
-                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-            }
-            .setNegativeButton("מאוחר יותר") { _, _ ->
-                permissionDialogShowing = false
-            }
-            .setOnCancelListener {
-                permissionDialogShowing = false
-            }
-            .show()
+        try {
+            AlertDialog.Builder(this)
+                .setTitle("גישה לקריאת התראות")
+                .setMessage(
+                    "כדי לרשום הוצאות מ-Google Wallet צריך לאפשר ל-MoneyBoss " +
+                        "\"גישה להתראות\" / Notification access " +
+                        "(זה שונה מהרשאת הצגת התראות של האפליקציה).\n\n" +
+                        "גם כבה \"הגבלת האפליקציה כשהיא לא בשימוש\" בהגדרות MoneyBoss."
+                )
+                .setPositiveButton("פתח הגדרות") { _, _ ->
+                    permissionDialogShowing = false
+                    try {
+                        startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    } catch (_: Exception) {
+                    }
+                }
+                .setNegativeButton("מאוחר יותר") { _, _ ->
+                    permissionDialogShowing = false
+                }
+                .setOnCancelListener {
+                    permissionDialogShowing = false
+                }
+                .show()
+        } catch (_: Exception) {
+            permissionDialogShowing = false
+        }
     }
 
     private fun isNotificationServiceEnabled(): Boolean {
-        val cn = ComponentName(this, WalletNotificationListener::class.java)
-        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-            ?: return false
-        return flat.split(":").any {
-            ComponentName.unflattenFromString(it)?.equals(cn) == true
+        return try {
+            val cn = ComponentName(this, WalletNotificationListener::class.java)
+            val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+                ?: return false
+            flat.split(":").any {
+                ComponentName.unflattenFromString(it)?.equals(cn) == true
+            }
+        } catch (_: Exception) {
+            false
         }
     }
 
