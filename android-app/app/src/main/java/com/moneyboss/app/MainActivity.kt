@@ -24,12 +24,15 @@ import com.moneyboss.app.databinding.ActivityMainBinding
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val store by lazy { TokenStore(this) }
-    private var askedNotificationAccess = false
     private var pendingWebRefresh = false
+    private var permissionDialogShowing = false
 
     private val notifPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* no-op */ }
+    ) {
+        // After POST_NOTIFICATIONS result, still ensure listener access
+        ensureRequiredPermissions()
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,8 +92,11 @@ class MainActivity : AppCompatActivity() {
         if (intent.getBooleanExtra(EXTRA_REFRESH_WEB, false)) {
             pendingWebRefresh = true
         }
+    }
 
-        requestPostNotificationsIfNeeded()
+    override fun onResume() {
+        super.onResume()
+        ensureRequiredPermissions()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -98,6 +104,22 @@ class MainActivity : AppCompatActivity() {
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_REFRESH_WEB, false)) {
             refreshWebData()
+        }
+    }
+
+    /** Called on every app open — ask for anything still missing. */
+    private fun ensureRequiredPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                return
+            }
+        }
+        if (!isNotificationServiceEnabled()) {
+            promptNotificationListenerAccess()
         }
     }
 
@@ -157,7 +179,6 @@ class MainActivity : AppCompatActivity() {
             if (current != tokenParam) {
                 store.saveToken(tokenParam)
                 refreshWidgets()
-                maybePromptNotificationAccessOnce()
             }
         } else if (current != null && !url.contains("token=", ignoreCase = true)) {
             store.clear()
@@ -173,29 +194,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun requestPostNotificationsIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val granted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!granted) {
-            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
-
-    private fun maybePromptNotificationAccessOnce() {
-        if (askedNotificationAccess) return
-        if (isNotificationServiceEnabled()) return
-        askedNotificationAccess = true
+    private fun promptNotificationListenerAccess() {
+        if (permissionDialogShowing) return
+        permissionDialogShowing = true
         AlertDialog.Builder(this)
-            .setTitle("גישה להתראות")
+            .setTitle("גישה לקריאת התראות")
             .setMessage(
-                "כדי לרשום הוצאות אוטומטית מ-Google Wallet, אפשר גישה להתראות עבור MoneyBoss בהגדרות המערכת."
+                "כדי לרשום הוצאות מ-Google Wallet צריך לאפשר ל-MoneyBoss " +
+                    "\"גישה להתראות\" / Notification access " +
+                    "(זה שונה מהרשאת הצגת התראות של האפליקציה).\n\n" +
+                    "גם כבה \"הגבלת האפליקציה כשהיא לא בשימוש\" בהגדרות MoneyBoss."
             )
             .setPositiveButton("פתח הגדרות") { _, _ ->
+                permissionDialogShowing = false
                 startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
             }
-            .setNegativeButton("מאוחר יותר", null)
+            .setNegativeButton("מאוחר יותר") { _, _ ->
+                permissionDialogShowing = false
+            }
+            .setOnCancelListener {
+                permissionDialogShowing = false
+            }
             .show()
     }
 

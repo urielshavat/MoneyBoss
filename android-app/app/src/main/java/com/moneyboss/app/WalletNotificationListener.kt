@@ -19,22 +19,66 @@ class WalletNotificationListener : NotificationListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val api = SupabaseClient()
 
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        Log.i(TAG, "Notification listener CONNECTED")
+        notifyDebug("MoneyBoss מאזין", "שירות קריאת התראות מחובר")
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        Log.w(TAG, "Notification listener DISCONNECTED")
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
-        if (sbn.packageName !in WALLET_PACKAGES) return
+        val pkg = sbn.packageName.orEmpty()
+        // Ignore our own notifications (avoid loops)
+        if (pkg == packageName) return
 
-        val extras = sbn.notification.extras ?: return
-        val title = extras.getCharSequence("android.title")?.toString().orEmpty()
-        val text = extras.getCharSequence("android.text")?.toString().orEmpty()
-        val bigText = extras.getCharSequence("android.bigText")?.toString().orEmpty()
-        val combined = listOf(title, text, bigText).filter { it.isNotBlank() }.joinToString("\n")
-        if (combined.isBlank()) return
+        val extras = sbn.notification?.extras
+        val title = extras?.getCharSequence("android.title")?.toString().orEmpty()
+        val text = extras?.getCharSequence("android.text")?.toString().orEmpty()
+        val bigText = extras?.getCharSequence("android.bigText")?.toString().orEmpty()
+        val subText = extras?.getCharSequence("android.subText")?.toString().orEmpty()
+        val infoText = extras?.getCharSequence("android.infoText")?.toString().orEmpty()
+        val combined = listOf(title, text, bigText, subText, infoText)
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
 
-        val parsed = WalletParser.parse(combined) ?: return
-        val token = TokenStore(this).getToken() ?: return
+        if (!isMonitoredPackage(pkg, combined)) return
+
+        Log.i(TAG, "READ ok pkg=$pkg\n$combined")
+
+        val parsed = WalletParser.parse(combined)
+        val hasToken = TokenStore(this).getToken() != null
+
+        // Debug ping: always, even when parse/token/insert fail
+        val preview = combined.replace("\n", " | ").take(120)
+        val parseStatus = if (parsed != null) {
+            "parse OK: ${parsed.merchant} ₪${parsed.amount}"
+        } else {
+            "parse FAIL"
+        }
+        val tokenStatus = if (hasToken) "token OK" else "token MISSING"
+        notifyDebug(
+            title = "Wallet נקרא ✓",
+            body = "$parseStatus · $tokenStatus\n$pkg\n$preview"
+        )
+
+        if (parsed == null) {
+            Log.w(TAG, "parse failed for pkg=$pkg")
+            return
+        }
+
+        val token = TokenStore(this).getToken()
+        if (token == null) {
+            Log.w(TAG, "no saved token — skip insert")
+            return
+        }
 
         val externalId = "wallet_" + sha1(
-            "${sbn.packageName}|${sbn.key}|${parsed.amount}|${parsed.merchant}"
+            "${pkg}|${sbn.key}|${parsed.amount}|${parsed.merchant}"
         )
 
         scope.launch {
@@ -47,11 +91,60 @@ class WalletNotificationListener : NotificationListenerService() {
                 )
                 notifyUser(parsed.merchant, parsed.amount)
                 refreshWidgets()
-                Log.i(TAG, "Recorded wallet expense: ${parsed.merchant} ${parsed.amount}")
+                Log.i(TAG, "Recorded: ${parsed.merchant} ${parsed.amount} ext=$externalId")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to record wallet expense", e)
+                notifyDebug("Wallet insert FAIL", e.message ?: "error")
             }
         }
+    }
+
+    private fun isMonitoredPackage(pkg: String, combined: String): Boolean {
+        if (pkg in WALLET_PACKAGES) return true
+        val lower = pkg.lowercase()
+        if (lower.contains("wallet")) return true
+        if (lower.contains("google.android.apps.nbu")) return true
+        if (lower.contains("cal.card") || lower.contains("calapp") || lower.endsWith(".cal")) return true
+        // Play Services: only if text looks like a card transaction
+        if (lower == "com.google.android.gms") {
+            return looksLikeTransaction(combined)
+        }
+        return false
+    }
+
+    private fun looksLikeTransaction(combined: String): Boolean {
+        return combined.contains("₪") ||
+            combined.contains("בסך") ||
+            combined.contains("עסקה") ||
+            combined.contains("Paid", ignoreCase = true) ||
+            combined.contains("בכרטיס")
+    }
+
+    private fun ensureDebugChannel(): String {
+        val channelId = "wallet_debug"
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.createNotificationChannel(
+            NotificationChannel(
+                channelId,
+                "MoneyBoss Debug Wallet",
+                NotificationManager.IMPORTANCE_HIGH
+            )
+        )
+        return channelId
+    }
+
+    private fun notifyDebug(title: String, body: String) {
+        val channelId = ensureDebugChannel()
+        val nm = getSystemService(NotificationManager::class.java)
+        val notif = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+        nm.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notif)
     }
 
     private fun notifyUser(merchant: String, amount: Double) {
@@ -88,26 +181,30 @@ class WalletNotificationListener : NotificationListenerService() {
 
         val WALLET_PACKAGES = setOf(
             "com.google.android.apps.walletnfcrel",
-            "com.google.android.gms",
-            "com.google.android.apps.nbu.paisa.user"
+            "com.google.android.apps.nbu.paisa.user",
+            "com.google.android.apps.wallet",
+            "com.google.android.apps.nbu.googlewallet"
+            // com.google.android.gms handled separately — only if text looks like a transaction
         )
     }
 }
 
 object WalletParser {
-    // Examples:
-    // "Paid ₪42.50 at Cafe X"
-    // "תשלום של ₪50 אצל סופר יין"
-    // "You spent $12.00 at Starbucks"
-    // "₪36.90 · Aroma"
+    /**
+     * Real Google Wallet (HE) example:
+     *   title: vr BAKERY
+     *   text:  עסקה בסך 127.00 ₪ בכרטיס CashCal Pro 2098..
+     */
     private val amountPatterns = listOf(
+        Regex("""בסך\s*([\d]+(?:[.,]\d{1,2})?)""", RegexOption.IGNORE_CASE),
+        Regex("""([\d]+(?:[.,]\d{1,2})?)\s*(?:₪|NIS|ILS|ש["״]?ח)""", RegexOption.IGNORE_CASE),
         Regex("""(?:₪|NIS|ILS)\s*([\d]+(?:[.,]\d{1,2})?)""", RegexOption.IGNORE_CASE),
-        Regex("""([\d]+(?:[.,]\d{1,2})?)\s*(?:₪|NIS|ILS)""", RegexOption.IGNORE_CASE),
-        Regex("""(?:\$|USD)\s*([\d]+(?:[.,]\d{1,2})?)""", RegexOption.IGNORE_CASE)
+        Regex("""(?:\$|USD)\s*([\d]+(?:[.,]\d{1,2})?)""", RegexOption.IGNORE_CASE),
+        Regex("""(?:Paid|spent|עסקה)\s*(?:of\s*)?([\d]+(?:[.,]\d{1,2})?)""", RegexOption.IGNORE_CASE)
     )
 
     private val merchantPatterns = listOf(
-        Regex("""(?:at|אצל|ב-|ב)\s+(.+)$""", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)),
+        Regex("""(?:at|אצל)\s+(.+)$""", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE)),
         Regex("""₪[\d.,]+\s*[·\-–|]\s*(.+)$""", RegexOption.MULTILINE),
         Regex("""Paid\s+.+?\s+at\s+(.+)$""", RegexOption.IGNORE_CASE)
     )
@@ -123,20 +220,24 @@ object WalletParser {
 
         if (amount <= 0) return null
 
-        var merchant = merchantPatterns.firstNotNullOfOrNull { re ->
-            re.find(raw)?.groupValues?.getOrNull(1)?.trim()
+        val lines = raw.lines().map { it.trim() }.filter { it.isNotBlank() }
+
+        var merchant = lines.firstOrNull { line -> looksLikeMerchantTitle(line) }
+
+        if (merchant.isNullOrBlank()) {
+            merchant = merchantPatterns.firstNotNullOfOrNull { re ->
+                re.find(raw)?.groupValues?.getOrNull(1)?.trim()
+            }
         }
 
         if (merchant.isNullOrBlank()) {
-            // Fallback: first non-amount line as merchant
-            merchant = raw.lines()
-                .map { it.trim() }
-                .firstOrNull { line ->
-                    line.isNotBlank() &&
-                        !line.contains("₪") &&
-                        !line.contains("Paid", ignoreCase = true) &&
-                        !line.contains("תשלום")
-                }
+            merchant = lines.firstOrNull { line ->
+                !line.contains("₪") &&
+                    !line.contains("Paid", ignoreCase = true) &&
+                    !line.contains("תשלום") &&
+                    !line.contains("עסקה") &&
+                    !line.contains("בכרטיס")
+            }
         }
 
         merchant = merchant
@@ -146,5 +247,17 @@ object WalletParser {
             ?: "Wallet"
 
         return Parsed(amount = amount, merchant = merchant)
+    }
+
+    private fun looksLikeMerchantTitle(line: String): Boolean {
+        if (line.length < 2) return false
+        if (line.contains("₪")) return false
+        if (line.contains("עסקה")) return false
+        if (line.contains("בכרטיס")) return false
+        if (line.contains("בוצעה")) return false
+        if (line.contains("Paid", ignoreCase = true)) return false
+        if (line.contains("תשלום")) return false
+        if (line == "Google Wallet" || line == "ארנק Google" || line == "Wallet") return false
+        return true
     }
 }
