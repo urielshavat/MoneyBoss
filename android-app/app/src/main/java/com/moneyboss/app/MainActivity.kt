@@ -242,6 +242,7 @@ class MainActivity : AppCompatActivity() {
                 .setTitle("Notification access")
                 .setMessage(
                     "Enable Notification access for MoneyBoss to capture Google Wallet expenses.\n\n" +
+                        "After each APK update: turn it OFF, then ON again.\n\n" +
                         "Also disable \"Pause app activity if unused\"."
                 )
                 .setPositiveButton("Settings") { _, _ ->

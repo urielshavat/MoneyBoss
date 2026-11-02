@@ -46,11 +46,9 @@
                 android:resource="@xml/balance_widget_info" />
         </receiver>
 
-        <!-- Separate process: if the listener crashes, the UI can still open -->
         <service
             android:name=".WalletNotificationListener"
             android:exported="true"
-            android:process=":walletlistener"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:label="@string/notification_listener_label">
             <intent-filter>
