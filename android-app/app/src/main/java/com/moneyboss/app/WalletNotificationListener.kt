@@ -35,21 +35,24 @@ class WalletNotificationListener : NotificationListenerService() {
 
         Log.i(TAG, "READ ok pkg=$pkg\n$combined")
 
+        val preview = combined.replace("\n", " | ").take(120)
         val parsed = WalletParser.parse(combined)
-        val hasToken = TokenStore(this).getToken() != null
-        val parseStatus = if (parsed != null) {
-            "parse OK: ${parsed.merchant} ${parsed.amount}"
-        } else {
-            "parse FAIL"
+        if (parsed == null) {
+            notifyDebug(
+                "Wallet parse FAIL",
+                "$pkg\n$preview"
+            )
+            return
         }
-        val tokenStatus = if (hasToken) "token OK" else "token MISSING"
-        notifyDebug(
-            "Wallet read OK",
-            "$parseStatus | $tokenStatus\n$pkg\n${combined.replace("\n", " | ").take(120)}"
-        )
 
-        if (parsed == null) return
-        val token = TokenStore(this).getToken() ?: return
+        val token = TokenStore(this).getToken()
+        if (token == null) {
+            notifyDebug(
+                "Wallet token MISSING",
+                "parse OK: ${parsed.merchant} ${parsed.amount}\n$pkg"
+            )
+            return
+        }
 
         val externalId = "wallet_" + sha1(
             "${pkg}|${sbn.key}|${parsed.amount}|${parsed.merchant}"
@@ -63,12 +66,16 @@ class WalletNotificationListener : NotificationListenerService() {
                     name = parsed.merchant,
                     externalId = externalId
                 )
+                // Success: only the normal "expense saved" notification — no debug
                 notifyUser(parsed.merchant, parsed.amount)
                 refreshWidgets()
                 Log.i(TAG, "Recorded: ${parsed.merchant} ${parsed.amount}")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to record wallet expense", e)
-                notifyDebug("Wallet insert FAIL", e.message ?: "error")
+                notifyDebug(
+                    "Wallet insert FAIL",
+                    "${e.message}\n${parsed.merchant} ${parsed.amount}"
+                )
             }
         }
     }
@@ -156,40 +163,94 @@ class WalletNotificationListener : NotificationListenerService() {
 }
 
 object WalletParser {
-    // Real HE Wallet: title "vr BAKERY", text "עסקה בסך 127.00 ₪ בכרטיס..."
-    private val amountPatterns = listOf(
-        Regex("""\u05D1\u05E1\u05DA\s*([\d]+(?:[.,]\d{1,2})?)""", RegexOption.IGNORE_CASE),
-        Regex("""([\d]+(?:[.,]\d{1,2})?)\s*(?:\u20AA|NIS|ILS)""", RegexOption.IGNORE_CASE),
-        Regex("""(?:\u20AA|NIS|ILS)\s*([\d]+(?:[.,]\d{1,2})?)""", RegexOption.IGNORE_CASE),
-        Regex("""(?:\$|USD)\s*([\d]+(?:[.,]\d{1,2})?)""", RegexOption.IGNORE_CASE)
-    )
-
+    /**
+     * Real device formats:
+     * - "vr BAKERY" + "עסקה בסך 127.00 ₪ בכרטיס..."
+     * - "MACABI TIVEE | ₪ 499.35 ... בכרטיס CashCal Pro 2098"
+     * Wallet often inserts bidi marks around ₪ — strip those before matching.
+     */
     data class Parsed(val amount: Double, val merchant: String)
 
     fun parse(raw: String): Parsed? {
-        val amount = amountPatterns.firstNotNullOfOrNull { re ->
-            re.find(raw)?.groupValues?.getOrNull(1)
-                ?.replace(",", "")
-                ?.toDoubleOrNull()
-        } ?: return null
+        val text = normalize(raw)
+        val amount = extractAmount(text) ?: return null
         if (amount <= 0) return null
+        val merchant = extractMerchant(text)
+        return Parsed(amount = amount, merchant = merchant)
+    }
 
-        val lines = raw.lines().map { it.trim() }.filter { it.isNotBlank() }
-        var merchant = lines.firstOrNull { line ->
+    private fun normalize(raw: String): String {
+        return raw
+            // Bidirectional / embedding marks common in RTL notifications
+            .replace(Regex("[\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069\\uFEFF]"), "")
+            // Weird spaces → normal space
+            .replace(Regex("[\\u00A0\\u202F\\u2007\\u2009\\u200A\\u200B]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    private fun extractAmount(text: String): Double? {
+        val patterns = listOf(
+            // "בסך 127.00" / "בסך 127"
+            Regex("""\u05D1\u05E1\u05DA\s*(\d+(?:[.,]\d{1,2})?)""", RegexOption.IGNORE_CASE),
+            // "₪ 499.35" or "₪499.35" (any non-digit gap after currency glyph/word)
+            Regex("""(?:\u20AA|NIS|ILS|\$)\s*(\d+(?:[.,]\d{1,2})?)""", RegexOption.IGNORE_CASE),
+            // "499.35 ₪"
+            Regex("""(\d+(?:[.,]\d{1,2})?)\s*(?:\u20AA|NIS|ILS|\$)""", RegexOption.IGNORE_CASE),
+            // "MACABI TIVEE | 499.35" / "| ₪ 499.35" already covered; bare after pipe:
+            Regex("""\|\s*(?:\u20AA|NIS|ILS|\$)?\s*(\d+(?:[.,]\d{1,2})?)""", RegexOption.IGNORE_CASE),
+            // Fallback: first number with decimals (prefer money-like 499.35 over card 2098)
+            Regex("""(?<![\d.,])(\d+[.,]\d{2})(?![\d])""")
+        )
+
+        for (re in patterns) {
+            val m = re.find(text) ?: continue
+            val rawNum = m.groupValues.getOrNull(1) ?: continue
+            val value = parseNumber(rawNum) ?: continue
+            // Ignore likely card last-4 when no decimal and near card context
+            if (!rawNum.contains('.') && !rawNum.contains(',') && value in 1000.0..9999.0) {
+                val idx = m.range.first
+                val window = text.substring(maxOf(0, idx - 20), minOf(text.length, idx + 30))
+                if (window.contains("\u05D1\u05DB\u05E8\u05D8\u05D9\u05E1") ||
+                    window.contains("CashCal", ignoreCase = true) ||
+                    window.contains("••") ||
+                    window.contains("**")
+                ) {
+                    continue
+                }
+            }
+            return value
+        }
+        return null
+    }
+
+    private fun parseNumber(raw: String): Double? {
+        val cleaned = raw.trim()
+            .replace(" ", "")
+            .replace(',', '.') // 499,35 → 499.35
+        // If both . and , existed we'd have issues; Wallet uses . for decimals
+        return cleaned.toDoubleOrNull()
+    }
+
+    private fun extractMerchant(text: String): String {
+        // "MACABI TIVEE | ₪ 499.35 ..."
+        val pipe = text.indexOf('|')
+        if (pipe > 0) {
+            val before = text.substring(0, pipe).trim()
+            if (before.length >= 2) return before.take(80)
+        }
+
+        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val fromLine = lines.firstOrNull { line ->
             line.length >= 2 &&
-                !line.contains("\u20AA") &&
+                !line.contains('\u20AA') &&
+                !Regex("""\d+[.,]\d{2}""").containsMatchIn(line) &&
                 !line.contains("\u05E2\u05E1\u05E7\u05D4") &&
                 !line.contains("\u05D1\u05DB\u05E8\u05D8\u05D9\u05E1") &&
                 !line.contains("Paid", ignoreCase = true) &&
-                line != "Google Wallet" &&
-                line != "Wallet"
+                !line.equals("Google Wallet", ignoreCase = true) &&
+                !line.equals("Wallet", ignoreCase = true)
         }
-        if (merchant.isNullOrBlank()) {
-            merchant = lines.firstOrNull {
-                !it.contains("\u20AA") && !it.contains("Paid", ignoreCase = true)
-            }
-        }
-        merchant = merchant?.replace(Regex("""\s+"""), " ")?.take(80)?.ifBlank { null } ?: "Wallet"
-        return Parsed(amount = amount, merchant = merchant)
+        return fromLine?.take(80) ?: "Wallet"
     }
 }

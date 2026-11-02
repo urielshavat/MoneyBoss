@@ -10,141 +10,178 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.moneyboss.app.databinding.ActivityMainBinding
 
 /**
- * Startup path restored to the stable Oct-21 version (0c16d99):
- * no onResume permission loops. Permission prompts only from onCreate.
+ * Boots a native panel first. WebView is created only afterwards.
+ * If WebView/system component is broken, we show an error instead of crashing.
  */
 class MainActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityMainBinding
+    private lateinit var bootPanel: LinearLayout
+    private lateinit var bootStatus: TextView
+    private lateinit var bootError: TextView
+    private lateinit var bootRetry: Button
+    private lateinit var webContainer: FrameLayout
+
+    private var webView: WebView? = null
     private val store by lazy { TokenStore(this) }
     private var askedNotificationAccess = false
     private var pendingWebRefresh = false
+    private var webStarted = false
 
     private val notifPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            // After post-notification grant, offer listener access once
-            window.decorView.post { maybePromptNotificationAccessOnce() }
-        }
-    }
+    ) { /* no-op */ }
 
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        setContentView(R.layout.activity_main)
 
-        val web = binding.webView
-        web.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                val url = request?.url?.toString() ?: return false
-                syncTokenFromUrl(url)
-                return false
-            }
+        bootPanel = findViewById(R.id.bootPanel)
+        bootStatus = findViewById(R.id.bootStatus)
+        bootError = findViewById(R.id.bootError)
+        bootRetry = findViewById(R.id.bootRetry)
+        webContainer = findViewById(R.id.webContainer)
 
-            override fun onPageFinished(view: WebView?, url: String?) {
-                syncTokenFromUrl(url)
-                injectViewportFix(view)
-                if (pendingWebRefresh) {
-                    pendingWebRefresh = false
-                    refreshWebData()
-                }
-            }
-
-            override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
-                super.doUpdateVisitedHistory(view, url, isReload)
-                syncTokenFromUrl(url)
-            }
-        }
-        web.webChromeClient = WebChromeClient()
-
-        val settings: WebSettings = web.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.databaseEnabled = true
-        settings.cacheMode = WebSettings.LOAD_DEFAULT
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-        settings.useWideViewPort = true
-        settings.loadWithOverviewMode = true
-        settings.setSupportZoom(false)
-        settings.builtInZoomControls = false
-        settings.displayZoomControls = false
-        settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
-        settings.userAgentString =
-            settings.userAgentString.replace("; wv", "") + " Mobile"
-
-        web.setInitialScale(100)
-
-        val token = store.getToken()
-        val startUrl = if (token != null) {
-            "${Config.WEB_BASE_URL}?token=$token"
-        } else {
-            Config.WEB_BASE_URL
-        }
-        web.loadUrl(startUrl)
+        bootRetry.setOnClickListener { startWebViewSafe() }
 
         if (intent.getBooleanExtra(EXTRA_REFRESH_WEB, false)) {
             pendingWebRefresh = true
         }
 
-        // Same as stable Oct-21: only from onCreate, not onResume
-        requestPostNotificationsIfNeeded()
-        window.decorView.post { maybePromptNotificationAccessOnce() }
+        // Prove Activity can open without WebView
+        bootStatus.text = "UI OK — loading site..."
+
+        // Start WebView on next frame
+        window.decorView.post {
+            startWebViewSafe()
+        }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun startWebViewSafe() {
+        if (webStarted && webView != null) {
+            showWeb()
+            return
+        }
+        bootError.visibility = View.GONE
+        bootRetry.visibility = View.GONE
+        bootStatus.text = "Creating WebView..."
+
+        try {
+            val web = WebView(this@MainActivity)
+            webView = web
+
+            web.webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                    syncTokenFromUrl(request?.url?.toString())
+                    return false
+                }
+
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    syncTokenFromUrl(url)
+                    if (pendingWebRefresh) {
+                        pendingWebRefresh = false
+                        refreshWebData()
+                    }
+                    showWeb()
+                    window.decorView.post {
+                        try {
+                            requestPostNotificationsIfNeeded()
+                            maybePromptNotificationAccessOnce()
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+
+                override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                    super.doUpdateVisitedHistory(view, url, isReload)
+                    syncTokenFromUrl(url)
+                }
+            }
+            web.webChromeClient = WebChromeClient()
+
+            val settings: WebSettings = web.settings
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.cacheMode = WebSettings.LOAD_DEFAULT
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            settings.useWideViewPort = true
+            settings.loadWithOverviewMode = true
+            try {
+                settings.userAgentString =
+                    settings.userAgentString.replace("; wv", "") + " Mobile"
+            } catch (_: Exception) {
+            }
+
+            webContainer.removeAllViews()
+            webContainer.addView(
+                web,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            )
+
+            val token = store.getToken()
+            val startUrl = if (token != null) {
+                "${Config.WEB_BASE_URL}?token=$token"
+            } else {
+                Config.WEB_BASE_URL
+            }
+            bootStatus.text = "Loading $startUrl"
+            web.loadUrl(startUrl)
+            webStarted = true
+
+            // If page never finishes, still reveal after timeout
+            window.decorView.postDelayed({ showWeb() }, 4000)
+        } catch (e: Exception) {
+            bootStatus.text = "WebView failed"
+            bootError.visibility = View.VISIBLE
+            bootError.text =
+                "Android System WebView error:\n${e.javaClass.simpleName}: ${e.message}\n\n" +
+                    "Update/disable Android System WebView in Play Store, or clear its storage."
+            bootRetry.visibility = View.VISIBLE
+        }
+    }
+
+    private fun showWeb() {
+        if (webView == null) return
+        bootPanel.visibility = View.GONE
+        webContainer.visibility = View.VISIBLE
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_REFRESH_WEB, false)) {
+            pendingWebRefresh = true
             refreshWebData()
+            showWeb()
         }
     }
 
     private fun refreshWebData() {
-        if (!::binding.isInitialized) return
-        binding.webView.evaluateJavascript(
-            """
-            (function() {
-              try {
-                if (typeof window.fetchTransactionsOnly === 'function') {
-                  window.fetchTransactionsOnly(true);
-                }
-              } catch (e) {}
-            })();
-            """.trimIndent(),
-            null
-        )
-    }
-
-    private fun injectViewportFix(view: WebView?) {
-        view?.evaluateJavascript(
-            """
-            (function() {
-              var m = document.querySelector('meta[name=viewport]');
-              if (!m) {
-                m = document.createElement('meta');
-                m.name = 'viewport';
-                document.head.appendChild(m);
-              }
-              m.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-              document.documentElement.style.width = '100%';
-              document.body && (document.body.style.width = '100%');
-            })();
-            """.trimIndent(),
-            null
-        )
+        try {
+            webView?.evaluateJavascript(
+                "(function(){try{if(window.fetchTransactionsOnly)window.fetchTransactionsOnly(true);}catch(e){}})();",
+                null
+            )
+        } catch (_: Exception) {
+        }
     }
 
     private fun syncTokenFromUrl(url: String?) {
@@ -154,7 +191,8 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Exception) {
             return
         }
-        if (uri.host != null && !uri.host!!.contains("moneyboss", ignoreCase = true) &&
+        if (uri.host != null &&
+            !uri.host!!.contains("moneyboss", ignoreCase = true) &&
             !uri.host!!.contains("netlify", ignoreCase = true)
         ) {
             return
@@ -162,12 +200,10 @@ class MainActivity : AppCompatActivity() {
 
         val tokenParam = uri.getQueryParameter("token")?.trim()?.uppercase().orEmpty()
         val current = store.getToken()
-
         if (tokenParam.length == Config.TOKEN_LEN) {
             if (current != tokenParam) {
                 store.saveToken(tokenParam)
                 refreshWidgets()
-                maybePromptNotificationAccessOnce()
             }
         } else if (current != null && !url.contains("token=", ignoreCase = true)) {
             store.clear()
@@ -176,10 +212,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshWidgets() {
-        val mgr = AppWidgetManager.getInstance(this)
-        val ids = mgr.getAppWidgetIds(ComponentName(this, BalanceWidgetProvider::class.java))
-        if (ids.isNotEmpty()) {
-            BalanceWidgetProvider.requestUpdate(this, ids)
+        try {
+            val mgr = AppWidgetManager.getInstance(this)
+            val ids = mgr.getAppWidgetIds(ComponentName(this, BalanceWidgetProvider::class.java))
+            if (ids.isNotEmpty()) BalanceWidgetProvider.requestUpdate(this, ids)
+        } catch (_: Exception) {
         }
     }
 
@@ -197,25 +234,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun maybePromptNotificationAccessOnce() {
-        if (askedNotificationAccess) return
-        if (isFinishing || isDestroyed) return
+        if (askedNotificationAccess || isFinishing) return
         if (isNotificationServiceEnabled()) return
         askedNotificationAccess = true
         try {
             AlertDialog.Builder(this)
-                .setTitle("\u05D2\u05D9\u05E9\u05D4 \u05DC\u05E7\u05E8\u05D9\u05D0\u05EA \u05D4\u05EA\u05E8\u05D0\u05D5\u05EA")
+                .setTitle("Notification access")
                 .setMessage(
-                    "\u05DB\u05D3\u05D9 \u05DC\u05E8\u05E9\u05D5\u05DD \u05D4\u05D5\u05E6\u05D0\u05D5\u05EA \u05DE-Google Wallet \u05E6\u05E8\u05D9\u05DA \u05DC\u05D0\u05E4\u05E9\u05E8 \u05DC-MoneyBoss " +
-                        "Notification access / \u05D2\u05D9\u05E9\u05D4 \u05DC\u05D4\u05EA\u05E8\u05D0\u05D5\u05EA.\n\n" +
-                        "\u05D2\u05DD \u05DB\u05D1\u05D4 \"\u05D4\u05D2\u05D1\u05DC\u05EA \u05D4\u05D0\u05E4\u05DC\u05D9\u05E7\u05E6\u05D9\u05D4 \u05DB\u05E9\u05D4\u05D9\u05D0 \u05DC\u05D0 \u05D1\u05E9\u05D9\u05DE\u05D5\u05E9\"."
+                    "Enable Notification access for MoneyBoss to capture Google Wallet expenses.\n\n" +
+                        "Also disable \"Pause app activity if unused\"."
                 )
-                .setPositiveButton("\u05E4\u05EA\u05D7 \u05D4\u05D2\u05D3\u05E8\u05D5\u05EA") { _, _ ->
+                .setPositiveButton("Settings") { _, _ ->
                     try {
                         startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                     } catch (_: Exception) {
                     }
                 }
-                .setNegativeButton("\u05DE\u05D0\u05D5\u05D7\u05E8 \u05D9\u05D5\u05EA\u05E8", null)
+                .setNegativeButton("Later", null)
                 .show()
         } catch (_: Exception) {
             askedNotificationAccess = false
@@ -228,7 +263,7 @@ class MainActivity : AppCompatActivity() {
             val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
                 ?: return false
             flat.split(":").any {
-                ComponentName.unflattenFromString(it)?.equals(cn) == true
+                ComponentName.unflattenFromString(it)?.flatten() == cn.flatten()
             }
         } catch (_: Exception) {
             false
@@ -237,9 +272,9 @@ class MainActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (::binding.isInitialized && binding.webView.canGoBack()) {
-            binding.webView.goBack()
-        } else {
+        val web = webView
+        if (web != null && web.canGoBack()) web.goBack()
+        else {
             @Suppress("DEPRECATION")
             super.onBackPressed()
         }
