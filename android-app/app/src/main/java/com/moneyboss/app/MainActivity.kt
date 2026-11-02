@@ -263,7 +263,7 @@ class MainActivity : AppCompatActivity() {
             val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
                 ?: return false
             flat.split(":").any {
-                ComponentName.unflattenFromString(it)?.flatten() == cn.flatten()
+                ComponentName.unflattenFromString(it) == cn
             }
         } catch (_: Exception) {
             false
