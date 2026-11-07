@@ -6,6 +6,8 @@
     <title>MoneyBoss</title>
     <link rel="icon" type="image/png" href="favicon-32x32.png" sizes="32x32">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="alternate" type="text/markdown" href="/bot-instructions.md" title="agent-instructions">
+    <meta name="agent-instructions" content="/bot-instructions.md">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -911,6 +913,11 @@
                 <i class="fa-solid fa-circle-info text-blue-400 w-4 text-center flex-shrink-0"></i>
                 <span>איך מתחילים?</span>
             </button>
+            <div class="border-t border-slate-100 mx-3"></div>
+            <a href="bot-instructions.md" target="_blank" onclick="window.closeHamburgerMenu();" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                <i class="fa-solid fa-robot text-indigo-500 w-4 text-center flex-shrink-0"></i>
+                <span>הוראות לבוט</span>
+            </a>
             <div class="border-t border-slate-100 mx-3"></div>
             <button onclick="window.closeHamburgerMenu(); window.shareApp();" class="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors">
                 <i class="fa-solid fa-share-nodes text-green-500 w-4 text-center flex-shrink-0"></i>
