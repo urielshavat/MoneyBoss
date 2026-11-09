@@ -52,6 +52,9 @@ class SupabaseClient {
         }
     }
 
+    /**
+     * @return true if a new row was inserted; false if duplicate external_id (409).
+     */
     suspend fun insertExpense(
         token: String,
         amount: Double,
@@ -59,7 +62,7 @@ class SupabaseClient {
         category: String = Config.DEFAULT_CATEGORY,
         externalId: String? = null,
         createdAt: String = Instant.now().toString()
-    ): Unit = withContext(Dispatchers.IO) {
+    ): Boolean = withContext(Dispatchers.IO) {
         val row = JSONObject()
             .put("amount", amount)
             .put("name", name)
@@ -74,12 +77,11 @@ class SupabaseClient {
             .post(row.toString().toRequestBody(jsonMedia))
             .build()
         client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) {
-                val err = resp.body?.string().orEmpty()
-                // Unique violation on external_id — treat as already recorded
-                if (resp.code == 409) return@withContext
-                throw IllegalStateException("insert failed: ${resp.code} $err")
-            }
+            if (resp.isSuccessful) return@withContext true
+            val err = resp.body?.string().orEmpty()
+            // Unique violation on external_id — already recorded
+            if (resp.code == 409) return@withContext false
+            throw IllegalStateException("insert failed: ${resp.code} $err")
         }
     }
 

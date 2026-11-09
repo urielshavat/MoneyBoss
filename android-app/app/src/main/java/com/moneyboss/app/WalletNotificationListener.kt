@@ -15,11 +15,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.io.File
 import java.security.MessageDigest
+import java.util.Collections
 
 class WalletNotificationListener : NotificationListenerService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val api = SupabaseClient()
+    /** Skip re-posts / updates of the same Wallet notification (same sbn.key). */
+    private val processedKeys = Collections.synchronizedSet(mutableSetOf<String>())
 
     override fun onListenerConnected() {
         super.onListenerConnected()
@@ -97,22 +100,32 @@ class WalletNotificationListener : NotificationListenerService() {
 
         val merchant = parsed.merchant
         val amount = parsed.amount
-        val externalId = "wallet_" + sha1(
-            "${pkg}|${sbn.key}|$amount|$merchant"
-        )
+        // Stable id per Wallet notification instance — amount/merchant not needed
+        // (avoids double-notify when Wallet re-posts the same shade entry).
+        val notifKey = sbn.key.orEmpty().ifBlank { "$pkg|$merchant|$amount" }
+        if (!processedKeys.add(notifKey)) {
+            Log.i(TAG, "Skip already-processed key=$notifKey")
+            return
+        }
+        val externalId = "wallet_" + sha1(notifKey)
 
         scope.launch {
             try {
-                api.insertExpense(
+                val inserted = api.insertExpense(
                     token = token,
                     amount = amount,
                     name = merchant,
                     externalId = externalId
                 )
+                if (!inserted) {
+                    Log.i(TAG, "Duplicate external_id, skip notify: $merchant $amount")
+                    return@launch
+                }
                 notifyUser(merchant, amount)
                 refreshWidgets()
                 Log.i(TAG, "Recorded: $merchant $amount")
             } catch (e: Exception) {
+                processedKeys.remove(notifKey)
                 Log.e(TAG, "Failed to record wallet expense", e)
                 notifyDebug(
                     "Wallet insert FAIL",
@@ -246,13 +259,15 @@ object WalletParser {
     private fun extractAmount(text: String): Double? {
         // ₪ $ NIS ILS ש"ח ש״ח שח
         val cur = """(?:NIS|ILS|\u20AA|\$|\u05E9\u05F4\u05D7|\u05E9\"\u05D7|\u05E9\u05D7)"""
-        val num = """(\d+(?:[.,]\d{1,2})?)"""
+        // Prefer thousands form first: 1,813.00 / 1.813,00 — then plain 120.27
+        val num =
+            """(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)"""
         val patterns = listOf(
             Regex("""\u05D1\u05E1\u05DA\s*$cur?\s*$num""", RegexOption.IGNORE_CASE),
             Regex("""$num\s*$cur""", RegexOption.IGNORE_CASE),
             Regex("""$cur\s*$num""", RegexOption.IGNORE_CASE),
             Regex("""\|\s*$cur?\s*$num""", RegexOption.IGNORE_CASE),
-            Regex("""(?<![\d.,])(\d+[.,]\d{1,2})(?![\d])""")
+            Regex("""(?<![\d.,])$num(?![\d])""")
         )
 
         for (re in patterns) {
@@ -278,8 +293,37 @@ object WalletParser {
         return null
     }
 
+    /**
+     * Handles 1,813.00 (US thousands) and 1.813,00 (EU), not just replace(','→'.').
+     */
     private fun parseNumber(raw: String): Double? {
-        return raw.trim().replace(" ", "").replace(',', '.').toDoubleOrNull()
+        val s = raw.trim().replace(" ", "").replace("\u00A0", "")
+        if (s.isEmpty()) return null
+        val lastComma = s.lastIndexOf(',')
+        val lastDot = s.lastIndexOf('.')
+        val normalized = when {
+            lastComma >= 0 && lastDot >= 0 -> {
+                if (lastDot > lastComma) {
+                    // 1,813.00
+                    s.replace(",", "")
+                } else {
+                    // 1.813,00
+                    s.replace(".", "").replace(',', '.')
+                }
+            }
+            lastComma >= 0 -> {
+                val after = s.length - lastComma - 1
+                if (after == 3) {
+                    // 1,813 thousands
+                    s.replace(",", "")
+                } else {
+                    // 12,50 decimal
+                    s.replace(',', '.')
+                }
+            }
+            else -> s
+        }
+        return normalized.toDoubleOrNull()
     }
 
     private fun extractMerchant(text: String, titleHint: String): String {
