@@ -10,8 +10,14 @@
         <item name="android:windowLightStatusBar">true</item>
     </style>
 
-    <style name="Theme.MoneyBoss.Dialog" parent="Theme.MaterialComponents.DayNight.Dialog">
+    <!-- Light dialog always: DayNight made EditText text white on white inputs. -->
+    <style name="Theme.MoneyBoss.Dialog" parent="Theme.MaterialComponents.Light.Dialog">
         <item name="colorPrimary">@color/mb_blue</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="android:windowBackground">@color/mb_surface</item>
+        <item name="android:textColorPrimary">@color/mb_text</item>
+        <item name="android:editTextColor">@color/mb_text</item>
+        <item name="editTextColor">@color/mb_text</item>
         <item name="android:windowMinWidthMajor">90%</item>
         <item name="android:windowMinWidthMinor">90%</item>
     </style>
