@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- RemoteViews-safe: only LinearLayout / TextView / shape backgrounds. No ImageView+vector. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -33,16 +34,17 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Same structure as working commit a429578 -->
-    <ImageView
+    <TextView
         android:id="@+id/widget_open_button"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:layout_marginEnd="8dp"
         android:background="@drawable/bg_widget_open"
-        android:contentDescription="@string/app_name"
-        android:padding="8dp"
-        android:src="@drawable/ic_open_app" />
+        android:gravity="center"
+        android:text="@string/widget_open"
+        android:textColor="@color/mb_blue"
+        android:textSize="11sp"
+        android:textStyle="bold" />
 
     <TextView
         android:id="@+id/widget_add_button"

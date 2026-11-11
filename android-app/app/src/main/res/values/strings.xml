@@ -14,6 +14,6 @@
     <string name="menu_logout">Logout</string>
     <string name="menu_notifications">Notifications</string>
     <string name="widget_add">+</string>
-    <string name="widget_open">Home</string>
+    <string name="widget_open">App</string>
     <string name="widget_balance_placeholder">...</string>
 </resources>
