@@ -1462,7 +1462,7 @@
                         <input type="text" inputmode="decimal" id="newCategoryAmount" placeholder="0" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800">
                     </div>
                 </div>
-                <!-- Savings-only: reminder settings -->
+                <!-- Fixed-only: reminder settings -->
                 <div id="newCategoryReminderSection" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3">
                     <p class="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">תזכורת חודשית</p>
                     <div class="flex items-center justify-between gap-2">
@@ -1472,7 +1472,7 @@
                         </label>
                         <div id="newCategoryReminderDateWrap" class="hidden flex items-center gap-1.5">
                             <span class="text-[10px] text-slate-500">ב-</span>
-                            <input type="number" id="newCategoryReminderDate" min="1" max="28" value="11" class="w-14 text-sm font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-2 py-1 text-center outline-none">
+                            <input type="number" id="newCategoryReminderDate" min="1" max="28" value="1" class="w-14 text-sm font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-2 py-1 text-center outline-none">
                             <span class="text-[10px] text-slate-500">לחודש</span>
                         </div>
                     </div>
@@ -1480,6 +1480,21 @@
                 <!-- Savings-only: balance and yield -->
                 <div id="newCategorySavingsSection" class="hidden space-y-2 bg-purple-50 border border-purple-100 rounded-xl p-3">
                     <p class="text-[10px] font-bold text-purple-600 uppercase tracking-wider">פרטי חיסכון</p>
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">עדכון יתרה</span>
+                        <div class="flex bg-white border border-purple-100 p-0.5 rounded-lg">
+                            <button type="button" id="newCategorySavingsModeAutoBtn" onclick="window.setNewCategorySavingsMode('auto')" class="px-2.5 py-1 text-[10px] font-bold rounded-md bg-purple-600 text-white shadow-sm">אוטומטי</button>
+                            <button type="button" id="newCategorySavingsModeManualBtn" onclick="window.setNewCategorySavingsMode('manual')" class="px-2.5 py-1 text-[10px] font-bold rounded-md text-slate-400">ידני</button>
+                        </div>
+                        <input type="hidden" id="newCategorySavingsMode" value="auto">
+                    </div>
+                    <div id="newCategorySavingsReminderDateWrap" class="hidden flex items-center justify-between gap-2 bg-white border border-purple-100 rounded-lg px-3 py-2">
+                        <span class="text-[10px] font-bold text-slate-500">תזכורת הפקדה ב-</span>
+                        <div class="flex items-center gap-1.5">
+                            <input type="number" id="newCategorySavingsReminderDate" min="1" max="28" value="11" class="w-14 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-center outline-none">
+                            <span class="text-[10px] text-slate-500">לחודש</span>
+                        </div>
+                    </div>
                     <div>
                         <div class="flex items-center justify-between mb-1 mr-1">
                             <label id="newCategorySavingsBalanceLabel" class="block text-[10px] font-bold text-slate-400 uppercase">יתרה נוכחית בחיסכון</label>
@@ -1505,8 +1520,23 @@
                 <!-- Loan-only: balance, rate, remaining months -->
                 <div id="newCategoryLoanSection" class="hidden space-y-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
                     <p class="text-[10px] font-bold text-slate-600 uppercase tracking-wider">פרטי הלוואה</p>
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">עדכון יתרה</span>
+                        <div class="flex bg-white border border-slate-200 p-0.5 rounded-lg">
+                            <button type="button" id="newCategoryLoanModeAutoBtn" onclick="window.setNewCategoryLoanMode('auto')" class="px-2.5 py-1 text-[10px] font-bold rounded-md bg-slate-700 text-white shadow-sm">אוטומטי</button>
+                            <button type="button" id="newCategoryLoanModeManualBtn" onclick="window.setNewCategoryLoanMode('manual')" class="px-2.5 py-1 text-[10px] font-bold rounded-md text-slate-400">ידני</button>
+                        </div>
+                        <input type="hidden" id="newCategoryLoanMode" value="auto">
+                    </div>
+                    <div id="newCategoryLoanReminderDateWrap" class="hidden flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2">
+                        <span class="text-[10px] font-bold text-slate-500">תזכורת החזר ב-</span>
+                        <div class="flex items-center gap-1.5">
+                            <input type="number" id="newCategoryLoanReminderDate" min="1" max="28" value="1" class="w-14 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-center outline-none">
+                            <span class="text-[10px] text-slate-500">לחודש</span>
+                        </div>
+                    </div>
                     <div>
-                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">יתרת ההלוואה הנוכחית</label>
+                        <label id="newCategoryLoanBalanceLabel" class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">יתרה נוכחית של ההלוואה</label>
                         <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
                             <span class="text-slate-400 font-bold text-sm">₪</span>
                             <input type="text" inputmode="decimal" id="newCategoryLoanBalance" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
@@ -1520,7 +1550,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">מספר חודשים שנותרו</label>
+                        <label id="newCategoryLoanMonthsLabel" class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">חודשים שנותרו</label>
                         <input type="number" inputmode="numeric" id="newCategoryLoanMonths" min="0" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 text-sm outline-none" placeholder="0">
                     </div>
                 </div>
@@ -1750,7 +1780,7 @@
                         <input type="text" inputmode="decimal" id="budgetItemEditAmount" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800">
                     </div>
                 </div>
-                <!-- Savings-only: reminder settings -->
+                <!-- Fixed-only: reminder settings -->
                 <div id="budgetItemReminderSection" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3">
                     <p class="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">תזכורת חודשית</p>
                     <div class="flex items-center justify-between gap-2">
@@ -1760,7 +1790,7 @@
                         </label>
                         <div id="budgetItemReminderDateWrap" class="hidden flex items-center gap-1.5">
                             <span class="text-[10px] text-slate-500">ב-</span>
-                            <input type="number" id="budgetItemReminderDate" min="1" max="28" value="11" class="w-14 text-sm font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-2 py-1 text-center outline-none" onchange="window.saveBudgetItemReminderDate()">
+                            <input type="number" id="budgetItemReminderDate" min="1" max="28" value="1" class="w-14 text-sm font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-2 py-1 text-center outline-none" onchange="window.saveBudgetItemReminderDate()">
                             <span class="text-[10px] text-slate-500">לחודש</span>
                         </div>
                     </div>
@@ -1768,6 +1798,21 @@
                 <!-- Savings-only: current balance and annual yield -->
                 <div id="budgetItemSavingsSection" class="hidden space-y-2 bg-purple-50 border border-purple-100 rounded-xl p-3">
                     <p class="text-[10px] font-bold text-purple-600 uppercase tracking-wider">פרטי חיסכון</p>
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">עדכון יתרה</span>
+                        <div class="flex bg-white border border-purple-100 p-0.5 rounded-lg">
+                            <button type="button" id="budgetItemSavingsModeAutoBtn" onclick="window.setBudgetItemSavingsMode('auto')" class="px-2.5 py-1 text-[10px] font-bold rounded-md bg-purple-600 text-white shadow-sm">אוטומטי</button>
+                            <button type="button" id="budgetItemSavingsModeManualBtn" onclick="window.setBudgetItemSavingsMode('manual')" class="px-2.5 py-1 text-[10px] font-bold rounded-md text-slate-400">ידני</button>
+                        </div>
+                        <input type="hidden" id="budgetItemSavingsMode" value="auto">
+                    </div>
+                    <div id="budgetItemSavingsReminderDateWrap" class="hidden flex items-center justify-between gap-2 bg-white border border-purple-100 rounded-lg px-3 py-2">
+                        <span class="text-[10px] font-bold text-slate-500">תזכורת הפקדה ב-</span>
+                        <div class="flex items-center gap-1.5">
+                            <input type="number" id="budgetItemSavingsReminderDate" min="1" max="28" value="11" class="w-14 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-center outline-none" onchange="window.saveBudgetItemSavingsReminderDate()">
+                            <span class="text-[10px] text-slate-500">לחודש</span>
+                        </div>
+                    </div>
                     <div>
                         <div class="flex items-center justify-between mb-1 mr-1">
                             <label id="budgetItemSavingsBalanceLabel" class="block text-[10px] font-bold text-slate-400 uppercase">יתרה נוכחית בחיסכון</label>
@@ -1793,8 +1838,23 @@
                 <!-- Loan-only: current balance, rate, remaining months -->
                 <div id="budgetItemLoanSection" class="hidden space-y-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
                     <p class="text-[10px] font-bold text-slate-600 uppercase tracking-wider">פרטי הלוואה</p>
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">עדכון יתרה</span>
+                        <div class="flex bg-white border border-slate-200 p-0.5 rounded-lg">
+                            <button type="button" id="budgetItemLoanModeAutoBtn" onclick="window.setBudgetItemLoanMode('auto')" class="px-2.5 py-1 text-[10px] font-bold rounded-md bg-slate-700 text-white shadow-sm">אוטומטי</button>
+                            <button type="button" id="budgetItemLoanModeManualBtn" onclick="window.setBudgetItemLoanMode('manual')" class="px-2.5 py-1 text-[10px] font-bold rounded-md text-slate-400">ידני</button>
+                        </div>
+                        <input type="hidden" id="budgetItemLoanMode" value="auto">
+                    </div>
+                    <div id="budgetItemLoanReminderDateWrap" class="hidden flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2">
+                        <span class="text-[10px] font-bold text-slate-500">תזכורת החזר ב-</span>
+                        <div class="flex items-center gap-1.5">
+                            <input type="number" id="budgetItemLoanReminderDate" min="1" max="28" value="1" class="w-14 text-sm font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-center outline-none" onchange="window.saveBudgetItemLoanReminderDate()">
+                            <span class="text-[10px] text-slate-500">לחודש</span>
+                        </div>
+                    </div>
                     <div>
-                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">יתרת ההלוואה הנוכחית</label>
+                        <label id="budgetItemLoanBalanceLabel" class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">יתרה נוכחית של ההלוואה</label>
                         <div class="bg-white border border-slate-200 rounded-lg px-3 py-2 flex items-center gap-1">
                             <span class="text-slate-400 font-bold text-sm">₪</span>
                             <input type="text" inputmode="decimal" id="budgetItemLoanBalance" class="flex-1 bg-transparent border-none outline-none font-bold text-slate-800 text-sm" placeholder="0">
@@ -1808,7 +1868,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">חודשים שנותרו</label>
+                        <label id="budgetItemLoanMonthsLabel" class="block text-[10px] font-bold text-slate-400 uppercase mb-1 mr-1">חודשים שנותרו</label>
                         <input type="number" inputmode="numeric" id="budgetItemLoanMonths" min="0" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-800 text-sm outline-none" placeholder="0">
                     </div>
                 </div>
@@ -3254,7 +3314,7 @@
 
     function catsInBudget(budget) {
         const b = budget || state.budget || {};
-        return [...(b.annual || []), ...(b.fixed || []), ...(b.savings || []), ...(b.incomes || [])];
+        return [...(b.annual || []), ...(b.fixed || []), ...(b.savings || []), ...(b.loans || []), ...(b.incomes || [])];
     }
 
     // מוצא קטגוריה לפי tag בתקציב של התקופה — לא תמיד בתקציב הנוכחי
@@ -3989,10 +4049,14 @@
                 budget_amount: 0,
                 type: 'hist_annual'
             };
-            const inFixed = (state.budget.fixed || []).some(f => tagMatchesCat(key, f)) ||
-                (state.budget.savings || []).some(s => tagMatchesCat(key, s));
+            const inLoan = (state.budget.loans || []).some(l => tagMatchesCat(key, l));
+            const inSavings = (state.budget.savings || []).some(s => tagMatchesCat(key, s));
+            const inFixed = (state.budget.fixed || []).some(f => tagMatchesCat(key, f)) || inSavings || inLoan;
             if (inFixed) {
-                if ((state.budget.savings || []).some(s => tagMatchesCat(key, s))) {
+                if (inLoan) {
+                    item.type = 'hist_loan';
+                    cats.loans.push(item);
+                } else if (inSavings) {
                     item.type = 'hist_savings';
                     cats.savings.push(item);
                 } else {
@@ -4561,7 +4625,7 @@
                 const id = parts[1];
                 const field = parts[2];
                 if (!state.budget.loanMeta[id]) state.budget.loanMeta[id] = {};
-                state.budget.loanMeta[id][field] = field === 'last_update'
+                state.budget.loanMeta[id][field] = (field === 'last_update' || field === 'initial_date')
                     ? (r.parent_group || '')
                     : safeParseFloat(r.budget_amount);
             });
@@ -5234,11 +5298,18 @@
             window.closeAddExpenseModal();
             window.showToast(type === 'income' ? 'הכנסה נרשמה' : 'הוצאה נרשמה', 'check');
 
-            // If this expense is a savings deposit — update savings balance & dismiss reminder
-            const savingsItem = findSavingsByTag(category);
-            if (savingsItem && type === 'expense') {
-                await syncSavingsAfterDeposit(savingsItem, txDate);
-                if (state.currentView === 'budget') renderBudget();
+            // If this expense is a savings deposit / loan payment — update balance & dismiss reminder
+            if (type === 'expense') {
+                const savingsItem = findSavingsByTag(category);
+                if (savingsItem) {
+                    await syncSavingsAfterDeposit(savingsItem, txDate);
+                    if (state.currentView === 'budget') renderBudget();
+                }
+                const loanItem = findLoanByTag(category);
+                if (loanItem) {
+                    await syncLoanAfterPayment(loanItem, txDate);
+                    if (state.currentView === 'budget') renderBudget();
+                }
             }
 
             // רענון שקט ברקע (בלי לחסום UI) — לקבלת ID/סנכרון מלא
@@ -5340,9 +5411,15 @@
             localStorage.setItem('expense_history', JSON.stringify(state.transactions));
             render();
 
+            const syncDate = dateVal || new Date().toLocaleDateString('en-GB');
             const savingsItem = findSavingsByTag(category);
             if (savingsItem) {
-                await syncSavingsAfterDeposit(savingsItem, dateVal || new Date().toLocaleDateString('en-GB'));
+                await syncSavingsAfterDeposit(savingsItem, syncDate);
+                if (state.currentView === 'budget') renderBudget();
+            }
+            const loanItem = findLoanByTag(category);
+            if (loanItem) {
+                await syncLoanAfterPayment(loanItem, syncDate);
                 if (state.currentView === 'budget') renderBudget();
             }
             window.showToast('עודכן', 'check');
@@ -5427,6 +5504,15 @@
                     window.saveSavingsMetaToDB(savingsItem.id, updated).catch(e => console.error(e));
                     if (state.currentView === 'budget') renderBudget();
                 }
+                const loanItem = findLoanByTag(deletedTx.tag);
+                if (loanItem && isLoanReminderEnabled(loanItem)) {
+                    const meta = (state.budget.loanMeta || {})[loanItem.id] || {};
+                    const calc = calculatePaymentBasedLoanState(loanItem, meta);
+                    const updated = { ...meta, balance: calc.balance, months: calc.months };
+                    state.budget.loanMeta[loanItem.id] = updated;
+                    window.saveLoanMetaToDB(loanItem.id, updated).catch(e => console.error(e));
+                    if (state.currentView === 'budget') renderBudget();
+                }
             }
             render();
             window.showToast('נמחק', 'check');
@@ -5460,6 +5546,18 @@
             }
             recalculateBalanceAfterLocalTxChange();
             localStorage.setItem('expense_history', JSON.stringify(state.transactions));
+            const taggedTx = state.transactions.find(t => t.row === txId || t.id === txId);
+            const tagDate = taggedTx?.date || new Date().toLocaleDateString('en-GB');
+            const savingsItem = findSavingsByTag(categoryName);
+            if (savingsItem) {
+                await syncSavingsAfterDeposit(savingsItem, tagDate);
+                if (state.currentView === 'budget') renderBudget();
+            }
+            const loanItem = findLoanByTag(categoryName);
+            if (loanItem) {
+                await syncLoanAfterPayment(loanItem, tagDate);
+                if (state.currentView === 'budget') renderBudget();
+            }
             render();
             window.showToast('שויך', 'check');
         } catch (e) {
@@ -5475,13 +5573,15 @@
         setLoading(true, true);
         window.closeTagModal();
         try {
+            const txId = state.pendingActionRow.row;
+            const prevIdx = state.transactions.findIndex(t => t.row === txId || t.id === txId);
+            const prevTag = prevIdx >= 0 ? state.transactions[prevIdx].tag : null;
             const { error } = await sbClient
                 .from('transactions')
                 .update({ category: 'שוטף' })
                 .eq('id', state.pendingActionRow.row)
                 .eq('user_token', USER_TOKEN);
             if (error) throw error;
-            const txId = state.pendingActionRow.row;
             const idx = state.transactions.findIndex(t => t.row === txId || t.id === txId);
             if (idx >= 0) {
                 state.transactions[idx] = {
@@ -5491,6 +5591,25 @@
             }
             recalculateBalanceAfterLocalTxChange();
             localStorage.setItem('expense_history', JSON.stringify(state.transactions));
+            if (prevTag) {
+                const savingsItem = findSavingsByTag(prevTag);
+                if (savingsItem && isSavingsReminderEnabled(savingsItem)) {
+                    const meta = (state.budget.savingsMeta || {})[savingsItem.id] || {};
+                    const newBal = calculateDepositBasedSavingsBalance(savingsItem, meta);
+                    const updated = { ...meta, balance: newBal };
+                    state.budget.savingsMeta[savingsItem.id] = updated;
+                    window.saveSavingsMetaToDB(savingsItem.id, updated).catch(e => console.error(e));
+                }
+                const loanItem = findLoanByTag(prevTag);
+                if (loanItem && isLoanReminderEnabled(loanItem)) {
+                    const meta = (state.budget.loanMeta || {})[loanItem.id] || {};
+                    const calc = calculatePaymentBasedLoanState(loanItem, meta);
+                    const updated = { ...meta, balance: calc.balance, months: calc.months };
+                    state.budget.loanMeta[loanItem.id] = updated;
+                    window.saveLoanMetaToDB(loanItem.id, updated).catch(e => console.error(e));
+                }
+                if (state.currentView === 'budget') renderBudget();
+            }
             render();
             window.showToast('הוסר', 'check');
         } catch (e) {
@@ -5553,10 +5672,12 @@
         if (!nameInp || !nameInp.value.trim()) return;
 
         // Capture reminder settings before closing modal
-        const hasReminder = state.pendingAddType === 'savings' || state.pendingAddType === 'fixed';
         const isSavings = state.pendingAddType === 'savings';
         const isLoan = state.pendingAddType === 'loan';
-        const remEnabled = hasReminder && (document.getElementById('newCategoryReminderEnabled')?.checked || false);
+        const isFixed = state.pendingAddType === 'fixed';
+        const savingsManual = isSavings && (document.getElementById('newCategorySavingsMode')?.value === 'manual');
+        const savingsRemDate = parseInt(document.getElementById('newCategorySavingsReminderDate')?.value || '11');
+        const remEnabled = isFixed && (document.getElementById('newCategoryReminderEnabled')?.checked || false);
         const remDate = parseInt(document.getElementById('newCategoryReminderDate')?.value || '1');
         const newName = nameInp.value.trim();
 
@@ -5573,7 +5694,7 @@
                 last_update: currentMonth,
                 currency
             };
-            if (remEnabled) {
+            if (savingsManual) {
                 newSavingsMeta.initial_balance = bal;
                 newSavingsMeta.initial_date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
             }
@@ -5581,15 +5702,24 @@
 
         // Capture loan extra fields
         let newLoanMeta = null;
+        const loanManual = isLoan && (document.getElementById('newCategoryLoanMode')?.value === 'manual');
+        const loanRemDate = parseInt(document.getElementById('newCategoryLoanReminderDate')?.value || '1');
         if (isLoan) {
             const now = new Date();
             const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+            const bal = parseFloat((document.getElementById('newCategoryLoanBalance')?.value || '').replace(/,/g, '')) || 0;
+            const months = parseInt(document.getElementById('newCategoryLoanMonths')?.value || '0') || 0;
             newLoanMeta = {
-                balance: parseFloat((document.getElementById('newCategoryLoanBalance')?.value || '').replace(/,/g, '')) || 0,
+                balance: bal,
                 rate: parseFloat((document.getElementById('newCategoryLoanRate')?.value || '').replace(/,/g, '')) || 0,
-                months: parseInt(document.getElementById('newCategoryLoanMonths')?.value || '0') || 0,
+                months,
                 last_update: currentMonth
             };
+            if (loanManual) {
+                newLoanMeta.initial_balance = bal;
+                newLoanMeta.initial_months = months;
+                newLoanMeta.initial_date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+            }
         }
 
         setLoading(true, true);
@@ -5610,11 +5740,23 @@
             const newId = data?.id;
 
             // Save reminder settings to localStorage
-            if (isSavings || state.pendingAddType === 'fixed') {
+            if (isFixed) {
                 const remId = newId || newName;
-                const remKey = `budget_reminder_${state.pendingAddType}_${remId}`;
+                const remKey = `budget_reminder_fixed_${remId}`;
                 localStorage.setItem(remKey + '_enabled', remEnabled ? 'true' : 'false');
                 localStorage.setItem(remKey + '_date', remDate);
+            }
+            if (isSavings) {
+                const remId = newId || newName;
+                const remKey = `budget_reminder_savings_${remId}`;
+                localStorage.setItem(remKey + '_enabled', savingsManual ? 'true' : 'false');
+                localStorage.setItem(remKey + '_date', Math.max(1, Math.min(28, savingsRemDate || 11)));
+            }
+            if (isLoan) {
+                const remId = newId || newName;
+                const remKey = `budget_reminder_loan_${remId}`;
+                localStorage.setItem(remKey + '_enabled', loanManual ? 'true' : 'false');
+                localStorage.setItem(remKey + '_date', Math.max(1, Math.min(28, loanRemDate || 1)));
             }
 
             // Save savings meta to DB
@@ -5677,19 +5819,15 @@
         document.getElementById('budgetItemEditName').value = item.category_name;
         document.getElementById('budgetItemEditAmount').value = Math.round(formatDisplayAmount(safeParseFloat(item.budget_amount))).toLocaleString();
 
-        // Show reminder section for savings and fixed
+        // Show reminder section for fixed only (savings/loans use mode toggle inside details)
         const remSection = document.getElementById('budgetItemReminderSection');
         if (remSection) {
-            const hasReminder = baseType === 'savings' || baseType === 'fixed';
+            const hasReminder = baseType === 'fixed';
             remSection.classList.toggle('hidden', !hasReminder);
             const remLabel = document.getElementById('budgetItemReminderLabel');
-            if (remLabel) {
-                remLabel.textContent = baseType === 'savings'
-                    ? 'הפעל תזכורת (אם ההפקדה לא אוטומטית)'
-                    : 'הפעל תזכורת';
-            }
+            if (remLabel) remLabel.textContent = 'הפעל תזכורת';
             if (hasReminder) {
-                const remKey = `budget_reminder_${baseType}_${item.id || item.category_name}`;
+                const remKey = `budget_reminder_fixed_${item.id || item.category_name}`;
                 const remEnabled = localStorage.getItem(remKey + '_enabled') === 'true';
                 const remDate = parseInt(localStorage.getItem(remKey + '_date') || '1');
                 const chk = document.getElementById('budgetItemReminderEnabled');
@@ -5715,9 +5853,12 @@
                 const displayBal = remOn && meta.initial_balance != null ? meta.initial_balance : meta.balance;
                 if (balInp) balInp.value = displayBal ? Math.round(displayBal).toString() : '';
                 if (yldInp) yldInp.value = meta.yield ? meta.yield.toString() : '';
-                const balLabel = document.getElementById('budgetItemSavingsBalanceLabel') || savSection.querySelector('label');
-                if (balLabel) balLabel.textContent = remOn ? 'יתרה התחלתית בחיסכון' : 'יתרה נוכחית בחיסכון';
+                const remKey = `budget_reminder_savings_${id}`;
+                const remDate = parseInt(localStorage.getItem(remKey + '_date') || localStorage.getItem(`savings_reminder_${id}_date`) || '11');
+                const dateInp = document.getElementById('budgetItemSavingsReminderDate');
+                if (dateInp) dateInp.value = remDate;
                 window.setBudgetItemSavingsCurrency(meta.currency === 'USD' ? 'USD' : 'ILS');
+                window.setBudgetItemSavingsMode(remOn ? 'manual' : 'auto', { skipPersist: true });
             }
         }
 
@@ -5729,12 +5870,20 @@
             if (isLoan) {
                 const id = item.id || item.category_name;
                 const meta = (metaSource.loanMeta || {})[id] || {};
+                const remOn = isLoanReminderEnabled(item);
                 const balInp = document.getElementById('budgetItemLoanBalance');
                 const rateInp = document.getElementById('budgetItemLoanRate');
                 const monthsInp = document.getElementById('budgetItemLoanMonths');
-                if (balInp) balInp.value = meta.balance ? Math.round(meta.balance).toString() : '';
+                const displayBal = remOn && meta.initial_balance != null ? meta.initial_balance : meta.balance;
+                const displayMonths = remOn && meta.initial_months != null ? meta.initial_months : meta.months;
+                if (balInp) balInp.value = displayBal ? Math.round(displayBal).toString() : '';
                 if (rateInp) rateInp.value = meta.rate ? meta.rate.toString() : '';
-                if (monthsInp) monthsInp.value = meta.months ? meta.months.toString() : '';
+                if (monthsInp) monthsInp.value = displayMonths ? displayMonths.toString() : '';
+                const remKey = `budget_reminder_loan_${id}`;
+                const remDate = parseInt(localStorage.getItem(remKey + '_date') || '1');
+                const dateInp = document.getElementById('budgetItemLoanReminderDate');
+                if (dateInp) dateInp.value = remDate;
+                window.setBudgetItemLoanMode(remOn ? 'manual' : 'auto', { skipPersist: true });
             }
         }
 
@@ -5754,23 +5903,6 @@
         localStorage.setItem(remKey + '_enabled', enabled ? 'true' : 'false');
         if (enabled && !localStorage.getItem(remKey + '_date')) {
             localStorage.setItem(remKey + '_date', '1');
-        }
-        // When enabling reminder on savings — snapshot current balance as initial
-        if (enabled && baseType === 'savings' && item.id) {
-            const now = new Date();
-            const meta = { ...((state.budget.savingsMeta || {})[item.id] || {}) };
-            const balInp = document.getElementById('budgetItemSavingsBalance');
-            const balFromInput = balInp ? (parseFloat((balInp.value || '').replace(/,/g, '')) || 0) : null;
-            const bal = balFromInput != null ? balFromInput : (meta.balance || 0);
-            meta.balance = bal;
-            meta.initial_balance = bal;
-            meta.initial_date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-            meta.last_update = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-            if (!state.budget.savingsMeta) state.budget.savingsMeta = {};
-            state.budget.savingsMeta[item.id] = meta;
-            window.saveSavingsMetaToDB(item.id, meta).catch(e => console.error(e));
-            const balLabel = document.getElementById('budgetItemSavingsBalanceLabel');
-            if (balLabel) balLabel.textContent = 'יתרה התחלתית בחיסכון';
         }
         renderSavingsReminders();
     };
@@ -5849,6 +5981,19 @@
         return meta;
     }
 
+    /** After rename / edit: recompute payment-based loan balance using current tags, then drop internal flags. */
+    function finalizeLoanMetaForSave(item, meta, categoryName) {
+        if (!meta) return meta;
+        const forCalc = { ...item, category_name: categoryName || item.category_name };
+        if (meta._recalcPaymentBalance) {
+            const calc = calculatePaymentBasedLoanState(forCalc, meta);
+            meta.balance = calc.balance;
+            meta.months = calc.months;
+            delete meta._recalcPaymentBalance;
+        }
+        return meta;
+    }
+
     window.saveBudgetItemEdit = async function() {
         if (!sbClient || !state.pendingBudgetItem) return;
         const { dbName, item, itemId } = state.pendingBudgetItem;
@@ -5907,7 +6052,38 @@
             const newMonths = parseInt(monthsInp?.value || '0') || 0;
             const now = new Date();
             const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-            pendingLoanMeta = { balance: newBal, rate: newRate, months: newMonths, last_update: currentMonth };
+            const existing = (state.budget.loanMeta || {})[itemKey] || {};
+            const remOn = isLoanReminderEnabled(item);
+            if (remOn) {
+                const prevInitial = existing.initial_balance != null ? existing.initial_balance : (existing.balance || 0);
+                const prevInitialMonths = existing.initial_months != null ? existing.initial_months : (existing.months || 0);
+                const initialChanged = Math.round(newBal) !== Math.round(prevInitial || 0) || newMonths !== (prevInitialMonths || 0);
+                pendingLoanMeta = {
+                    ...existing,
+                    rate: newRate,
+                    last_update: currentMonth
+                };
+                if (initialChanged) {
+                    pendingLoanMeta.initial_balance = newBal;
+                    pendingLoanMeta.initial_months = newMonths;
+                    pendingLoanMeta.initial_date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+                } else {
+                    pendingLoanMeta.initial_balance = existing.initial_balance != null ? existing.initial_balance : newBal;
+                    pendingLoanMeta.initial_months = existing.initial_months != null ? existing.initial_months : newMonths;
+                    if (!pendingLoanMeta.initial_date) {
+                        pendingLoanMeta.initial_date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+                    }
+                }
+                pendingLoanMeta.balance = pendingLoanMeta.initial_balance;
+                pendingLoanMeta.months = pendingLoanMeta.initial_months;
+                pendingLoanMeta._recalcPaymentBalance = true;
+            } else {
+                pendingLoanMeta = { ...existing, balance: newBal, rate: newRate, months: newMonths, last_update: currentMonth };
+                delete pendingLoanMeta.initial_balance;
+                delete pendingLoanMeta.initial_months;
+                delete pendingLoanMeta.initial_date;
+                delete pendingLoanMeta._recalcPaymentBalance;
+            }
         }
 
         window.closeBudgetItemEditModal();
@@ -5967,6 +6143,7 @@
                         state.budget.savingsMeta[itemKey] = pendingSavingsMeta;
                     }
                     if (pendingLoanMeta && itemKey) {
+                        finalizeLoanMetaForSave(item, pendingLoanMeta, newName);
                         await window.saveLoanMetaToDB(itemKey, pendingLoanMeta);
                         if (!state.budget.loanMeta) state.budget.loanMeta = {};
                         state.budget.loanMeta[itemKey] = pendingLoanMeta;
@@ -5995,6 +6172,7 @@
                 state.budget.savingsMeta[itemKey] = pendingSavingsMeta;
             }
             if (pendingLoanMeta && itemKey) {
+                finalizeLoanMetaForSave(item, pendingLoanMeta, newName);
                 await window.saveLoanMetaToDB(itemKey, pendingLoanMeta);
                 if (!state.budget.loanMeta) state.budget.loanMeta = {};
                 state.budget.loanMeta[itemKey] = pendingLoanMeta;
@@ -6045,14 +6223,33 @@
         if (!sbClient || !USER_TOKEN) return;
         const now = new Date();
         const currentMonth = meta.last_update || `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        const initialDate = meta.initial_date || '';
         await sbClient.from('budget_settings').delete().eq('user_token', USER_TOKEN)
-            .in('category_name', [`__loan_meta__:${id}:balance`, `__loan_meta__:${id}:rate`, `__loan_meta__:${id}:months`, `__loan_meta__:${id}:last_update`]);
-        await sbClient.from('budget_settings').insert([
+            .in('category_name', [
+                `__loan_meta__:${id}:balance`,
+                `__loan_meta__:${id}:rate`,
+                `__loan_meta__:${id}:months`,
+                `__loan_meta__:${id}:last_update`,
+                `__loan_meta__:${id}:initial_balance`,
+                `__loan_meta__:${id}:initial_months`,
+                `__loan_meta__:${id}:initial_date`
+            ]);
+        const rows = [
             { category_name: `__loan_meta__:${id}:balance`, budget_amount: meta.balance || 0, type: 'system', user_token: USER_TOKEN },
             { category_name: `__loan_meta__:${id}:rate`, budget_amount: meta.rate || 0, type: 'system', user_token: USER_TOKEN },
             { category_name: `__loan_meta__:${id}:months`, budget_amount: meta.months || 0, type: 'system', user_token: USER_TOKEN },
             { category_name: `__loan_meta__:${id}:last_update`, budget_amount: 0, parent_group: currentMonth, type: 'system', user_token: USER_TOKEN }
-        ]);
+        ];
+        if (meta.initial_balance != null) {
+            rows.push({ category_name: `__loan_meta__:${id}:initial_balance`, budget_amount: meta.initial_balance || 0, type: 'system', user_token: USER_TOKEN });
+        }
+        if (meta.initial_months != null) {
+            rows.push({ category_name: `__loan_meta__:${id}:initial_months`, budget_amount: meta.initial_months || 0, type: 'system', user_token: USER_TOKEN });
+        }
+        if (initialDate) {
+            rows.push({ category_name: `__loan_meta__:${id}:initial_date`, budget_amount: 0, parent_group: initialDate, type: 'system', user_token: USER_TOKEN });
+        }
+        await sbClient.from('budget_settings').insert(rows);
     };
 
     async function loadLoanMetaFromDB(id) {
@@ -7502,6 +7699,7 @@
         } else if (filter === 'fixed') {
             catsShown.push(...(viewBudget.fixed || []).map(c => ({ ...c, $type: 'fixed' })));
             catsShown.push(...(viewBudget.savings || []).map(c => ({ ...c, $type: 'fixed', $isSavings: true })));
+            catsShown.push(...(viewBudget.loans || []).map(c => ({ ...c, $type: 'fixed', $isLoan: true })));
             catsShown.push(...(viewBudget.incomes || []).map(c => ({ ...c, $type: 'income', $isIncome: true })));
         } else if (filter === 'planned') {
             catsShown.push(...(viewBudget.annual || []).filter(c => safeParseFloat(c.budget_amount || 0) > 0 || viewBudget.synthetic).map(c => ({ ...c, $type: 'planned' })));
@@ -7553,12 +7751,16 @@
             } else {
                 const fixed = (vb.fixed || []).find(f => tagMatchesCat(tx.tag, f));
                 const savings = !fixed ? (vb.savings || []).find(s => tagMatchesCat(tx.tag, s)) : null;
-                const income = (!fixed && !savings) ? (vb.incomes || []).find(i => tagMatchesCat(tx.tag, i)) : null;
+                const loan = (!fixed && !savings) ? (vb.loans || []).find(l => tagMatchesCat(tx.tag, l)) : null;
+                const income = (!fixed && !savings && !loan) ? (vb.incomes || []).find(i => tagMatchesCat(tx.tag, i)) : null;
                 if (fixed && d >= monthStart && d <= monthEnd) {
                     const key = 'fixed:' + (fixed.id || fixed.category_name);
                     totals[key] = (totals[key] || 0) + amt;
                 } else if (savings && d >= monthStart && d <= monthEnd) {
                     const key = 'fixed:' + (savings.id || savings.category_name);
+                    totals[key] = (totals[key] || 0) + amt;
+                } else if (loan && d >= monthStart && d <= monthEnd) {
+                    const key = 'fixed:' + (loan.id || loan.category_name);
                     totals[key] = (totals[key] || 0) + amt;
                 } else if (income && d >= monthStart && d <= monthEnd) {
                     const key = 'income:' + (income.id || income.category_name);
@@ -9623,7 +9825,7 @@
                 if (state.activeCategoryFilter.startsWith('group:')) {
                     const groupName = state.activeCategoryFilter.slice(6);
                     const vb = getViewBudget();
-                    const allBudget = [...(vb.fixed || []), ...(vb.annual || []), ...(vb.savings || []), ...(vb.incomes || [])];
+                    const allBudget = [...(vb.fixed || []), ...(vb.annual || []), ...(vb.savings || []), ...(vb.loans || []), ...(vb.incomes || [])];
                     const catsInGroup = allBudget.filter(b => b.parent_group === groupName);
                     return catsInGroup.some(cat => tagMatchesCat(tx.tag, cat));
                 }
@@ -9631,7 +9833,7 @@
                 if (state.activeCategoryFilter.startsWith('budget:')) {
                     const catId = state.activeCategoryFilter.slice(7);
                     const vb = getViewBudget();
-                    const allBudget = [...(vb.fixed || []), ...(vb.annual || []), ...(vb.savings || []), ...(vb.incomes || [])];
+                    const allBudget = [...(vb.fixed || []), ...(vb.annual || []), ...(vb.savings || []), ...(vb.loans || []), ...(vb.incomes || [])];
                     const cat = allBudget.find(b => String(b.id || b.category_name) === catId);
                     return cat ? tagMatchesCat(tx.tag, cat) : false;
                 }
@@ -10054,6 +10256,7 @@
             if (cat) {
                 const isFixedOrIncome = (budgetForTag.fixed || []).some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name)
                     || (budgetForTag.savings || []).some(s => (s.id && s.id === cat.id) || s.category_name === cat.category_name)
+                    || (budgetForTag.loans || []).some(l => (l.id && l.id === cat.id) || l.category_name === cat.category_name)
                     || (budgetForTag.incomes || []).some(i => (i.id && i.id === cat.id) || i.category_name === cat.category_name);
                 displayName = isFixedOrIncome ? cat.category_name : (cat.parent_group ? cat.parent_group + ' : ' + cat.category_name : cat.category_name);
             } else {
@@ -10070,6 +10273,7 @@
                  const isFixedCat = !isIncomeCat && (
                     (budgetForTag.fixed || []).some(f => (f.id && f.id === cat.id) || f.category_name === cat.category_name)
                     || (budgetForTag.savings || []).some(s => (s.id && s.id === cat.id) || s.category_name === cat.category_name)
+                    || (budgetForTag.loans || []).some(l => (l.id && l.id === cat.id) || l.category_name === cat.category_name)
                  );
                  const categoryType = isIncomeCat ? 'income' : (isFixedCat ? 'fixed' : 'planned');
                  const key = categoryType + ':' + (cat.id || cat.category_name);
@@ -10082,7 +10286,7 @@
                      let listToSearch = categoryType === 'income'
                         ? (budgetForTag.incomes || [])
                         : (categoryType === 'fixed')
-                            ? [...(budgetForTag.fixed || []), ...(budgetForTag.savings || [])]
+                            ? [...(budgetForTag.fixed || []), ...(budgetForTag.savings || []), ...(budgetForTag.loans || [])]
                             : (budgetForTag.annual || []);
                      let fallbackIdx = listToSearch.findIndex(item => (item.id && item.id === cat.id) || item.category_name === cat.category_name);
                      if (fallbackIdx !== -1) {
@@ -10504,11 +10708,18 @@
             localStorage.getItem(legacyKey + '_enabled') === 'true';
     }
 
+    function isLoanReminderEnabled(item) {
+        if (!item) return false;
+        const id = item.id || item.category_name;
+        return localStorage.getItem(`budget_reminder_loan_${id}_enabled`) === 'true';
+    }
+
     function txIsFixedLike(tx) {
         if (!tx || !tx.tag) return false;
         const b = getBudgetForTx(tx);
         return (b.fixed || []).some(f => tagMatchesCat(tx.tag, f)) ||
             (b.savings || []).some(s => tagMatchesCat(tx.tag, s)) ||
+            (b.loans || []).some(l => tagMatchesCat(tx.tag, l)) ||
             (b.incomes || []).some(i => tagMatchesCat(tx.tag, i));
     }
 
@@ -10553,6 +10764,11 @@
             diff += planned - sumForCat(cat);
         });
         (vb.savings || []).forEach(cat => {
+            if (!hasActivity(cat)) return;
+            const planned = safeParseFloat(cat.budget_amount || 0);
+            diff += planned - sumForCat(cat);
+        });
+        (vb.loans || []).forEach(cat => {
             if (!hasActivity(cat)) return;
             const planned = safeParseFloat(cat.budget_amount || 0);
             diff += planned - sumForCat(cat);
@@ -10689,6 +10905,11 @@
     function findSavingsByTag(tag) {
         if (!tag) return null;
         return (state.budget.savings || []).find(s => tagMatchesCat(tag, s)) || null;
+    }
+
+    function findLoanByTag(tag) {
+        if (!tag) return null;
+        return (state.budget.loans || []).find(l => tagMatchesCat(tag, l)) || null;
     }
 
     // ---- USD/ILS rate for savings display ----
@@ -10903,6 +11124,82 @@
         renderSavingsReminders();
     }
 
+    /** Recalculate manual-mode loan: initial balance + interest over time − recorded payments. */
+    function calculatePaymentBasedLoanState(item, meta) {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const annualRate = meta.rate || 0;
+        let balance = (meta.initial_balance != null) ? meta.initial_balance : (meta.balance || 0);
+        let months = (meta.initial_months != null) ? meta.initial_months : (meta.months || 0);
+        let cursor = parseMetaDate(meta.initial_date);
+        if (!cursor) cursor = parseMetaDate(meta.last_update) || today;
+        cursor.setHours(0,0,0,0);
+
+        const payments = (state.transactions || [])
+            .filter(tx => {
+                if (tx.isAdjustment || !tx.tag || !tagMatchesCat(tx.tag, item)) return false;
+                const amt = safeParseFloat(tx.amount);
+                if (amt <= 0) return false;
+                const d = parseLocalDate(tx.date);
+                if (!d) return false;
+                d.setHours(0,0,0,0);
+                return d.getTime() > cursor.getTime();
+            })
+            .map(tx => {
+                const d = parseLocalDate(tx.date);
+                d.setHours(0,0,0,0);
+                return { amount: safeParseFloat(tx.amount), date: d };
+            })
+            .sort((a, b) => a.date - b.date);
+
+        payments.forEach(p => {
+            balance = growWithYield(balance, annualRate, cursor, p.date);
+            balance = Math.max(0, balance - p.amount);
+            months = Math.max(0, months - 1);
+            cursor = p.date;
+        });
+        balance = growWithYield(balance, annualRate, cursor, today);
+        return { balance: Math.round(balance), months: Math.max(0, Math.round(months)) };
+    }
+
+    /** After a loan payment expense is recorded for manual-mode loan, refresh balance & dismiss reminder. */
+    async function syncLoanAfterPayment(item, paymentDateStr) {
+        if (!item || !item.id || !isLoanReminderEnabled(item)) return;
+        const id = item.id;
+        const meta = { ...((state.budget.loanMeta || {})[id] || {}) };
+        const now = new Date();
+        if (meta.initial_balance == null) {
+            meta.initial_balance = meta.balance || 0;
+            meta.initial_months = meta.initial_months != null ? meta.initial_months : (meta.months || 0);
+            meta.initial_date = meta.initial_date || toISODateLocal(now);
+        }
+        const payDate = parseLocalDate(paymentDateStr) || now;
+        payDate.setHours(0,0,0,0);
+        let initialDate = parseMetaDate(meta.initial_date) || now;
+        initialDate.setHours(0,0,0,0);
+        if (payDate.getTime() <= initialDate.getTime()) {
+            const prev = new Date(payDate);
+            prev.setDate(prev.getDate() - 1);
+            meta.initial_date = toISODateLocal(prev);
+        }
+        const calc = calculatePaymentBasedLoanState(item, meta);
+        const updatedMeta = {
+            ...meta,
+            balance: calc.balance,
+            months: calc.months,
+            last_update: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
+        };
+        if (!state.budget.loanMeta) state.budget.loanMeta = {};
+        state.budget.loanMeta[id] = updatedMeta;
+        try {
+            await window.saveLoanMetaToDB(id, updatedMeta);
+        } catch (e) {
+            console.error('syncLoanAfterPayment error:', e);
+        }
+        const monthKey = `${now.getFullYear()}-${now.getMonth()+1}`;
+        localStorage.setItem(`budget_dismissed_loan_${id}_${monthKey}`, 'true');
+        renderSavingsReminders();
+    }
+
     window.autoUpdateSavingsAndLoans = function(b) {
         if (!b) return;
         const now = new Date();
@@ -10965,11 +11262,38 @@
             window.saveSavingsMetaToDB(id, updatedMeta).catch(e => console.error('savings meta save error:', e));
         });
 
-        // Auto-update loan balances (Shpitzer amortization)
+        // Auto-update loan balances (Shpitzer amortization) — or payment-based in manual mode
         (b.loans || []).forEach(item => {
             const id = item.id;
             if (!id) return;
             const meta = loanMeta[id] || {};
+            const reminderMode = isLoanReminderEnabled(item);
+
+            if (reminderMode) {
+                if (meta.initial_balance == null && meta.balance != null) {
+                    meta.initial_balance = meta.balance;
+                    meta.initial_months = meta.initial_months != null ? meta.initial_months : (meta.months || 0);
+                    if (!meta.initial_date) meta.initial_date = toISODateLocal(now);
+                }
+                const calc = calculatePaymentBasedLoanState(item, meta);
+                const updatedMeta = {
+                    ...meta,
+                    balance: calc.balance,
+                    months: calc.months,
+                    initial_balance: meta.initial_balance != null ? meta.initial_balance : (meta.balance || 0),
+                    initial_months: meta.initial_months != null ? meta.initial_months : (meta.months || 0),
+                    initial_date: meta.initial_date || toISODateLocal(now),
+                    last_update: currentMonth
+                };
+                const prevBal = Math.round(meta.balance || 0);
+                const prevMonths = Math.round(meta.months || 0);
+                state.budget.loanMeta[id] = updatedMeta;
+                if (prevBal !== calc.balance || prevMonths !== calc.months || !loanMeta[id]?.initial_date) {
+                    window.saveLoanMetaToDB(id, updatedMeta).catch(e => console.error('loan meta save error:', e));
+                }
+                return;
+            }
+
             const lastUpdate = meta.last_update || '';
             if (!lastUpdate || lastUpdate >= currentMonth) return; // already up to date
 
@@ -11100,6 +11424,7 @@
         const allRemindable = [
             ...(state.budget.savings || []).map(i => ({ ...i, _type: 'savings' })),
             ...(state.budget.fixed  || []).map(i => ({ ...i, _type: 'fixed' })),
+            ...(state.budget.loans  || []).map(i => ({ ...i, _type: 'loan' })),
         ];
 
         allRemindable.forEach(item => {
@@ -11120,17 +11445,18 @@
             if (dismissed) return;
 
             const isSav = item._type === 'savings';
-            const color = isSav ? 'purple' : 'red';
-            const icon = isSav ? 'fa-piggy-bank' : 'fa-circle-arrow-down';
-            const label = isSav ? 'תזכורת הפקדה' : 'תזכורת תשלום';
-            const btnText = isSav ? 'האם הפקדת?' : 'האם שילמת?';
+            const isLoan = item._type === 'loan';
+            const color = isSav ? 'purple' : (isLoan ? 'slate' : 'red');
+            const icon = isSav ? 'fa-piggy-bank' : (isLoan ? 'fa-hand-holding-dollar' : 'fa-circle-arrow-down');
+            const label = isSav ? 'תזכורת הפקדה' : (isLoan ? 'תזכורת החזר הלוואה' : 'תזכורת תשלום');
+            const btnText = isSav ? 'הפקד עכשיו' : (isLoan ? 'שלם עכשיו' : 'האם שילמת?');
             const amount = Math.round(formatDisplayAmount(safeParseFloat(item.budget_amount)));
 
             const banner = document.createElement('div');
             banner.style.cssText = `background:linear-gradient(135deg,var(--rem-bg1),var(--rem-bg2));border:1px solid var(--rem-border);border-radius:1rem;padding:0.875rem 1rem;margin-bottom:0.75rem;`;
-            banner.style.setProperty('--rem-bg1', isSav ? '#faf5ff' : '#fff1f2');
-            banner.style.setProperty('--rem-bg2', isSav ? '#f3e8ff' : '#ffe4e6');
-            banner.style.setProperty('--rem-border', isSav ? '#d8b4fe' : '#fecdd3');
+            banner.style.setProperty('--rem-bg1', isSav ? '#faf5ff' : (isLoan ? '#f8fafc' : '#fff1f2'));
+            banner.style.setProperty('--rem-bg2', isSav ? '#f3e8ff' : (isLoan ? '#f1f5f9' : '#ffe4e6'));
+            banner.style.setProperty('--rem-border', isSav ? '#d8b4fe' : (isLoan ? '#cbd5e1' : '#fecdd3'));
             banner.innerHTML = `
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
@@ -11140,7 +11466,7 @@
                             <p class="text-[10px] text-${color}-600 font-semibold">₪${amount.toLocaleString()} לחודש</p>
                         </div>
                     </div>
-                    <button onclick="window.dismissBudgetReminder('${item._type}','${(item.id || item.category_name).toString().replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="bg-${color}-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl">${isSav ? 'הפקד עכשיו' : btnText}</button>
+                    <button onclick="window.dismissBudgetReminder('${item._type}','${(item.id || item.category_name).toString().replace(/'/g,"\\'").replace(/"/g, "&quot;")}')" class="bg-${color}-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl">${btnText}</button>
                 </div>`;
             container.appendChild(banner);
         });
@@ -11180,6 +11506,13 @@
             const name = item?.category_name || itemId;
             // Open add-expense with fixed + savings category prefilled
             window.openAddExpenseModal('fixed', name, null, `הפקדה לחסכון ${name}`);
+            const amt = safeParseFloat(item?.budget_amount);
+            const amtInp = document.getElementById('amountInput');
+            if (amtInp && amt > 0) amtInp.value = Math.round(amt).toString();
+        } else if (type === 'loan') {
+            const item = (state.budget.loans || []).find(i => (i.id || i.category_name).toString() === itemId.toString());
+            const name = item?.category_name || itemId;
+            window.openAddExpenseModal('fixed', name, null, `החזר הלוואה ${name}`);
             const amt = safeParseFloat(item?.budget_amount);
             const amtInp = document.getElementById('amountInput');
             if (amtInp && amt > 0) amtInp.value = Math.round(amt).toString();
@@ -11862,6 +12195,7 @@
         const activeAnnuals = (pickerBudget.annual || []).filter(a => safeParseFloat(a.budget_amount) > 0 || pickerBudget.synthetic);
         const activeFixed   = (pickerBudget.fixed || []).filter(f => safeParseFloat(f.budget_amount) > 0 || pickerBudget.synthetic);
         const activeSavings = (pickerBudget.savings || []);
+        const activeLoans   = (pickerBudget.loans || []);
         const activeIncomes = (pickerBudget.incomes || []).filter(i => safeParseFloat(i.budget_amount) > 0 || pickerBudget.synthetic);
         const ongoingCats   = state.expenseCategories || [];
 
@@ -11882,7 +12216,7 @@
 
         let selectedLabel = 'ללא';
         if (config.currentTag) {
-            const cat = [...activeAnnuals, ...activeFixed, ...activeSavings, ...activeIncomes].find(c => c.category_name.trim() === config.currentTag.trim());
+            const cat = [...activeAnnuals, ...activeFixed, ...activeSavings, ...activeLoans, ...activeIncomes].find(c => c.category_name.trim() === config.currentTag.trim());
             if (cat) selectedLabel = (cat.parent_group ? `${cat.parent_group} › ${cat.category_name}` : cat.category_name);
         } else if (config.currentCatId) {
             const cat = ongoingCats.find(c => c.id === config.currentCatId);
@@ -11894,7 +12228,7 @@
         // but user says if no categories in current/planned - hide)
         let hasCats = false;
         if (type === 'current') hasCats = ongoingCats.length > 0;
-        else if (type === 'fixed') hasCats = activeFixed.length > 0 || activeSavings.length > 0 || activeIncomes.length > 0;
+        else if (type === 'fixed') hasCats = activeFixed.length > 0 || activeSavings.length > 0 || activeLoans.length > 0 || activeIncomes.length > 0;
         else if (type === 'planned') hasCats = activeAnnuals.length > 0;
 
         const container = picker.parentElement;
@@ -11972,8 +12306,12 @@
             activeSavings.forEach(cat => {
                 if (cat.parent_group) { (savingsGroups[cat.parent_group] = savingsGroups[cat.parent_group] || []).push(cat); } else savingsStandalone.push(cat);
             });
+            const loanGroups = {}; const loanStandalone = [];
+            activeLoans.forEach(cat => {
+                if (cat.parent_group) { (loanGroups[cat.parent_group] = loanGroups[cat.parent_group] || []).push(cat); } else loanStandalone.push(cat);
+            });
 
-            if (activeFixed.length === 0 && activeSavings.length === 0 && activeIncomes.length === 0) {
+            if (activeFixed.length === 0 && activeSavings.length === 0 && activeLoans.length === 0 && activeIncomes.length === 0) {
                 const p = document.createElement('p'); p.className = 'text-[10px] text-slate-400 text-center py-5';
                 p.textContent = 'אין קטגוריות קבועות'; expanded.appendChild(p);
             } else {
@@ -11983,6 +12321,7 @@
                     btn.className = `w-full flex items-center px-4 py-2.5 text-right transition-colors border-b border-slate-50 flex-shrink-0 ${isChild ? 'pr-7' : ''} ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'}`;
                     let badge = '';
                     if (badgeKind === 'savings') badge = `<span class="text-[9px] font-bold text-purple-500 mr-2">חיסכון</span>`;
+                    else if (badgeKind === 'loan') badge = `<span class="text-[9px] font-bold text-slate-500 mr-2">הלוואה</span>`;
                     else if (badgeKind === 'income') badge = `<span class="text-[9px] font-bold text-emerald-500 mr-2">הכנסה</span>`;
                     btn.innerHTML = `<span class="text-xs font-bold ${isSelected ? 'text-blue-700' : 'text-slate-700'}">${isSelected ? '✓ ' : ''}${cat.category_name}</span>${badge}`;
                     btn.onclick = () => {
@@ -12038,6 +12377,21 @@
                         cats.forEach(cat => expanded.appendChild(makeFixedItem(cat, true, 'savings')));
                     });
                     savingsStandalone.forEach(cat => expanded.appendChild(makeFixedItem(cat, false, 'savings')));
+                }
+
+                if (activeLoans.length > 0) {
+                    const loanHeader = document.createElement('div');
+                    loanHeader.className = 'px-4 py-1.5 text-[9px] font-bold text-slate-500 bg-slate-50/80 border-b border-slate-100 flex-shrink-0';
+                    loanHeader.textContent = 'הלוואות';
+                    expanded.appendChild(loanHeader);
+                    Object.entries(loanGroups).forEach(([parentName, cats]) => {
+                        const header = document.createElement('div');
+                        header.className = 'px-4 py-1.5 text-[9px] font-bold text-slate-400 bg-slate-50/40 border-b border-slate-50 flex-shrink-0 pr-7';
+                        header.textContent = parentName;
+                        expanded.appendChild(header);
+                        cats.forEach(cat => expanded.appendChild(makeFixedItem(cat, true, 'loan')));
+                    });
+                    loanStandalone.forEach(cat => expanded.appendChild(makeFixedItem(cat, false, 'loan')));
                 }
             }
         } else if (type === 'planned') {
@@ -12432,24 +12786,20 @@
         const amtLabel = document.getElementById('newCategoryAmountLabel');
         if (amtLabel) amtLabel.textContent = amtLabels[type] || 'סכום';
 
-        // Show/hide reminder section for savings and fixed
+        // Show/hide reminder section for fixed only
         const remSection = document.getElementById('newCategoryReminderSection');
         if (remSection) {
-            const hasReminder = type === 'savings' || type === 'fixed';
+            const hasReminder = type === 'fixed';
             remSection.classList.toggle('hidden', !hasReminder);
             const remLabel = document.getElementById('newCategoryReminderLabel');
-            if (remLabel) {
-                remLabel.textContent = type === 'savings'
-                    ? 'הפעל תזכורת (אם ההפקדה לא אוטומטית)'
-                    : 'הפעל תזכורת';
-            }
+            if (remLabel) remLabel.textContent = 'הפעל תזכורת';
             if (hasReminder) {
                 const chk = document.getElementById('newCategoryReminderEnabled');
                 if (chk) chk.checked = false;
                 const dateWrap = document.getElementById('newCategoryReminderDateWrap');
                 if (dateWrap) dateWrap.classList.add('hidden');
                 const dateInp = document.getElementById('newCategoryReminderDate');
-                if (dateInp) dateInp.value = type === 'savings' ? 11 : 1;
+                if (dateInp) dateInp.value = 1;
             }
         }
 
@@ -12462,9 +12812,10 @@
                 const y = document.getElementById('newCategorySavingsYield');
                 if (b) b.value = '';
                 if (y) y.value = '';
-                const balLabel = document.getElementById('newCategorySavingsBalanceLabel');
-                if (balLabel) balLabel.textContent = 'יתרה נוכחית בחיסכון';
+                const remDate = document.getElementById('newCategorySavingsReminderDate');
+                if (remDate) remDate.value = 11;
                 window.setNewCategorySavingsCurrency('ILS');
+                window.setNewCategorySavingsMode('auto');
             }
         }
 
@@ -12479,6 +12830,9 @@
                 if (b) b.value = '';
                 if (r) r.value = '';
                 if (m) m.value = '';
+                const remDate = document.getElementById('newCategoryLoanReminderDate');
+                if (remDate) remDate.value = 1;
+                window.setNewCategoryLoanMode('auto');
             }
         }
 
@@ -12495,12 +12849,146 @@
         const chk = document.getElementById('newCategoryReminderEnabled');
         const dateWrap = document.getElementById('newCategoryReminderDateWrap');
         if (dateWrap) dateWrap.classList.toggle('hidden', !chk?.checked);
-        if (state.pendingAddType === 'savings') {
-            const balLabel = document.getElementById('newCategorySavingsBalanceLabel');
-            if (balLabel) {
-                balLabel.textContent = chk?.checked ? 'יתרה התחלתית בחיסכון' : 'יתרה נוכחית בחיסכון';
-            }
+    };
+
+    function applySavingsModeUi(prefix, mode) {
+        const isManual = mode === 'manual';
+        const modeInp = document.getElementById(`${prefix}SavingsMode`);
+        if (modeInp) modeInp.value = isManual ? 'manual' : 'auto';
+        const autoBtn = document.getElementById(`${prefix}SavingsModeAutoBtn`);
+        const manualBtn = document.getElementById(`${prefix}SavingsModeManualBtn`);
+        if (autoBtn) {
+            autoBtn.className = `px-2.5 py-1 text-[10px] font-bold rounded-md ${isManual ? 'text-slate-400' : 'bg-purple-600 text-white shadow-sm'}`;
         }
+        if (manualBtn) {
+            manualBtn.className = `px-2.5 py-1 text-[10px] font-bold rounded-md ${isManual ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-400'}`;
+        }
+        const remWrap = document.getElementById(`${prefix}SavingsReminderDateWrap`);
+        if (remWrap) remWrap.classList.toggle('hidden', !isManual);
+        const balLabel = document.getElementById(`${prefix}SavingsBalanceLabel`);
+        if (balLabel) balLabel.textContent = isManual ? 'יתרה התחלתית בחיסכון' : 'יתרה נוכחית בחיסכון';
+    }
+
+    window.setNewCategorySavingsMode = function(mode) {
+        applySavingsModeUi('newCategory', mode === 'manual' ? 'manual' : 'auto');
+    };
+
+    window.setBudgetItemSavingsMode = function(mode, opts = {}) {
+        const item = state.pendingBudgetItem?.item;
+        const isManual = mode === 'manual';
+        applySavingsModeUi('budgetItem', isManual ? 'manual' : 'auto');
+        if (!item || opts.skipPersist) return;
+        const id = item.id || item.category_name;
+        const remKey = `budget_reminder_savings_${id}`;
+        localStorage.setItem(remKey + '_enabled', isManual ? 'true' : 'false');
+        // Keep legacy key in sync for older reminder lookups
+        localStorage.setItem(`savings_reminder_${id}_enabled`, isManual ? 'true' : 'false');
+        if (isManual && !localStorage.getItem(remKey + '_date')) {
+            localStorage.setItem(remKey + '_date', '11');
+        }
+        const balInp = document.getElementById('budgetItemSavingsBalance');
+        if (isManual && item.id) {
+            const now = new Date();
+            const meta = { ...((state.budget.savingsMeta || {})[item.id] || {}) };
+            const balFromInput = balInp ? (parseFloat((balInp.value || '').replace(/,/g, '')) || 0) : null;
+            const bal = balFromInput != null ? balFromInput : (meta.balance || 0);
+            meta.balance = bal;
+            meta.initial_balance = bal;
+            meta.initial_date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+            meta.last_update = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+            if (!state.budget.savingsMeta) state.budget.savingsMeta = {};
+            state.budget.savingsMeta[item.id] = meta;
+            window.saveSavingsMetaToDB(item.id, meta).catch(e => console.error(e));
+        } else if (!isManual && item.id) {
+            const meta = (state.budget.savingsMeta || {})[item.id] || {};
+            if (balInp) balInp.value = meta.balance ? Math.round(meta.balance).toString() : (balInp.value || '');
+        }
+        renderSavingsReminders();
+    };
+
+    window.saveBudgetItemSavingsReminderDate = function() {
+        const item = state.pendingBudgetItem?.item;
+        if (!item) return;
+        const dateInp = document.getElementById('budgetItemSavingsReminderDate');
+        const d = Math.max(1, Math.min(28, parseInt(dateInp?.value || '11')));
+        if (dateInp) dateInp.value = d;
+        const id = item.id || item.category_name;
+        localStorage.setItem(`budget_reminder_savings_${id}_date`, d);
+        localStorage.setItem(`savings_reminder_${id}_date`, d);
+        renderSavingsReminders();
+    };
+
+    function applyLoanModeUi(prefix, mode) {
+        const isManual = mode === 'manual';
+        const modeInp = document.getElementById(`${prefix}LoanMode`);
+        if (modeInp) modeInp.value = isManual ? 'manual' : 'auto';
+        const autoBtn = document.getElementById(`${prefix}LoanModeAutoBtn`);
+        const manualBtn = document.getElementById(`${prefix}LoanModeManualBtn`);
+        if (autoBtn) {
+            autoBtn.className = `px-2.5 py-1 text-[10px] font-bold rounded-md ${isManual ? 'text-slate-400' : 'bg-slate-700 text-white shadow-sm'}`;
+        }
+        if (manualBtn) {
+            manualBtn.className = `px-2.5 py-1 text-[10px] font-bold rounded-md ${isManual ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400'}`;
+        }
+        const remWrap = document.getElementById(`${prefix}LoanReminderDateWrap`);
+        if (remWrap) remWrap.classList.toggle('hidden', !isManual);
+        const balLabel = document.getElementById(`${prefix}LoanBalanceLabel`);
+        if (balLabel) balLabel.textContent = 'יתרה נוכחית של ההלוואה';
+        const monthsLabel = document.getElementById(`${prefix}LoanMonthsLabel`);
+        if (monthsLabel) monthsLabel.textContent = 'חודשים שנותרו';
+    }
+
+    window.setNewCategoryLoanMode = function(mode) {
+        applyLoanModeUi('newCategory', mode === 'manual' ? 'manual' : 'auto');
+    };
+
+    window.setBudgetItemLoanMode = function(mode, opts = {}) {
+        const item = state.pendingBudgetItem?.item;
+        const isManual = mode === 'manual';
+        applyLoanModeUi('budgetItem', isManual ? 'manual' : 'auto');
+        if (!item || opts.skipPersist) return;
+        const id = item.id || item.category_name;
+        const remKey = `budget_reminder_loan_${id}`;
+        localStorage.setItem(remKey + '_enabled', isManual ? 'true' : 'false');
+        if (isManual && !localStorage.getItem(remKey + '_date')) {
+            localStorage.setItem(remKey + '_date', '1');
+        }
+        const balInp = document.getElementById('budgetItemLoanBalance');
+        const monthsInp = document.getElementById('budgetItemLoanMonths');
+        if (isManual && item.id) {
+            const now = new Date();
+            const meta = { ...((state.budget.loanMeta || {})[item.id] || {}) };
+            const balFromInput = balInp ? (parseFloat((balInp.value || '').replace(/,/g, '')) || 0) : null;
+            const monthsFromInput = monthsInp ? (parseInt(monthsInp.value || '0') || 0) : null;
+            const bal = balFromInput != null ? balFromInput : (meta.balance || 0);
+            const months = monthsFromInput != null ? monthsFromInput : (meta.months || 0);
+            meta.balance = bal;
+            meta.months = months;
+            meta.initial_balance = bal;
+            meta.initial_months = months;
+            meta.initial_date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+            meta.last_update = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+            if (!state.budget.loanMeta) state.budget.loanMeta = {};
+            state.budget.loanMeta[item.id] = meta;
+            window.saveLoanMetaToDB(item.id, meta).catch(e => console.error(e));
+        } else if (!isManual && item.id) {
+            // Switching to auto: show current calculated remaining balance, not the initial snapshot
+            const meta = (state.budget.loanMeta || {})[item.id] || {};
+            if (balInp) balInp.value = meta.balance ? Math.round(meta.balance).toString() : (balInp.value || '');
+            if (monthsInp) monthsInp.value = meta.months ? meta.months.toString() : (monthsInp.value || '');
+        }
+        renderSavingsReminders();
+    };
+
+    window.saveBudgetItemLoanReminderDate = function() {
+        const item = state.pendingBudgetItem?.item;
+        if (!item) return;
+        const dateInp = document.getElementById('budgetItemLoanReminderDate');
+        const d = Math.max(1, Math.min(28, parseInt(dateInp?.value || '1')));
+        if (dateInp) dateInp.value = d;
+        const remKey = `budget_reminder_loan_${item.id || item.category_name}`;
+        localStorage.setItem(remKey + '_date', d);
+        renderSavingsReminders();
     };
 
     window.closeNewCategoryModal = () => { const o = document.getElementById('newCategoryOverlay'); if (o) { o.classList.remove('opacity-100'); setTimeout(() => o.classList.add('hidden'), 300); } };
@@ -13767,7 +14255,8 @@
         const vb = getViewBudget();
         const fixedItems = [
             ...((vb && vb.fixed) ? vb.fixed.filter(f => safeParseFloat(f.budget_amount) > 0) : []),
-            ...((vb && vb.savings) ? vb.savings : [])
+            ...((vb && vb.savings) ? vb.savings : []),
+            ...((vb && vb.loans) ? vb.loans : [])
         ];
         const card = document.getElementById('fixedCatStatsCard');
         if (!card) return;
@@ -13788,7 +14277,8 @@
         txs.forEach(tx => {
             if (tx.tag) {
                 const foundFixed = (vb.fixed || []).find(f => tagMatchesCat(tx.tag, f))
-                    || (vb.savings || []).find(s => tagMatchesCat(tx.tag, s));
+                    || (vb.savings || []).find(s => tagMatchesCat(tx.tag, s))
+                    || (vb.loans || []).find(l => tagMatchesCat(tx.tag, l));
                 if (foundFixed) {
                     const key = foundFixed.parent_group || foundFixed.category_name;
                     totals[key] = (totals[key] || 0) + safeParseFloat(tx.amount);
@@ -15971,6 +16461,8 @@
                 if (fixedItem) { prefillType = 'fixed'; prefillCatName = fixedItem.category_name; }
                 const savingsItem = (vb.savings || []).find(s => String(s.id) === catFilter.slice(7) || s.category_name === catFilter.slice(7));
                 if (savingsItem) { prefillType = 'fixed'; prefillCatName = savingsItem.category_name; }
+                const loanItem = (vb.loans || []).find(l => String(l.id) === catFilter.slice(7) || l.category_name === catFilter.slice(7));
+                if (loanItem) { prefillType = 'fixed'; prefillCatName = loanItem.category_name; }
             } else if (catFilter.startsWith('group:')) {
                 // expense category group — no specific sub-category to prefill
             } else {
